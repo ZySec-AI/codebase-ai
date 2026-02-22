@@ -1,0 +1,40 @@
+{
+  "name": "codebase",
+  "version": "0.1.0",
+  "description": "One command. Every AI tool understands your project instantly.",
+  "type": "module",
+  "bin": {
+    "codebase": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "codebase",
+    "ai",
+    "context",
+    "manifest",
+    "mcp",
+    "claude",
+    "cursor",
+    "copilot",
+    "developer-tools"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.codebase.json
+.codebase.cache.json
+*.tgz
+.DS_Store

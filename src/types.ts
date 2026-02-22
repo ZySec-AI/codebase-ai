@@ -1,0 +1,213 @@
+// ─── Core Interfaces ─────────────────────────────────────────────
+
+export interface ScanContext {
+  root: string;
+  files: string[];
+  readFile(path: string): Promise<string>;
+  fileExists(path: string): boolean;
+  glob(pattern: string): string[];
+  exec(cmd: string): Promise<string>;
+}
+
+export interface Detector {
+  name: string;
+  category: string;
+  detect(ctx: ScanContext): Promise<Record<string, unknown>>;
+}
+
+export interface Integration {
+  name: string;
+  detect(root: string): boolean;
+  inject(root: string): void;
+  remove(root: string): void;
+}
+
+// ─── Manifest Schema ─────────────────────────────────────────────
+
+export interface Manifest {
+  version: string;
+  generated_at: string;
+
+  // Project identity
+  project?: ProjectData;
+
+  // Code scanning (filesystem + git)
+  repo?: RepoData;
+  structure?: StructureData;
+  stack?: StackData;
+  commands?: CommandsData;
+  dependencies?: DependenciesData;
+  config?: ConfigData;
+  git?: GitData;
+  quality?: QualityData;
+  patterns?: PatternsData;
+
+  // Project awareness (GitHub via `gh` CLI)
+  status?: StatusData;
+  roadmap?: RoadmapData;
+  decisions?: DecisionsData;
+}
+
+export interface ProjectData {
+  name: string;
+  description: string | null;
+}
+
+export interface RepoData {
+  url: string | null;
+  default_branch: string | null;
+  is_monorepo: boolean;
+  workspace_manager?: string | null;
+  active_branches: string[];
+}
+
+export interface StructureData {
+  entry_points: string[];
+  build_output: string[];
+  tree: Record<string, string[]>;
+  workspaces?: Record<string, { framework?: string; entry?: string; type?: string }>;
+}
+
+export interface StackData {
+  languages: string[];
+  frameworks: string[];
+  package_manager: string | null;
+  database: string | null;
+  orm: string | null;
+  styling: string | null;
+  build_tool: string | null;
+}
+
+export interface CommandsData {
+  dev: string | null;
+  build: string | null;
+  test: string | null;
+  lint: string | null;
+  format: string | null;
+  [key: string]: string | null;
+}
+
+export interface DependenciesData {
+  direct_count: number;
+  dev_count: number;
+  lock_file: string | null;
+  notable: string[];
+}
+
+export interface ConfigData {
+  env_files: string[];
+  config_files: string[];
+  feature_flags: string | null;
+}
+
+export interface GitData {
+  recent_commits: string[];
+  last_committers: string[];
+  uncommitted_changes: boolean;
+}
+
+export interface QualityData {
+  test_framework: string | null;
+  linter: string | null;
+  formatter: string | null;
+  ci: string | null;
+  pre_commit_hooks: boolean;
+}
+
+export interface PatternsData {
+  architecture: string | null;
+  state_management: string | null;
+  api_style: string | null;
+  key_modules: Record<string, string>;
+}
+
+// ─── GitHub / Project Awareness ──────────────────────────────────
+
+export interface StatusData {
+  synced_at: string | null;
+  github_available: boolean;
+  issues: IssueData[];
+  pull_requests: PullRequestData[];
+  kanban: KanbanView;
+  priorities: IssueData[];
+}
+
+export interface IssueData {
+  number: number;
+  title: string;
+  state: "open" | "closed";
+  labels: string[];
+  assignee: string | null;
+  milestone: string | null;
+  created_at: string;
+  updated_at: string;
+  mapped_files?: string[];
+}
+
+export interface PullRequestData {
+  number: number;
+  title: string;
+  state: "open" | "closed" | "merged";
+  author: string;
+  branch: string;
+  labels: string[];
+  reviewers: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KanbanView {
+  backlog: IssueData[];
+  in_progress: IssueData[];
+  done: IssueData[];
+}
+
+export interface RoadmapData {
+  milestones: MilestoneData[];
+}
+
+export interface MilestoneData {
+  title: string;
+  description: string;
+  due_date: string | null;
+  progress: { open: number; closed: number; percent: number };
+  issues: IssueData[];
+}
+
+export interface DecisionsData {
+  from_prs: DecisionEntry[];
+  from_adrs: DecisionEntry[];
+  manual: DecisionEntry[];
+}
+
+export interface DecisionEntry {
+  title: string;
+  summary: string;
+  date: string;
+  source: string;
+  url?: string;
+}
+
+// ─── CLI Options ─────────────────────────────────────────────────
+
+export interface CLIOptions {
+  command: string;
+  subcommand: string;
+  positionals: string[];
+  path: string;
+  format: string;
+  depth: number;
+  categories: string[];
+  incremental: boolean;
+  quiet: boolean;
+  raw: boolean;
+  port: number;
+  tools: string[];
+  dryRun: boolean;
+  debounce: number;
+  watch: boolean;
+  since: string;
+  sync: boolean;
+  message: string;
+  reason: string;
+}

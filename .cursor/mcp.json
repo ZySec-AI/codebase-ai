@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "codebase": {
+      "command": "npx",
+      "args": [
+        "codebase",
+        "mcp"
+      ],
+      "cwd": "/Volumes/Workspace/code/dev-tools/codebase"
+    }
+  }
+}
