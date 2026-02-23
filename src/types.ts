@@ -99,6 +99,7 @@ export interface ConfigData {
   env_files: string[];
   config_files: string[];
   feature_flags: string | null;
+  env_vars?: Record<string, { description?: string; required: boolean }>;
 }
 
 export interface GitData {

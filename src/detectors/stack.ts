@@ -73,11 +73,29 @@ const FRAMEWORK_MAP: Record<string, string> = {
 };
 
 const DB_MARKERS: Record<string, string> = {
-  "pg": "postgresql", "postgres": "postgresql",
-  "mysql2": "mysql", "mysql": "mysql",
-  "better-sqlite3": "sqlite", "sqlite3": "sqlite",
-  "mongodb": "mongodb", "mongoose": "mongodb",
-  "redis": "redis", "ioredis": "redis",
+  "pg": "postgresql", "postgres": "postgresql", "pg-promise": "postgresql",
+  "mysql2": "mysql", "mysql": "mysql", "@mysql/xdevapi": "mysql",
+  "better-sqlite3": "sqlite", "sqlite3": "sqlite", "sql.js": "sqlite",
+  "mongodb": "mongodb", "mongoose": "mongodb", "mongoodb": "mongodb",
+  "redis": "redis", "ioredis": "redis", "@redis/client": "redis", "redis-mock": "redis",
+  "cassandra-driver": "cassandra", "express-cassandra": "cassandra",
+  "elasticsearch": "elasticsearch", "@elastic/elasticsearch": "elasticsearch",
+  "@elastic/elasticsearch-ng": "elasticsearch",
+  "neo4j-driver": "neo4j", "neo4j": "neo4j",
+  "couchbase": "couchbase", "ottoman": "couchbase",
+  "rethinkdb": "rethinkdb", "rethinkdbdash": "rethinkdb",
+  "level": "leveldb", "levelup": "leveldb",
+  "aws-sdk": "dynamodb", "@aws-sdk/client-dynamodb": "dynamodb",
+  "mssql": "mssql", "tedious": "mssql", "msnodesqlv8": "mssql",
+  "oracledb": "oracle", "node-oracledb": "oracle",
+  "pg-copy-streams": "postgresql",
+  "pg-pool": "postgresql", "pg-native": "postgresql",
+  " knex": "knex",
+  "minio": "minio",
+  "firebird": "firebird", "node-firebird": "firebird",
+  "hdb-pool": "sap-hana",
+  "snowflake-sdk": "snowflake",
+  "cassandra-client": "scylladb",
 };
 
 const ORM_MARKERS: Record<string, string> = {

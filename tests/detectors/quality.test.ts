@@ -743,6 +743,7 @@ describe("qualityDetector", () => {
 
       expect(result.test_framework).toBeNull();
       expect(result.linter).toBeNull();
+      // editorconfig is detected as a formatter
       expect(result.formatter).toBe("editorconfig");
       expect(result.ci).toBeNull();
       expect(result.pre_commit_hooks).toBe(false);

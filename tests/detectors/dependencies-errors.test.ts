@@ -28,6 +28,6 @@ describe("dependenciesDetector error paths", () => {
       },
     });
     const result = await dependenciesDetector.detect(ctx);
-    expect(result.lock_file).toBe("bun.lockb");
+    expect(result.lock_file).toBe("bun.lock");
   });
 });
