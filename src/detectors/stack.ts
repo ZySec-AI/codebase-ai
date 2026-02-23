@@ -154,6 +154,14 @@ export const stackDetector: Detector = {
       }
     }
 
+    // Enhanced database detection from files
+    const fileBasedDatabases = await detectDatabasesFromFiles(ctx);
+    for (const db of fileBasedDatabases) {
+      if (!databases.includes(db)) {
+        databases.push(db);
+      }
+    }
+
     // Multi-language framework detection
     const [pyFramework, goFramework, rustFramework, javaFramework, rubyFramework, phpFramework, csharpFramework] = await Promise.all([
       detectPythonFramework(ctx),
@@ -280,6 +288,211 @@ async function detectPrismaProvider(ctx: ScanContext): Promise<string | null> {
   if (provider === "mongodb") return "mongodb";
   if (provider === "cockroachdb") return "cockroachdb";
   return provider;
+}
+
+async function detectDatabasesFromFiles(ctx: ScanContext): Promise<string[]> {
+  const databases: string[] = [];
+
+  // Detect from migration files
+  const migrationDirs = [
+    "migrations/",
+    "prisma/migrations/",
+    "db/migrate/",
+    "database/migrations/",
+    "src/migrations/",
+    "server/migrations/",
+    "api/migrations/",
+    "migrate/",
+    "sql/",
+    "db/sql/",
+  ];
+
+  for (const dir of migrationDirs) {
+    if (ctx.files.some(f => f.startsWith(dir))) {
+      // Try to detect DB type from migration files
+      const dbType = await detectDBFromMigrations(ctx, dir);
+      if (dbType && !databases.includes(dbType)) {
+        databases.push(dbType);
+      }
+    }
+  }
+
+  // Detect from Docker Compose
+  const dockerDatabases = await detectDBFromDockerCompose(ctx);
+  for (const db of dockerDatabases) {
+    if (!databases.includes(db)) {
+      databases.push(db);
+    }
+  }
+
+  // Detect from ORM configs
+  const ormDatabases = await detectDBFromORMConfigs(ctx);
+  for (const db of ormDatabases) {
+    if (!databases.includes(db)) {
+      databases.push(db);
+    }
+  }
+
+  // Detect from SQL schema files
+  const schemaDatabases = await detectDBFromSchemas(ctx);
+  for (const db of schemaDatabases) {
+    if (!databases.includes(db)) {
+      databases.push(db);
+    }
+  }
+
+  return databases;
+}
+
+async function detectDBFromMigrations(ctx: ScanContext, dir: string): Promise<string | null> {
+  const files = ctx.files.filter(f => f.startsWith(dir));
+
+  for (const file of files) {
+    const content = await ctx.readFile(file);
+    if (!content) continue;
+
+    const lower = content.toLowerCase();
+    if (lower.includes("create table") || lower.includes("alter table")) {
+      if (lower.includes("postgresql") || lower.includes("serial") || lower.includes("bigserial")) return "postgresql";
+      if (lower.includes("mysql") || lower.includes("engine=innodb")) return "mysql";
+      if (lower.includes("sqlite")) return "sqlite";
+      if (lower.includes("mongodb") || lower.includes("mongoose")) return "mongodb";
+      if (lower.includes("redis")) return "redis";
+      if (lower.includes("elasticsearch")) return "elasticsearch";
+    }
+  }
+
+  return null;
+}
+
+async function detectDBFromDockerCompose(ctx: ScanContext): Promise<string[]> {
+  const found: string[] = [];
+  const composeFiles = [
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "docker-compose.dev.yml",
+    "docker-compose.prod.yml",
+    "compose.yml",
+    "compose.yaml",
+  ];
+
+  for (const file of composeFiles) {
+    if (!ctx.fileExists(file)) continue;
+
+    const content = await ctx.readFile(file);
+    if (!content) continue;
+
+    const lower = content.toLowerCase();
+
+    // Detect database services
+    if (lower.includes("postgres") || lower.includes("postgresql")) found.push("postgresql");
+    if (lower.includes("mysql")) found.push("mysql");
+    if (lower.includes("mariadb")) found.push("mariadb");
+    if (lower.includes("mongodb") || lower.includes("mongo")) found.push("mongodb");
+    if (lower.includes("redis")) found.push("redis");
+    if (lower.includes("elasticsearch")) found.push("elasticsearch");
+    if (lower.includes("cassandra")) found.push("cassandra");
+    if (lower.includes("couchdb")) found.push("couchdb");
+    if (lower.includes("neo4j")) found.push("neo4j");
+    if (lower.includes("rabbitmq")) found.push("rabbitmq");
+    if (lower.includes("dynamodb")) found.push("dynamodb");
+  }
+
+  return found;
+}
+
+async function detectDBFromORMConfigs(ctx: ScanContext): Promise<string[]> {
+  const found: string[] = [];
+
+  // TypeORM
+  const typeormConfig = await ctx.readFile("ormconfig.json") ||
+                         await ctx.readFile("ormconfig.js") ||
+                         await ctx.readFile("src/data-source.ts");
+  if (typeormConfig) {
+    const lower = typeormConfig.toLowerCase();
+    if (lower.includes("postgres") || lower.includes("pg")) found.push("postgresql");
+    if (lower.includes("mysql")) found.push("mysql");
+    if (lower.includes("sqlite")) found.push("sqlite");
+    if (lower.includes("mongodb")) found.push("mongodb");
+  }
+
+  // Sequelize config
+  const sequelizeFiles = [".sequelizerc", "config/database.js", "config/config.js"];
+  for (const file of sequelizeFiles) {
+    const content = await ctx.readFile(file);
+    if (content) {
+      const lower = content.toLowerCase();
+      if (lower.includes("postgres")) found.push("postgresql");
+      if (lower.includes("mysql")) found.push("mysql");
+      if (lower.includes("sqlite")) found.push("sqlite");
+      if (lower.includes("mariadb")) found.push("mariadb");
+    }
+  }
+
+  // MikroORM
+  const mikroOrmConfig = await ctx.readFile("mikro-orm.config.ts") ||
+                          await ctx.readFile("mikro-orm.config.js");
+  if (mikroOrmConfig) {
+    const lower = mikroOrmConfig.toLowerCase();
+    if (lower.includes("postgres")) found.push("postgresql");
+    if (lower.includes("mysql")) found.push("mysql");
+    if (lower.includes("sqlite")) found.push("sqlite");
+    if (lower.includes("mongodb")) found.push("mongodb");
+  }
+
+  // Drizzle config
+  const drizzleFiles = ["drizzle.config.ts", "drizzle.config.js", "drizzle.config.json"];
+  for (const file of drizzleFiles) {
+    const content = await ctx.readFile(file);
+    if (content) {
+      const lower = content.toLowerCase();
+      if (lower.includes("postgres") || lower.includes("pg")) found.push("postgresql");
+      if (lower.includes("mysql")) found.push("mysql");
+      if (lower.includes("sqlite")) found.push("sqlite");
+    }
+  }
+
+  return found;
+}
+
+async function detectDBFromSchemas(ctx: ScanContext): Promise<string[]> {
+  const found: string[] = [];
+
+  // Look for SQL schema files
+  const schemaFiles = ctx.files.filter(f =>
+    f.endsWith(".sql") ||
+    f.includes("schema") ||
+    f.includes("migrate") ||
+    f.includes("migration")
+  );
+
+  for (const file of schemaFiles) {
+    const content = await ctx.readFile(file);
+    if (!content) continue;
+
+    const lower = content.toLowerCase();
+
+    // PostgreSQL-specific patterns
+    if (lower.includes("serial") || lower.includes("bigserial") ||
+        lower.includes("text[]") || lower.includes("jsonb") ||
+        lower.includes("create extension") || lower.includes("pg_")) {
+      if (!found.includes("postgresql")) found.push("postgresql");
+    }
+
+    // MySQL-specific patterns
+    if (lower.includes("engine=innodb") || lower.includes("auto_increment") ||
+        lower.includes("tinyint") || lower.includes("mediumint") ||
+        lower.includes("enum(")) {
+      if (!found.includes("mysql")) found.push("mysql");
+    }
+
+    // SQLite-specific patterns
+    if (lower.includes("autoincrement") || lower.includes("integer primary key")) {
+      if (!found.includes("sqlite")) found.push("sqlite");
+    }
+  }
+
+  return found;
 }
 
 async function detectPythonFramework(ctx: ScanContext): Promise<string | null> {

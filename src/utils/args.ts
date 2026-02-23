@@ -12,6 +12,7 @@ const DEFAULTS: CLIOptions = {
   incremental: false,
   quiet: false,
   raw: false,
+  verbose: false,
   port: 7432,
   tools: [],
   dryRun: false,
@@ -21,6 +22,8 @@ const DEFAULTS: CLIOptions = {
   sync: false,
   message: "",
   reason: "",
+  examples: false,
+  helpCommand: false,
 };
 
 const COMMANDS = new Set([
@@ -33,11 +36,26 @@ export function parseArgs(argv: string[]): CLIOptions {
   const opts: CLIOptions = { ...DEFAULTS };
   const positionals: string[] = [];
 
+  // First pass: check for command to enable --help for specific commands
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (!arg.startsWith("-") && COMMANDS.has(arg)) {
+      opts.command = arg;
+      // Check if next arg is --help
+      if (argv[i + 1] === "--help" || argv[i + 1] === "-h") {
+        opts.helpCommand = true;
+        return opts;
+      }
+      break;
+    }
+  }
+
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
 
-    if (arg === "--help" || arg === "-h") {
-      printHelp();
+    // Global help (no command specified yet)
+    if ((arg === "--help" || arg === "-h") && !opts.command) {
+      printMainHelp();
       process.exit(0);
     }
 
@@ -51,10 +69,12 @@ export function parseArgs(argv: string[]): CLIOptions {
 
       if (key === "quiet" || key === "q") { opts.quiet = true; continue; }
       if (key === "raw") { opts.raw = true; continue; }
+      if (key === "verbose" || key === "V") { opts.verbose = true; continue; }
       if (key === "incremental") { opts.incremental = true; continue; }
       if (key === "dry-run") { opts.dryRun = true; continue; }
       if (key === "watch") { opts.watch = true; continue; }
       if (key === "sync") { opts.sync = true; continue; }
+      if (key === "examples") { opts.examples = true; continue; }
       if (key === "mine") { positionals.push("mine"); continue; }
 
       const next = argv[i + 1];
@@ -105,6 +125,11 @@ export function parseArgs(argv: string[]): CLIOptions {
   if (process.env.CODEBASE_QUIET === "true") opts.quiet = true;
 
   return opts;
+}
+
+export function showCommandHelp(commandName: string): void {
+  printCommandHelp(commandName);
+  process.exit(0);
 }
 
 function printHelp(): void {
