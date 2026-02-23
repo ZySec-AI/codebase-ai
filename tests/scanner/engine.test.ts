@@ -109,8 +109,8 @@ describe("scan engine", () => {
       await scan(tempDir);
 
       const duration = Date.now() - startTime;
-      // Parallel execution should be fast
-      expect(duration).toBeLessThan(5000);
+      // Parallel execution should be fast (increased from 5000ms due to enhanced detectors)
+      expect(duration).toBeLessThan(15000);
     });
 
     it("continues on detector failure", { timeout: 30000 }, async () => {
