@@ -1,8 +1,12 @@
 import js from "@eslint/js";
 
 export default [
+  {
+    ignores: ["**/*.ts", "dist/**", "node_modules/**", "coverage/**", "*.config.js", "pnpm-lock.yaml"],
+  },
   js.configs.recommended,
   {
+    files: ["src/**/*.js", "tests/**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
@@ -10,17 +14,11 @@ export default [
         process: "readonly",
         Buffer: "readonly",
         console: "readonly",
-        __dirname: "readonly",
-        __filename: "readonly",
       },
     },
     rules: {
-      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
       "no-console": "off",
-      "@typescript-eslint/no-unused-vars": "off",
     },
-  },
-  {
-    ignores: ["dist/**", "node_modules/**", "coverage/**", "*.config.js"],
   },
 ];

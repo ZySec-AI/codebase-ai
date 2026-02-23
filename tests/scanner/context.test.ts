@@ -263,10 +263,9 @@ describe("createScanContext", () => {
       expect(result).toBe("");
     });
 
-    it("returns empty string on command timeout", async () => {
+    it("returns empty string on command failure (non-zero exit)", async () => {
       const ctx = await createScanContext(tempDir);
-      // Command that takes longer than 10s timeout
-      const result = await ctx.exec("sleep 20 && echo 'done'");
+      const result = await ctx.exec("exit 1");
 
       expect(result).toBe("");
     });

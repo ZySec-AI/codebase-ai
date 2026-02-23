@@ -240,6 +240,7 @@ export interface CLIOptions {
   incremental: boolean;
   quiet: boolean;
   raw: boolean;
+  verbose: boolean;
   port: number;
   tools: string[];
   dryRun: boolean;
@@ -249,4 +250,6 @@ export interface CLIOptions {
   sync: boolean;
   message: string;
   reason: string;
+  examples: boolean;
+  helpCommand: boolean;
 }

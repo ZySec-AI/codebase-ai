@@ -235,6 +235,101 @@ function detectFrameworks(deps: Record<string, string>): string[] {
     }
   }
 
+  // Enhanced framework detection from files
+  const enhancedFrameworks = detectEnhancedFrameworks(deps);
+  frameworks.push(...enhancedFrameworks);
+
+  return [...new Set(frameworks)];
+}
+
+/**
+ * Enhanced framework detection with detailed information
+ */
+function detectEnhancedFrameworks(deps: Record<string, string>): string[] {
+  const frameworks: string[] = [];
+  const allDeps = Object.keys(deps).join(" ");
+
+  // Next.js detection (app router vs pages router)
+  if (allDeps.includes("next")) {
+    const version = deps["next"]?.replace(/^[\^~>=<]+/, "").split(".").slice(0, 2).join(".");
+    const details = [];
+
+    if (version) {
+      // Next.js 13+ has app router
+      if (parseFloat(version) >= 13) {
+        details.push("app-router available");
+      }
+      details.push(version);
+    }
+
+    frameworks.push(details.length > 0 ? `next.js@${details.join(" ")}` : "next.js");
+  }
+
+  // Vue detection (Vue 2 vs Vue 3)
+  if (allDeps.includes("vue")) {
+    const version = deps["vue"]?.replace(/^[\^~>=<]+/, "");
+    if (version) {
+      const majorVersion = parseInt(version.split(".")[0], 10);
+      frameworks.push(majorVersion >= 3 ? `vue@${version}` : `vue@${version}`);
+    } else {
+      frameworks.push("vue");
+    }
+
+    // Nuxt detection
+    if (allDeps.includes("nuxt")) {
+      const nuxtVersion = deps["nuxt"]?.replace(/^[\^~>=<]+/, "");
+      if (nuxtVersion) {
+        const majorVersion = parseInt(nuxtVersion.split(".")[0], 10);
+        frameworks.push(majorVersion >= 3 ? `nuxt@${nuxtVersion} (Nuxt 3)` : `nuxt@${nuxtVersion} (Nuxt 2)`);
+      } else {
+        frameworks.push("nuxt");
+      }
+    }
+  }
+
+  // SvelteKit detection
+  if (allDeps.includes("@sveltejs/kit")) {
+    const version = deps["@sveltejs/kit"]?.replace(/^[\^~>=<]+/, "");
+    frameworks.push(version ? `sveltekit@${version}` : "sveltekit");
+  }
+
+  // Astro detection
+  if (allDeps.includes("astro")) {
+    const version = deps["astro"]?.replace(/^[\^~>=<]+/, "");
+    const integrations: string[] = [];
+
+    // Detect Astro integrations
+    if (deps["@astrojs/react"]) integrations.push("react");
+    if (deps["@astrojs/vue"]) integrations.push("vue");
+    if (deps["@astrojs/svelte"]) integrations.push("svelte");
+    if (deps["@astrojs/preact"]) integrations.push("preact");
+    if (deps["@astrojs/solid-js"]) integrations.push("solid");
+
+    if (integrations.length > 0) {
+      frameworks.push(version ? `astro@${version} (${integrations.join(", ")})` : `astro (${integrations.join(", ")})`);
+    } else {
+      frameworks.push(version ? `astro@${version}` : "astro");
+    }
+  }
+
+  // Remix detection
+  if (allDeps.includes("@remix-run/react") || allDeps.includes("@remix-run/node")) {
+    const version = deps["@remix-run/react"]?.replace(/^[\^~>=<]+/, "") || deps["@remix-run/node"]?.replace(/^[\^~>=<]+/, "");
+    frameworks.push(version ? `remix@${version}` : "remix");
+  }
+
+  // Angular detection
+  if (allDeps.includes("@angular/core")) {
+    const version = deps["@angular/core"]?.replace(/^[\^~>=<]+/, "").split(".").slice(0, 2).join(".");
+    frameworks.push(version ? `angular@${version}` : "angular");
+  }
+
+  // Gatsby detection
+  if (allDeps.includes("gatsby")) {
+    const version = deps["gatsby"]?.replace(/^[\^~>=<]+/, "");
+    frameworks.push(version ? `gatsby@${version}` : "gatsby");
+  }
+
   return frameworks;
 }
 
@@ -501,9 +596,34 @@ async function detectPythonFramework(ctx: ScanContext): Promise<string | null> {
   const setup = await ctx.readFile("setup.py");
   const combined = pyproject + "\n" + requirements + "\n" + setup;
 
-  if (combined.includes("fastapi")) return "fastapi";
-  if (combined.includes("django")) return "django";
-  if (combined.includes("flask")) return "flask";
+  // Web frameworks
+  if (combined.includes("fastapi")) {
+    const version = extractVersion(requirements, "fastapi") || extractVersion(pyproject, "fastapi");
+    return version ? `fastapi@${version}` : "fastapi";
+  }
+  if (combined.includes("django")) {
+    const version = extractVersion(requirements, "django") || extractVersion(pyproject, "django");
+    const djangoDetails: string[] = [];
+    if (version) djangoDetails.push(version);
+
+    // Detect Django apps
+    const djangoApps = await detectDjangoApps(ctx);
+    if (djangoApps.length > 0) {
+      djangoDetails.push(`apps: ${djangoApps.join(", ")}`);
+    }
+
+    // Detect Django settings
+    const settingsModule = await detectDjangoSettings(ctx);
+    if (settingsModule) {
+      djangoDetails.push(settingsModule);
+    }
+
+    return djangoDetails.length > 0 ? `django@${djangoDetails.join(" ")}` : (version ? `django@${version}` : "django");
+  }
+  if (combined.includes("flask")) {
+    const version = extractVersion(requirements, "flask") || extractVersion(pyproject, "flask");
+    return version ? `flask@${version}` : "flask";
+  }
   if (combined.includes("starlette")) return "starlette";
   if (combined.includes("tornado")) return "tornado";
   if (combined.includes("aiohttp")) return "aiohttp";
@@ -513,6 +633,7 @@ async function detectPythonFramework(ctx: ScanContext): Promise<string | null> {
   if (combined.includes("cherrypy")) return "cherrypy";
   if (combined.includes("falcon")) return "falcon";
   if (combined.includes("masonite")) return "masonite";
+
   // ML frameworks
   if (combined.includes("torch") || combined.includes("pytorch")) return "pytorch";
   if (combined.includes("tensorflow")) return "tensorflow";
@@ -520,9 +641,66 @@ async function detectPythonFramework(ctx: ScanContext): Promise<string | null> {
   if (combined.includes("scikit-learn")) return "scikit-learn";
   if (combined.includes("pandas")) return "pandas";
   if (combined.includes("numpy")) return "numpy";
+
   // Task queues
   if (combined.includes("celery")) return "celery";
   if (combined.includes("rq")) return "rq";
+
+  return null;
+}
+
+/**
+ * Detect Django apps from settings.py or settings/
+ */
+async function detectDjangoApps(ctx: ScanContext): Promise<string[]> {
+  const apps: string[] = [];
+
+  // Try to find settings file
+  const settingsFiles = ctx.files.filter(f =>
+    f.includes("settings.py") ||
+    f.includes("settings/") ||
+    f.match(/settings.*\.py$/)
+  );
+
+  for (const file of settingsFiles.slice(0, 3)) { // Check at most 3 files
+    try {
+      const content = await ctx.readFile(file);
+      if (!content) continue;
+
+      // Find INSTALLED_APPS
+      const installedAppsMatch = content.match(/INSTALLED_APPS\s*=\s*\[([\s\S]*?)\]/);
+      if (installedAppsMatch) {
+        const appsContent = installedAppsMatch[1];
+        // Extract app names (simple extraction)
+        const appMatches = appsContent.match(/'([^']+)'/g) || appsContent.match(/"([^"]+)"/g) || [];
+        for (const app of appMatches) {
+          const appName = app.replace(/['"]/g, '');
+          // Filter out django apps and third-party apps
+          if (!appName.startsWith('django.') && appName.includes('.')) {
+            apps.push(appName.split('.')[0]);
+          }
+        }
+      }
+    } catch {
+      // Skip errors reading settings files
+    }
+  }
+
+  return [...new Set(apps)].slice(0, 5); // Return up to 5 apps
+}
+
+/**
+ * Detect Django settings module
+ */
+async function detectDjangoSettings(ctx: ScanContext): Promise<string | null> {
+  const hasSettingsPy = ctx.files.some(f => f.endsWith("settings.py"));
+  const hasSettingsDir = ctx.files.some(f => f.includes("settings/") && f.endsWith(".py"));
+  const hasDevSettings = ctx.files.some(f => f.includes("settings_dev.py") || f.includes("settings.dev"));
+
+  if (hasDevSettings) return "settings:dev";
+  if (hasSettingsDir) return "settings:dir";
+  if (hasSettingsPy) return "settings:py";
+
   return null;
 }
 
@@ -530,37 +708,71 @@ async function detectGoFramework(ctx: ScanContext): Promise<string | null> {
   const gomod = await ctx.readFile("go.mod");
   if (!gomod) return null;
 
-  if (gomod.includes("github.com/gin-gonic/gin")) return "gin";
-  if (gomod.includes("github.com/gofiber/fiber")) return "fiber";
-  if (gomod.includes("github.com/labstack/echo")) return "echo";
-  if (gomod.includes("github.com/gorilla/mux")) return "gorilla";
-  if (gomod.includes("github.com/gorilla/schema")) return "gorilla";
-  if (gomod.includes("net/http")) return "net/http (std)";
-  if (gomod.includes("go-chi/chi")) return "chi";
-  if (gomod.includes("go-chi/chi/v5")) return "chi";
-  if (gomod.includes("github.com/go-chi/chi")) return "chi";
-  if (gomod.includes("github.com/bxcodec/faker")) return "faker";
-  if (gomod.includes("github.com/stretchr/testify")) return "testify";
-  if (gomod.includes("grpc")) return "grpc";
-  return null;
+  const versions: string[] = [];
+
+  if (gomod.includes("github.com/gin-gonic/gin")) {
+    const version = extractGoVersion(gomod, "github.com/gin-gonic/gin");
+    versions.push(version ? `gin@${version}` : "gin");
+  }
+  if (gomod.includes("github.com/gofiber/fiber")) {
+    const version = extractGoVersion(gomod, "github.com/gofiber/fiber");
+    versions.push(version ? `fiber@${version}` : "fiber");
+  }
+  if (gomod.includes("github.com/labstack/echo")) {
+    const version = extractGoVersion(gomod, "github.com/labstack/echo");
+    versions.push(version ? `echo@${version}` : "echo");
+  }
+  if (gomod.includes("github.com/gorilla/mux")) {
+    const version = extractGoVersion(gomod, "github.com/gorilla/mux");
+    versions.push(version ? `gorilla/mux@${version}` : "gorilla/mux");
+  }
+  if (gomod.includes("go-chi/chi")) {
+    const version = extractGoVersion(gomod, "go-chi/chi");
+    versions.push(version ? `chi@${version}` : "chi");
+  }
+  if (gomod.includes("grpc")) {
+    versions.push("grpc");
+  }
+  if (gomod.includes("net/http")) {
+    versions.push("net/http (std)");
+  }
+
+  return versions.length > 0 ? versions.join(", ") : null;
 }
 
 async function detectRustFramework(ctx: ScanContext): Promise<string | null> {
   const cargo = await ctx.readFile("Cargo.toml");
   if (!cargo) return null;
 
-  if (cargo.includes("actix-web")) return "actix-web";
-  if (cargo.includes("axum")) return "axum";
-  if (cargo.includes("rocket")) return "rocket";
-  if (cargo.includes("warp")) return "warp";
-  if (cargo.includes("tokio")) return "tokio";
-  if (cargo.includes("serde")) return "serde";
-  if (cargo.includes("hyper")) return "hyper";
-  if (cargo.includes("tonic")) return "tonic (grpc)";
-  if (cargo.includes("clap")) return "clap";
-  if (cargo.includes("anyhow")) return "anyhow";
-  if (cargo.includes("thiserror")) return "thiserror";
-  return null;
+  const versions: string[] = [];
+
+  if (cargo.includes("actix-web")) {
+    const version = extractCargoVersion(cargo, "actix-web");
+    versions.push(version ? `actix-web@${version}` : "actix-web");
+  }
+  if (cargo.includes("axum")) {
+    const version = extractCargoVersion(cargo, "axum");
+    versions.push(version ? `axum@${version}` : "axum");
+  }
+  if (cargo.includes("rocket")) {
+    const version = extractCargoVersion(cargo, "rocket");
+    versions.push(version ? `rocket@${version}` : "rocket");
+  }
+  if (cargo.includes("warp")) {
+    versions.push("warp");
+  }
+  if (cargo.includes("tokio")) {
+    const version = extractCargoVersion(cargo, "tokio");
+    versions.push(version ? `tokio@${version}` : "tokio");
+  }
+  if (cargo.includes("hyper")) {
+    versions.push("hyper");
+  }
+  if (cargo.includes("tonic")) {
+    versions.push("tonic (grpc)");
+  }
+
+  return versions.length > 0 ? versions.join(", ") : null;
 }
 
 async function detectJavaFramework(ctx: ScanContext): Promise<string | null> {
@@ -569,15 +781,35 @@ async function detectJavaFramework(ctx: ScanContext): Promise<string | null> {
   const buildGradleKts = await ctx.readFile("build.gradle.kts");
   const combined = pom + "\n" + buildGradle + "\n" + buildGradleKts;
 
-  if (combined.includes("spring-boot")) return "spring boot";
-  if (combined.includes("spring-framework")) return "spring";
-  if (combined.includes("spring")) return "spring";
-  if (combined.includes("micronaut")) return "micronaut";
-  if (combined.includes("quarkus")) return "quarkus";
-  if (combined.includes("jakarta")) return "jakarta ee";
-  if (combined.includes("javax")) return "java ee";
-  if (combined.includes("vertx")) return "vert.x";
-  if (combined.includes("kafka")) return "kafka";
+  if (combined.includes("spring-boot")) {
+    const version = extractFromXml(pom, "spring-boot-starter-parent") || extractFromGradle(buildGradle, "org.springframework.boot");
+    return version ? `spring boot@${version}` : "spring boot";
+  }
+  if (combined.includes("spring-framework") || combined.includes("spring-core")) {
+    const version = extractFromXml(pom, "spring-framework") || extractFromGradle(buildGradle, "org.springframework");
+    return version ? `spring@${version}` : "spring";
+  }
+  if (combined.includes("micronaut")) {
+    const version = extractFromXml(pom, "micronaut") || extractFromGradle(buildGradle, "io.micronaut");
+    return version ? `micronaut@${version}` : "micronaut";
+  }
+  if (combined.includes("quarkus")) {
+    const version = extractFromXml(pom, "quarkus") || extractFromGradle(buildGradle, "io.quarkus");
+    return version ? `quarkus@${version}` : "quarkus";
+  }
+  if (combined.includes("jakarta")) {
+    return "jakarta ee";
+  }
+  if (combined.includes("javax")) {
+    return "java ee";
+  }
+  if (combined.includes("vertx")) {
+    return "vert.x";
+  }
+  if (combined.includes("kafka")) {
+    return "kafka";
+  }
+
   return null;
 }
 
@@ -586,44 +818,225 @@ async function detectRubyFramework(ctx: ScanContext): Promise<string | null> {
   const gemspec = await ctx.readFile(".gemspec");
   const combined = gemfile + "\n" + gemspec;
 
-  if (combined.includes("rails")) return "rails";
-  if (combined.includes("sinatra")) return "sinatra";
-  if (combined.includes("grape")) return "grape";
-  if (combined.includes("hanami")) return "hanami";
-  if (combined.includes("roda")) return "roda";
-  if (combined.includes("padrino")) return "padrino";
-  if (combined.includes("sidekiq")) return "sidekiq";
-  if (combined.includes("resque")) return "resque";
-  if (combined.includes("puma")) return "puma";
-  if (combined.includes("unicorn")) return "unicorn";
+  if (combined.includes("rails")) {
+    const version = extractGemVersion(combined, "rails");
+    const details: string[] = [];
+    if (version) details.push(version);
+
+    // Detect Rails middleware stack
+    const middlewareStack = await detectRailsMiddleware(ctx);
+    if (middlewareStack.length > 0) {
+      details.push(middlewareStack.join(", "));
+    }
+
+    return details.length > 0 ? `rails@${details.join(" ")}` : `rails@${version || "unknown"}`;
+  }
+  if (combined.includes("sinatra")) {
+    const version = extractGemVersion(combined, "sinatra");
+    return version ? `sinatra@${version}` : "sinatra";
+  }
+  if (combined.includes("grape")) {
+    return "grape";
+  }
+  if (combined.includes("hanami")) {
+    return "hanami";
+  }
+  if (combined.includes("roda")) {
+    return "roda";
+  }
+  if (combined.includes("padrino")) {
+    return "padrino";
+  }
+  if (combined.includes("sidekiq")) {
+    return "sidekiq";
+  }
+  if (combined.includes("resque")) {
+    return "resque";
+  }
+  if (combined.includes("puma")) {
+    return "puma";
+  }
+  if (combined.includes("unicorn")) {
+    return "unicorn";
+  }
+
   return null;
+}
+
+/**
+ * Detect Rails middleware stack from config/application.rb or config/environment files
+ */
+async function detectRailsMiddleware(ctx: ScanContext): Promise<string[]> {
+  const middleware: string[] = [];
+
+  // Check for common Rails gems
+  const gemfile = await ctx.readFile("Gemfile");
+  if (gemfile) {
+    if (gemfile.includes("devise")) middleware.push("devise");
+    if (gemfile.includes("pundit")) middleware.push("pundit");
+    if (gemfile.includes("cancancan")) middleware.push("cancancan");
+    if (gemfile.includes("rspec-rails")) middleware.push("rspec");
+    if (gemfile.includes("minitest")) middleware.push("minitest");
+    if (gemfile.includes("factory_bot_rails")) middleware.push("factory_bot");
+    if (gemfile.includes("faker")) middleware.push("faker");
+    if (gemfile.includes("sidekiq")) middleware.push("sidekiq");
+    if (gemfile.includes("redis") || gemfile.includes("redis-rails")) middleware.push("redis");
+    if (gemfile.includes("pg")) middleware.push("postgresql");
+    if (gemfile.includes("mysql2")) middleware.push("mysql");
+    if (gemfile.includes("sqlite3")) middleware.push("sqlite");
+    if (gemfile.includes("aws-sdk")) middleware.push("aws");
+    if (gemfile.includes("bootstrap")) middleware.push("bootstrap");
+    if (gemfile.includes("tailwindcss-rails")) middleware.push("tailwind");
+  }
+
+  return middleware.slice(0, 5); // Return up to 5 middleware components
 }
 
 async function detectPhpFramework(ctx: ScanContext): Promise<string | null> {
   const composer = await ctx.readFile("composer.json");
   if (!composer) return null;
 
-  if (composer.includes("laravel")) return "laravel";
-  if (composer.includes("symfony")) return "symfony";
-  if (composer.includes("slim")) return "slim";
-  if (composer.includes("codeigniter")) return "codeigniter";
-  if (composer.includes("cakephp")) return "cakephp";
-  if (composer.includes("yii")) return "yii";
-  if (composer.includes("lumen")) return "lumen";
-  if (composer.includes("phpunit")) return "phpunit";
+  try {
+    const pkg = JSON.parse(composer);
+    const deps = { ...(pkg.require || {}), ...(pkg["require-dev"] || {}) };
+    const combined = Object.keys(deps).join(" ");
+
+    if (combined.includes("laravel")) {
+      const version = deps["laravel/framework"] || deps["laravel/lumen"];
+      return version ? `laravel@${version.replace(/^[\^~>=<]+/, "")}` : "laravel";
+    }
+    if (combined.includes("symfony")) {
+      const version = deps["symfony/framework-bundle"];
+      return version ? `symfony@${version.replace(/^[\^~>=<]+/, "")}` : "symfony";
+    }
+    if (combined.includes("slim")) {
+      const version = deps["slim/slim"];
+      return version ? `slim@${version.replace(/^[\^~>=<]+/, "")}` : "slim";
+    }
+    if (combined.includes("codeigniter")) {
+      return "codeigniter";
+    }
+    if (combined.includes("cakephp")) {
+      return "cakephp";
+    }
+    if (combined.includes("yii")) {
+      const version = deps["yiisoft/yii2"];
+      return version ? `yii@${version.replace(/^[\^~>=<]+/, "")}` : "yii";
+    }
+    if (combined.includes("lumen")) {
+      return "lumen";
+    }
+
+  } catch {}
+
   return null;
 }
 
 async function detectCSharpFramework(ctx: ScanContext): Promise<string | null> {
-  const csproj = await ctx.readFile(".csproj");
-  const sln = await ctx.readFile(".sln");
-  const combined = csproj + "\n" + sln;
+  const csprojFiles = ctx.files.filter(f => f.endsWith(".csproj"));
+  if (csprojFiles.length === 0) return null;
 
-  if (combined.includes("Microsoft.AspNetCore")) return "asp.net core";
-  if (combined.includes("Microsoft.NET.Sdk.Web")) return "asp.net core";
-  if (combined.includes("EntityFramework")) return "entity framework";
-  if (combined.includes("NUnit")) return "nunit";
-  if (combined.includes("xUnit")) return "xunit";
-  if (combined.includes("Moq")) return "moq";
+  const frameworks: string[] = [];
+
+  for (const file of csprojFiles) {
+    const content = await ctx.readFile(file);
+
+    if (content.includes("Microsoft.AspNetCore")) {
+      const version = extractCsprojVersion(content, "Microsoft.AspNetCore.App");
+      frameworks.push(version ? `asp.net core@${version}` : "asp.net core");
+    }
+    if (content.includes("EntityFramework")) {
+      frameworks.push("entity framework");
+    }
+    if (content.includes("NUnit")) {
+      frameworks.push("nunit");
+    }
+    if (content.includes("xUnit")) {
+      frameworks.push("xunit");
+    }
+    if (content.includes("Moq")) {
+      frameworks.push("moq");
+    }
+  }
+
+  return frameworks.length > 0 ? frameworks.join(", ") : null;
+}
+
+// Helper functions for version extraction
+
+function extractVersion(content: string, packageName: string): string | null {
+  if (!content) return null;
+
+  // Match patterns like "package==1.2.3", "package>=1.2.3", "package@1.2.3"
+  const patterns = [
+    new RegExp(`${packageName}===?\\s*([\\d.]+)`), // === or ==
+    new RegExp(`${packageName}>=?\\s*([\\d.]+)`), // >= or >
+    new RegExp(`${packageName}~=?\\s*([\\d.]+)`), // ~= or ~
+    new RegExp(`${packageName}@([\\d.]+)`), // @
+    new RegExp(`"${packageName}":\\s*"([\\d.]+)"`), // JSON format
+    new RegExp(`'${packageName}':\\s*'([\\d.]+)'`), // JSON single quotes
+  ];
+
+  for (const pattern of patterns) {
+    const match = content.match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+
   return null;
+}
+
+function extractGoVersion(content: string, packageName: string): string | null {
+  // Go modules format: package version v1.2.3
+  const pattern = new RegExp(`${packageName}\\s+v([\\d.]+)`);
+  const match = content.match(pattern);
+  return match ? match[1] : null;
+}
+
+function extractCargoVersion(content: string, packageName: string): string | null {
+  // Cargo.toml format: package = "1.2.3"
+  const pattern = new RegExp(`${packageName}\\s*=\\s*"([\\d.]+)"`);
+  const match = content.match(pattern);
+  return match ? match[1] : null;
+}
+
+function extractFromXml(content: string, artifactId: string): string | null {
+  if (!content) return null;
+
+  // Match <version>1.2.3</version> within a dependency with matching artifactId
+  const pattern = new RegExp(`<artifactId>${artifactId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</artifactId>[\\s\\S]*?<version>([\\d.]+)</version>`);
+  const match = content.match(pattern);
+  return match ? match[1] : null;
+}
+
+function extractFromGradle(content: string, group: string): string | null {
+  if (!content) return null;
+
+  // Match version: "group:version:1.2.3" or group/version patterns
+  const patterns = [
+    new RegExp(`${group.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:[^:]*:([\\d.]+)`),
+    new RegExp(`${group.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:([\\d.]+)`),
+  ];
+
+  for (const pattern of patterns) {
+    const match = content.match(pattern);
+    if (match) return match[1];
+  }
+
+  return null;
+}
+
+function extractGemVersion(content: string, gemName: string): string | null {
+  // Rubygems format: gem "package", "1.2.3" or gem "package", "~> 1.2.3"
+  const pattern = new RegExp(`gem\\s+['"]${gemName}['"][^,]*,\\s*['"]~?>?\\s*([\\d.]+)['"]`);
+  const match = content.match(pattern);
+  return match ? match[1] : null;
+}
+
+function extractCsprojVersion(content: string, packageRef: string): string | null {
+  // .csproj format: <PackageReference Include="..." Version="1.2.3" />
+  const pattern = new RegExp(`<PackageReference\\s+Include="${packageRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*Version="([\\d.]+)"`);
+  const match = content.match(pattern);
+  return match ? match[1] : null;
 }
