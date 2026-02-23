@@ -15,6 +15,7 @@ import { runMcp } from "./commands/mcp.js";
 import { runServe } from "./commands/serve.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runFix } from "./commands/fix.js";
+import { runPr } from "./commands/pr.js";
 import type { CLIOptions } from "./types.js";
 
 const options = parseArgs(process.argv.slice(2));
@@ -38,6 +39,7 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
   serve: runServe,
   doctor: runDoctor,
   fix: runFix,
+  pr: runPr,
   // Keep "scan-only" for hooks that just want manifest refresh
   "scan-only": runScan,
 };

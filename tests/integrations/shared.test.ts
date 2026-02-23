@@ -183,15 +183,17 @@ describe("Integration shared functions", () => {
     });
 
     it("handles missing end marker (does nothing if only start marker)", () => {
-      const file = "CLAUDE.md";
+      const file = "missing-end.md"; // Use a different filename to avoid conflicts
       const content = "# Rules\n<!-- codebase:start -->\nContent\n";
       writeFileSync(join(tempDir, file), content, "utf-8");
 
       removeMarkdown(tempDir, file);
 
       const result = readFileSync(join(tempDir, file), "utf-8");
-      // Function requires both markers to remove content
+      // Function requires both markers to remove content, so it should be unchanged
       expect(result).toContain("<!-- codebase:start -->");
+      expect(result).toContain("# Rules");
+      expect(result).toContain("Content");
     });
   });
 
