@@ -97,6 +97,7 @@ async function analyzeCommits(root: string, rawCommits: RawCommit[]): Promise<Re
     chore: [],
     ci: [],
     build: [],
+    revert: [],
     other: [],
   };
   const linkedIssues = new Map<number, string>();

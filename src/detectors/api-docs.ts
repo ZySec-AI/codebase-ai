@@ -135,7 +135,7 @@ async function detectPostmanCollections(ctx: ScanContext): Promise<PostmanData |
 
   if (postmanFiles.length === 0) return null;
 
-  const collections: string[] = [];
+  const collections: Array<{ file: string; name: string | null }> = [];
 
   for (const file of postmanFiles) {
     const content = await ctx.readFile(file);
@@ -146,7 +146,7 @@ async function detectPostmanCollections(ctx: ScanContext): Promise<PostmanData |
       if (json.info?.schema?.includes("postman")) {
         collections.push({
           file: file,
-          name: json.info?.name || null,
+          name: (json.info?.name as string | undefined) || null,
         });
       }
     } catch {}

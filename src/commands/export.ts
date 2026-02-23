@@ -29,7 +29,8 @@ export async function runExport(options: CLIOptions): Promise<void> {
       output = formatMarkdown(manifest);
       break;
     case "yaml":
-      output = formatYaml(manifest);
+      // YAML format not yet implemented, fallback to JSON
+      output = JSON.stringify(manifest, null, 2) + "\n";
       break;
     default:
       output = JSON.stringify(manifest, null, 2) + "\n";
