@@ -5,7 +5,7 @@ const DEFAULTS: CLIOptions = {
   subcommand: "",
   positionals: [],
   path: process.cwd(),
-  format: "json",
+  format: "text",
   depth: 4,
   categories: [],
   incremental: false,

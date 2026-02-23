@@ -16,6 +16,11 @@ export function generateBrief(m: Manifest): string {
   }
   sections.push(`\nGenerated: ${m.generated_at}\n`);
 
+  // If only specific categories are present, skip the header warning
+  const hasCategories = Object.keys(m).filter(k =>
+    k !== 'version' && k !== 'generated_at' && k !== 'project'
+  ).length < Object.keys(m).length - 2;
+
   // ─── What is this project? ─────────────────────────────────────
   sections.push("## Technical Overview");
   const projectParts: string[] = [];
