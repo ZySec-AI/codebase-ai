@@ -4,3 +4,6 @@ dist/
 .codebase.cache.json
 *.tgz
 .DS_Store
+.claude/
+coverage/
+*.log
