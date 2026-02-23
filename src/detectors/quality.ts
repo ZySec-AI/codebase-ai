@@ -119,12 +119,26 @@ async function detectFormatter(ctx: ScanContext): Promise<string | null> {
 
 function detectCI(ctx: ScanContext): string | null {
   if (ctx.files.some(f => f.startsWith(".github/workflows/"))) return "github-actions";
-  if (ctx.fileExists(".gitlab-ci.yml")) return "gitlab-ci";
-  if (ctx.fileExists("Jenkinsfile")) return "jenkins";
+  if (ctx.fileExists(".gitlab-ci.yml") || ctx.fileExists(".gitlab-ci.yaml")) return "gitlab-ci";
+  if (ctx.fileExists("Jenkinsfile") || ctx.fileExists("Jenkinsfile")) return "jenkins";
   if (ctx.files.some(f => f.startsWith(".circleci/"))) return "circleci";
   if (ctx.fileExists("bitbucket-pipelines.yml")) return "bitbucket-pipelines";
   if (ctx.fileExists(".travis.yml")) return "travis-ci";
-  if (ctx.fileExists("azure-pipelines.yml")) return "azure-pipelines";
+  if (ctx.fileExists("azure-pipelines.yml") || ctx.fileExists("azure-pipelines.yaml")) return "azure-pipelines";
+  if (ctx.fileExists("buildspec.yml")) return "aws-codebuild";
+  if (ctx.fileExists("cloudbuild.yaml") || ctx.fileExists("cloudbuild.yml")) return "google-cloud-build";
+  if (ctx.fileExists(".drone.yml")) return "drone-ci";
+  if (ctx.fileExists("workflow.yml")) return "gsuite-actions";
+  if (ctx.fileExists("now.json") || ctx.fileExists(".vercelignore")) return "vercel";
+  if (ctx.fileExists("netlify.toml")) return "netlify";
+  if (ctx.fileExists(".github/workflows/ci.yml") || ctx.fileExists(".github/workflows/cd.yml")) return "github-actions";
+  if (ctx.fileExists("procfile") || ctx.fileExists("Procfile")) return "heroku";
+  if (ctx.fileExists("appveyor.yml")) return "appveyor";
+  if (ctx.fileExists("codeship-services.yml") || ctx.fileExists("codeship-steps.yml")) return "codeship";
+  if (ctx.fileExists("semantic.yml")) return "semantic-release";
+  if (ctx.fileExists(".rerun.yaml") || ctx.fileExists(".rerun.yml")) return "rerun";
+  if (ctx.fileExists("woodpecker.yml")) return "woodpecker-ci";
+  if (ctx.fileExists(".forgejo")) return "forgejo";
   return null;
 }
 
