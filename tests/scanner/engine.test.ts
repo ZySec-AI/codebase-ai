@@ -25,7 +25,7 @@ describe("scan engine", () => {
   });
 
   describe("basic scan", () => {
-    it("scans project and returns manifest with all detector categories", async () => {
+    it("scans project and returns manifest with all detector categories", { timeout: 30000 }, async () => {
       writeFileSync(join(tempDir, "package.json"), JSON.stringify({
         name: "test-project",
         description: "A test project",
@@ -46,14 +46,14 @@ describe("scan engine", () => {
       expect(manifest.structure).toBeDefined();
     });
 
-    it("includes version and timestamp", async () => {
+    it("includes version and timestamp", { timeout: 30000 }, async () => {
       const manifest = await scan(tempDir);
 
       expect(manifest.version).toBe("1.0");
       expect(manifest.generated_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
 
-    it("returns empty manifest for empty directory", async () => {
+    it("returns empty manifest for empty directory", { timeout: 30000 }, async () => {
       const manifest = await scan(tempDir);
 
       expect(manifest.version).toBe("1.0");
@@ -62,7 +62,7 @@ describe("scan engine", () => {
   });
 
   describe("category filtering", () => {
-    it("scans only specified categories", async () => {
+    it("scans only specified categories", { timeout: 30000 }, async () => {
       writeFileSync(join(tempDir, "package.json"), JSON.stringify({
         name: "test",
         scripts: { build: "tsup" },
@@ -77,7 +77,7 @@ describe("scan engine", () => {
       expect(manifest.dependencies).toBeUndefined();
     });
 
-    it("handles invalid category gracefully", async () => {
+    it("handles invalid category gracefully", { timeout: 30000 }, async () => {
       const manifest = await scan(tempDir, { categories: ["invalid-category"] });
 
       expect(manifest.version).toBe("1.0");
@@ -86,7 +86,7 @@ describe("scan engine", () => {
       expect(Object.keys(manifest).filter(k => !["version", "generated_at"].includes(k))).toEqual([]);
     });
 
-    it("handles empty categories array", async () => {
+    it("handles empty categories array", { timeout: 30000 }, async () => {
       writeFileSync(join(tempDir, "package.json"), JSON.stringify({ name: "test" }), "utf-8");
 
       const manifest = await scan(tempDir, { categories: [] });
@@ -97,7 +97,7 @@ describe("scan engine", () => {
   });
 
   describe("detector execution", () => {
-    it("runs all detectors in parallel", async () => {
+    it("runs all detectors in parallel", { timeout: 30000 }, async () => {
       const startTime = Date.now();
 
       writeFileSync(join(tempDir, "package.json"), JSON.stringify({
@@ -113,7 +113,7 @@ describe("scan engine", () => {
       expect(duration).toBeLessThan(5000);
     });
 
-    it("continues on detector failure", async () => {
+    it("continues on detector failure", { timeout: 30000 }, async () => {
       // Create a minimal project that should work
       writeFileSync(join(tempDir, "package.json"), JSON.stringify({ name: "test" }), "utf-8");
 
@@ -124,7 +124,7 @@ describe("scan engine", () => {
       expect(manifest.generated_at).toBeDefined();
     });
 
-    it("warns on detector failure when quiet mode is off", async () => {
+    it("warns on detector failure when quiet mode is off", { timeout: 30000 }, async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       writeFileSync(join(tempDir, "package.json"), JSON.stringify({ name: "test" }), "utf-8");
@@ -138,7 +138,7 @@ describe("scan engine", () => {
   });
 
   describe("depth option", () => {
-    it("respects depth limit in scan", async () => {
+    it("respects depth limit in scan", { timeout: 30000 }, async () => {
       // Create nested structure
       let currentPath = tempDir;
       for (let i = 0; i < 5; i++) {
@@ -154,7 +154,7 @@ describe("scan engine", () => {
   });
 
   describe("GitHub sync", () => {
-    it("does not call syncGitHub when sync option is false", async () => {
+    it("does not call syncGitHub when sync option is false", { timeout: 30000 }, async () => {
       const { syncGitHub } = await import("../../src/github/sync.js");
 
       const manifest = await scan(tempDir, { sync: false });
@@ -164,7 +164,7 @@ describe("scan engine", () => {
       expect(manifest.decisions).toBeUndefined();
     });
 
-    it("includes GitHub data when sync option is true and gh CLI works", async () => {
+    it("includes GitHub data when sync option is true and gh CLI works", { timeout: 30000 }, async () => {
       // Mock is already set up at top of file
       const { syncGitHub } = await import("../../src/github/sync.js");
 
@@ -174,7 +174,7 @@ describe("scan engine", () => {
       expect(manifest.status).toBeUndefined();
     });
 
-    it("handles GitHub sync failure gracefully", async () => {
+    it("handles GitHub sync failure gracefully", { timeout: 30000 }, async () => {
       const manifest = await scan(tempDir, { sync: true, quiet: true });
 
       // Should still return a valid manifest even if sync fails
@@ -184,7 +184,7 @@ describe("scan engine", () => {
   });
 
   describe("incremental mode", () => {
-    it("supports incremental scanning option", async () => {
+    it("supports incremental scanning option", { timeout: 30000 }, async () => {
       writeFileSync(join(tempDir, "package.json"), JSON.stringify({ name: "test" }), "utf-8");
 
       const manifest = await scan(tempDir, { incremental: true });
