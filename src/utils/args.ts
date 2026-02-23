@@ -29,7 +29,7 @@ const DEFAULTS: CLIOptions = {
 const COMMANDS = new Set([
   "scan", "setup", "query", "watch", "mcp", "serve",
   "hook", "diff", "export", "issue", "status", "init", "scan-only",
-  "brief", "next", "doctor", "fix", "pr",
+  "brief", "next", "doctor", "fix", "pr", "release",
 ]);
 
 export function parseArgs(argv: string[]): CLIOptions {

@@ -60,7 +60,7 @@ export async function syncGitHub(root: string): Promise<GitHubData | null> {
 
       issues = (graphqlData.issues || []) as IssueData[];
       prs = (graphqlData.pull_requests || []) as PullRequestData[];
-      milestones = (graphqlData.milestones || []) as MilestoneData[];
+      milestones = (graphqlData.milestones || []) as unknown as MilestoneData[];
       releases = (graphqlData.releases || []) as ReleaseData[];
       projectBoards = (graphqlData.project_boards || []) as ProjectBoardData[];
     } catch {
@@ -144,7 +144,7 @@ async function fetchIssues(root: string): Promise<IssueData[]> {
   }
 }
 
-function parseIssue(raw: Record<string, unknown>): IssueData {
+export function parseIssue(raw: Record<string, unknown>): IssueData {
   const labels = (raw.labels as Array<{ name: string }>) || [];
   const assignees = (raw.assignees as Array<{ login: string }>) || [];
   const milestone = raw.milestone as { title: string } | null;
@@ -178,7 +178,7 @@ async function fetchPullRequests(root: string): Promise<PullRequestData[]> {
   }
 }
 
-function parsePR(raw: Record<string, unknown>): PullRequestData {
+export function parsePR(raw: Record<string, unknown>): PullRequestData {
   const labels = (raw.labels as Array<{ name: string }>) || [];
   const reviewRequests = (raw.reviewRequests as Array<{ login?: string; name?: string }>) || [];
   const author = raw.author as { login: string } | null;

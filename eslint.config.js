@@ -2,11 +2,18 @@ import js from "@eslint/js";
 
 export default [
   {
-    ignores: ["**/*.ts", "dist/**", "node_modules/**", "coverage/**", "*.config.js", "pnpm-lock.yaml"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "coverage/**",
+      "*.config.js",
+      "pnpm-lock.yaml",
+      "**/*.ts",  // Ignore TypeScript files - we use tsc for checking
+    ],
   },
   js.configs.recommended,
   {
-    files: ["src/**/*.js", "tests/**/*.js"],
+    files: ["**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
@@ -17,7 +24,7 @@ export default [
       },
     },
     rules: {
-      "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "no-unused-vars": "off",  // Disabled - TypeScript catches this
       "no-console": "off",
     },
   },

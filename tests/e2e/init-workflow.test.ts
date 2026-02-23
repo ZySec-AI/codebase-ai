@@ -104,22 +104,26 @@ describe("E2E: Init Workflow", () => {
 
   it("should inject into .cursorrules if present", () => {
     // Create project with .cursorrules
-    execSync(`npm init -y`, { cwd: tempDir, stdio: "pipe" });
-    execSync(`git init`, { cwd: tempDir, stdio: "pipe" });
-    execSync(`git config user.email "test@example.com"`, { cwd: tempDir, stdio: "pipe" });
-    execSync(`git config user.name "Test User"`, { cwd: tempDir, stdio: "pipe" });
-    execSync(`git add .`, { cwd: tempDir, stdio: "pipe" });
-    execSync(`git commit -m "Initial commit"`, { cwd: tempDir, stdio: "pipe" });
+    const cursorRulesDir = join(tempDir, "cursor-test");
+    execSync(`mkdir -p ${cursorRulesDir}`, { stdio: "pipe" });
+
+    execSync(`npm init -y`, { cwd: cursorRulesDir, stdio: "pipe" });
+    execSync(`git init`, { cwd: cursorRulesDir, stdio: "pipe" });
+    execSync(`git config user.email "test@example.com"`, { cwd: cursorRulesDir, stdio: "pipe" });
+    execSync(`git config user.name "Test User"`, { cwd: cursorRulesDir, stdio: "pipe" });
+    execSync(`git add .`, { cwd: cursorRulesDir, stdio: "pipe" });
+    execSync(`git commit -m "Initial commit"`, { cwd: cursorRulesDir, stdio: "pipe" });
 
     const cursorRules = "# Cursor Rules\n\nBe helpful.";
-    execSync(`echo '${cursorRules}' > .cursorrules`, { cwd: tempDir, stdio: "pipe" });
+    execSync(`echo '${cursorRules}' > .cursorrules`, { cwd: cursorRulesDir, stdio: "pipe" });
 
     // Run init
-    execSync(`node ${cliPath} init`, { cwd: tempDir, stdio: "pipe" });
+    execSync(`node ${cliPath} init`, { cwd: cursorRulesDir, stdio: "pipe" });
 
-    // Verify .cursorrules was updated
-    const cursorContent = readFileSync(join(tempDir, ".cursorrules"), "utf-8");
-    expect(cursorContent).toContain(".codebase.json");
+    // Verify .cursorrules was updated with codebase markers
+    const cursorContent = readFileSync(join(cursorRulesDir, ".cursorrules"), "utf-8");
+    expect(cursorContent).toContain("codebase:start");
+    expect(cursorContent).toContain("codebase:end");
   });
 
   it("should handle --dry-run flag", () => {

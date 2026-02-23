@@ -116,6 +116,9 @@ fastapi = "^0.109.0"
 `;
     execSync(`echo '${pyproject}' > pyproject.toml`, { cwd: tempDir, stdio: "pipe" });
 
+    // Add a Python file so the detector finds it
+    execSync(`echo 'print("hello")' > main.py`, { cwd: tempDir, stdio: "pipe" });
+
     // Run scan
     execSync(`node ${cliPath} scan`, { cwd: tempDir, stdio: "pipe" });
 

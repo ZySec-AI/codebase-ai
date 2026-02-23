@@ -48,6 +48,7 @@ interface CategorizedChanges {
   chore: string[];
   ci: string[];
   build: string[];
+  revert: string[];
   other: string[];
 }
 
@@ -238,7 +239,7 @@ function formatReleaseNotes(data: ReleaseNoteData, previousTag: string | null, c
     if (changes.length === 0) continue;
 
     output += `## ${categoryTitles[type as CommitCategory]}\n\n`;
-    changes.forEach(change => {
+    changes.forEach((change: string) => {
       output += `- ${change}\n`;
     });
     output += "\n";

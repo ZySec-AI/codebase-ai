@@ -1,5 +1,5 @@
 import { resolve, join } from "node:path";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import type { CLIOptions, Manifest } from "../types.js";
 import { error } from "../utils/output.js";
 
@@ -16,18 +16,33 @@ export async function runExport(options: CLIOptions): Promise<void> {
     process.exit(1);
   }
 
+  // Generate output based on format
+  let output: string;
   switch (options.format) {
     case "claude-md":
-      process.stdout.write(formatClaudeMd(manifest));
+      output = formatClaudeMd(manifest);
       break;
     case "cursor-rules":
-      process.stdout.write(formatCursorRules(manifest));
+      output = formatCursorRules(manifest);
       break;
     case "markdown":
-      process.stdout.write(formatMarkdown(manifest));
+      output = formatMarkdown(manifest);
+      break;
+    case "yaml":
+      output = formatYaml(manifest);
       break;
     default:
-      process.stdout.write(JSON.stringify(manifest, null, 2) + "\n");
+      output = JSON.stringify(manifest, null, 2) + "\n";
+  }
+
+  // Check if output should go to file
+  const outputFile = options.positionals[0];
+  if (outputFile) {
+    const outputPath = resolve(root, outputFile);
+    await writeFile(outputPath, output, "utf-8");
+    console.log(`Exported to ${outputPath}`);
+  } else {
+    process.stdout.write(output);
   }
 }
 
