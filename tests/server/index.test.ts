@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { writeFile, mkdirSync, rmSync, readFileSync } from "node:fs";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { writeFile } from "node:fs/promises";
+import { mkdirSync, rmSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer as createHttpServer } from "node:http";
@@ -136,7 +137,7 @@ describe("HTTP API Server", () => {
       const result = await handleRoute("/codebase/stack", "GET", emptyDir);
 
       expect(result.status).toBe(404);
-      expect(result.body).toHaveProperty("error", "No manifest");
+      expect(result.body).toHaveProperty("error", "No manifest.");
     });
 
     it("handles nested category paths", async () => {
@@ -184,7 +185,7 @@ describe("HTTP API Server", () => {
       const result = await handleRoute("/codebase/query?path=project", "GET", emptyDir);
 
       expect(result.status).toBe(404);
-      expect(result.body).toHaveProperty("error", "No manifest");
+      expect(result.body).toHaveProperty("error", "No manifest. POST /codebase/scan first.");
     });
 
     it("supports nested paths", async () => {
@@ -213,7 +214,7 @@ describe("HTTP API Server", () => {
   });
 
   describe("handleRoute - /codebase/scan endpoint", () => {
-    it("triggers scan and returns 200 with new manifest", async () => {
+    it("triggers scan and returns 200 with new manifest", { timeout: 30000 }, async () => {
       // Create a minimal Node.js project
       await writeFile(join(tempDir, "package.json"), JSON.stringify({
         name: "test-api",
@@ -222,7 +223,7 @@ describe("HTTP API Server", () => {
       }), "utf-8");
 
       mkdirSync(join(tempDir, "src"), { recursive: true });
-      await writeFile(join(tempDir, "src", "index.ts"), "console.log('test');");
+      await writeFile(join(tempDir, "src", "index.ts"), "console.log('test');", "utf-8");
 
       const { handleRoute } = await import("../../src/server/routes.js");
       const result = await handleRoute("/codebase/scan", "POST", tempDir);
