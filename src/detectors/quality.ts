@@ -55,7 +55,7 @@ async function detectTestFramework(ctx: ScanContext): Promise<string | null> {
   // Go
   if (ctx.files.some(f => f.endsWith("_test.go"))) return "go test";
   // Rust
-  if (ctx.files.some(f => f.includes("/tests/") || f.match(/mod\s+tests/))) return "cargo test";
+  if (ctx.files.some(f => f.includes("/tests/") || f.startsWith("tests/") || f.match(/mod\s+tests/))) return "cargo test";
 
   return null;
 }

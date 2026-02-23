@@ -106,6 +106,7 @@ export function removeMarkdown(root: string, file: string): void {
   const startIdx = content.indexOf(START_MARKER);
   const endIdx = content.indexOf(END_MARKER);
 
+  // Only remove if both markers are present
   if (startIdx !== -1 && endIdx !== -1) {
     content = content.slice(0, startIdx) + content.slice(endIdx + END_MARKER.length);
     content = content.replace(/\n{3,}/g, "\n\n").trim() + "\n";

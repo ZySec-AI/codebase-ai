@@ -27,6 +27,7 @@ export interface Integration {
 export interface Manifest {
   version: string;
   generated_at: string;
+  [key: string]: unknown; // Index signature for dynamic property access
 
   // Project identity
   project?: ProjectData;
@@ -130,6 +131,29 @@ export interface StatusData {
   pull_requests: PullRequestData[];
   kanban: KanbanView;
   priorities: IssueData[];
+  // Enhanced fields
+  releases?: ReleaseData[];
+  project_boards?: ProjectBoardData[];
+}
+
+export interface ReleaseData {
+  tag_name: string;
+  name: string;
+  created_at: string;
+  url: string;
+  author: string;
+  prerelease: boolean;
+}
+
+export interface ProjectBoardData {
+  number: number;
+  title: string;
+  state: "open" | "closed";
+  columns: Array<{
+    name: string;
+    cards_count: number;
+  }>;
+  url: string;
 }
 
 export interface IssueData {
@@ -142,6 +166,11 @@ export interface IssueData {
   created_at: string;
   updated_at: string;
   mapped_files?: string[];
+  // Enhanced fields
+  comments_count?: number;
+  reactions?: { thumbs_up: number; thumbs_down: number; laugh: number; hooray: number; confused: number; heart: number; rocket: number; eyes: number };
+  timeline_events?: number;
+  url?: string;
 }
 
 export interface PullRequestData {
@@ -154,6 +183,15 @@ export interface PullRequestData {
   reviewers: string[];
   created_at: string;
   updated_at: string;
+  // Enhanced fields
+  checks_status?: "pending" | "passing" | "failing";
+  mergeable?: boolean;
+  merge_conflicts?: boolean;
+  additions?: number;
+  deletions?: number;
+  comments_count?: number;
+  review_decision?: "approved" | "changes_requested" | "review_required" | null;
+  url?: string;
 }
 
 export interface KanbanView {
