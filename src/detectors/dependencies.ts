@@ -67,179 +67,226 @@ const NOTABLE_PACKAGES = new Set([
   "docker", "typescript", "kubernetes",
 ]);
 
+const NOTABLE_PYTHON = new Set([
+  "django", "flask", "fastapi", "starlette", "tornado", "aiohttp",
+  "sqlalchemy", "alembic", "pydantic", "celery", "redis",
+  "pytest", "numpy", "pandas", "scipy", "scikit-learn",
+  "tensorflow", "torch", "transformers", "langchain",
+  "requests", "httpx", "boto3",
+]);
+
+const NOTABLE_RUST = new Set([
+  "serde", "tokio", "axum", "actix-web", "rocket", "warp", "hyper",
+  "sqlx", "diesel", "sea-orm", "clap", "tracing", "anyhow",
+  "thiserror", "reqwest", "tonic", "prost",
+]);
+
+const NOTABLE_GO = new Set([
+  "gin", "echo", "fiber", "chi", "mux",
+  "gorm", "sqlx", "cobra", "viper", "zap",
+  "testify", "grpc", "protobuf", "wire",
+]);
+
 export const dependenciesDetector: Detector = {
   name: "dependencies",
   category: "dependencies",
 
   async detect(ctx: ScanContext) {
-    // Try JavaScript/TypeScript (package.json)
-    const npmResult = await detectNpmDeps(ctx);
-    if (npmResult.direct_count > 0 || npmResult.dev_count > 0) {
-      return { ...npmResult, lock_file: detectLockFile(ctx) };
+    const lockFile = detectLockFile(ctx);
+
+    // Node.js — package.json (highest priority)
+    const pkgContent = await ctx.readFile("package.json");
+    if (pkgContent) {
+      try {
+        const pkg = JSON.parse(pkgContent);
+        const deps = pkg.dependencies || {};
+        const devDeps = pkg.devDependencies || {};
+        const allDeps = { ...deps, ...devDeps };
+
+        const notable = Object.keys(allDeps)
+          .filter(d => NOTABLE_PACKAGES.has(d))
+          .sort();
+
+        return { direct_count: Object.keys(deps).length, dev_count: Object.keys(devDeps).length, lock_file: lockFile, notable };
+      } catch {
+        // malformed package.json — fall through
+      }
     }
 
-    // Try Python (requirements.txt, pyproject.toml)
-    const pythonResult = await detectPythonDeps(ctx);
-    if (pythonResult.direct_count > 0) {
-      return { ...pythonResult, lock_file: detectLockFile(ctx) };
+    // Python — pyproject.toml
+    const pyprojectContent = await ctx.readFile("pyproject.toml");
+    if (pyprojectContent) {
+      const result = parsePyprojectToml(pyprojectContent);
+      if (result) {
+        const notable = findNotable([...result.direct, ...result.dev], NOTABLE_PYTHON);
+        return { direct_count: result.direct.length, dev_count: result.dev.length, lock_file: lockFile, notable };
+      }
     }
 
-    // Try Rust (Cargo.toml)
-    const rustResult = await detectRustDeps(ctx);
-    if (rustResult.direct_count > 0) {
-      return { ...rustResult, lock_file: detectLockFile(ctx) };
+    // Python — requirements.txt
+    const reqContent = await ctx.readFile("requirements.txt");
+    if (reqContent) {
+      const names = parseRequirementsTxt(reqContent);
+      const notable = findNotable(names, NOTABLE_PYTHON);
+      return { direct_count: names.length, dev_count: 0, lock_file: lockFile, notable };
     }
 
-    // Try Go (go.mod)
-    const goResult = await detectGoDeps(ctx);
-    if (goResult.direct_count > 0) {
-      return { ...goResult, lock_file: detectLockFile(ctx) };
+    // Rust — Cargo.toml
+    const cargoContent = await ctx.readFile("Cargo.toml");
+    if (cargoContent) {
+      const result = parseCargoToml(cargoContent);
+      const notable = findNotable([...result.direct, ...result.dev], NOTABLE_RUST);
+      return { direct_count: result.direct.length, dev_count: result.dev.length, lock_file: lockFile, notable };
     }
 
-    // Try Ruby (Gemfile)
+    // Go — go.mod
+    const goModContent = await ctx.readFile("go.mod");
+    if (goModContent) {
+      const names = parseGoMod(goModContent);
+      const shortNames = names.map(n => n.split("/").pop()!);
+      const notable = findNotable(shortNames, NOTABLE_GO);
+      return { direct_count: names.length, dev_count: 0, lock_file: lockFile, notable };
+    }
+
+    // Ruby — Gemfile
     const rubyResult = await detectRubyDeps(ctx);
     if (rubyResult.direct_count > 0) {
-      return { ...rubyResult, lock_file: detectLockFile(ctx) };
+      return { ...rubyResult, lock_file: lockFile };
     }
 
-    // Try PHP (composer.json)
+    // PHP — composer.json
     const phpResult = await detectPhpDeps(ctx);
     if (phpResult.direct_count > 0) {
-      return { ...phpResult, lock_file: detectLockFile(ctx) };
+      return { ...phpResult, lock_file: lockFile };
     }
 
-    // Try Java (pom.xml)
+    // Java — pom.xml / build.gradle
     const javaResult = await detectJavaDeps(ctx);
     if (javaResult.direct_count > 0) {
-      return { ...javaResult, lock_file: detectLockFile(ctx) };
+      return { ...javaResult, lock_file: lockFile };
     }
 
-    // Try C# (.csproj)
+    // C# — .csproj
     const csharpResult = await detectCSharpDeps(ctx);
     if (csharpResult.direct_count > 0) {
-      return { ...csharpResult, lock_file: detectLockFile(ctx) };
+      return { ...csharpResult, lock_file: lockFile };
     }
 
-    // Fallback: just lock file info
-    return {
-      direct_count: 0,
-      dev_count: 0,
-      lock_file: detectLockFile(ctx),
-      notable: [],
-    };
+    return { direct_count: 0, dev_count: 0, lock_file: lockFile, notable: [] };
   },
 };
 
-async function detectNpmDeps(ctx: ScanContext): Promise<{ direct_count: number; dev_count: number; notable: string[] }> {
-  const content = await ctx.readFile("package.json");
-  if (!content) return { direct_count: 0, dev_count: 0, notable: [] };
+function findNotable(names: string[], notableSet: Set<string>): string[] {
+  return names.filter(n => notableSet.has(n)).sort();
+}
 
-  try {
-    const pkg = JSON.parse(content);
-    const deps = pkg.dependencies || {};
-    const devDeps = pkg.devDependencies || {};
-    const allDeps = { ...deps, ...devDeps };
+function parsePyprojectToml(content: string): { direct: string[]; dev: string[] } | null {
+  const direct: string[] = [];
+  const dev: string[] = [];
 
-    const notable = Object.keys(allDeps)
-      .filter(d => NOTABLE_PACKAGES.has(d))
-      .sort();
-
-    return {
-      direct_count: Object.keys(deps).length,
-      dev_count: Object.keys(devDeps).length,
-      notable,
-    };
-  } catch {
-    return { direct_count: 0, dev_count: 0, notable: [] };
+  // PEP 621: [project] dependencies = ["flask>=2.0", ...]
+  const pep621Match = content.match(/\[project\]\s[\s\S]*?dependencies\s*=\s*\[([\s\S]*?)\]/);
+  if (pep621Match) {
+    direct.push(...extractQuotedNames(pep621Match[1]));
   }
+
+  // PEP 621: [project.optional-dependencies] dev = ["pytest", ...]
+  const optDepsMatch = content.match(/\[project\.optional-dependencies\]\s*[\s\S]*?(?=\n\[|$)/);
+  if (optDepsMatch) {
+    const arrayMatches = optDepsMatch[0].matchAll(/\w+\s*=\s*\[([\s\S]*?)\]/g);
+    for (const m of arrayMatches) {
+      dev.push(...extractQuotedNames(m[1]));
+    }
+  }
+
+  // Poetry: [tool.poetry.dependencies]
+  const poetryDepsMatch = content.match(/\[tool\.poetry\.dependencies\]\s*\n([\s\S]*?)(?=\n\[|$)/);
+  if (poetryDepsMatch) {
+    const names = extractTomlKeys(poetryDepsMatch[1]);
+    direct.push(...names.filter(n => n !== "python"));
+  }
+
+  // Poetry: [tool.poetry.group.dev.dependencies] or [tool.poetry.dev-dependencies]
+  const poetryDevMatch = content.match(/\[tool\.poetry\.(?:group\.dev\.|dev-)dependencies\]\s*\n([\s\S]*?)(?=\n\[|$)/);
+  if (poetryDevMatch) {
+    dev.push(...extractTomlKeys(poetryDevMatch[1]));
+  }
+
+  if (direct.length === 0 && dev.length === 0) return null;
+  return { direct, dev };
 }
 
-async function detectPythonDeps(ctx: ScanContext): Promise<{ direct_count: number; dev_count: number; notable: string[] }> {
-  const requirements = await ctx.readFile("requirements.txt");
-  const pyproject = await ctx.readFile("pyproject.toml");
-  const setup = await ctx.readFile("setup.py");
-  const content = requirements + "\n" + pyproject + "\n" + setup;
-
-  if (!content.trim()) return { direct_count: 0, dev_count: 0, notable: [] };
-
-  const lines = content.split("\n")
-    .map(line => line.trim())
-    .filter(line => line && !line.startsWith("#"));
-
-  // Parse package names (strip version specs)
-  const packages = lines
-    .map(line => line.split(/[=>!<~\[]/)[0].toLowerCase())
-    .filter(pkg => pkg && pkg !== "" && !pkg.startsWith("-"));
-
-  const notable = packages.filter(p => NOTABLE_PACKAGES.has(p));
-
-  return {
-    direct_count: packages.length,
-    dev_count: 0, // Python doesn't always separate dev deps
-    notable: [...new Set(notable)].sort(),
-  };
+function extractQuotedNames(block: string): string[] {
+  const names: string[] = [];
+  const matches = block.matchAll(/"([^"]+)"|'([^']+)'/g);
+  for (const m of matches) {
+    const raw = m[1] || m[2];
+    const name = raw.split(/[>=<!;\[]/)[0].trim().toLowerCase();
+    if (name) names.push(name);
+  }
+  return names;
 }
 
-async function detectRustDeps(ctx: ScanContext): Promise<{ direct_count: number; dev_count: number; notable: string[] }> {
-  const cargo = await ctx.readFile("Cargo.toml");
-  if (!cargo) return { direct_count: 0, dev_count: 0, notable: [] };
+function extractTomlKeys(block: string): string[] {
+  const names: string[] = [];
+  for (const line of block.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const match = trimmed.match(/^([a-zA-Z0-9_-]+)\s*=/);
+    if (match) names.push(match[1].toLowerCase());
+  }
+  return names;
+}
 
-  const deps: string[] = [];
-  const devDeps: string[] = [];
-  const notable: string[] = [];
+function parseRequirementsTxt(content: string): string[] {
+  const names: string[] = [];
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("-")) continue;
+    const name = trimmed.split(/[>=<!;\[]/)[0].trim().toLowerCase();
+    if (name) names.push(name);
+  }
+  return names;
+}
 
-  const depsMatch = cargo.match(/\[dependencies\]([\s\S]*?)\[/g);
-  const devDepsMatch = cargo.match(/\[dev-dependencies\]([\s\S]*?)\[/g);
+function parseCargoToml(content: string): { direct: string[]; dev: string[] } {
+  const direct: string[] = [];
+  const dev: string[] = [];
 
+  const depsMatch = content.match(/\[dependencies\]\s*\n([\s\S]*?)(?=\n\[|$)/);
   if (depsMatch) {
-    for (const line of depsMatch[0].split("\n")) {
-      const match = line.match(/^(\w+)/);
-      if (match) deps.push(match[1]);
-    }
+    direct.push(...extractTomlKeys(depsMatch[1]));
   }
 
+  const devDepsMatch = content.match(/\[dev-dependencies\]\s*\n([\s\S]*?)(?=\n\[|$)/);
   if (devDepsMatch) {
-    for (const line of devDepsMatch[0].split("\n")) {
-      const match = line.match(/^(\w+)/);
-      if (match) devDeps.push(match[1]);
-    }
+    dev.push(...extractTomlKeys(devDepsMatch[1]));
   }
 
-  const allDeps = [...deps, ...devDeps];
-  for (const dep of allDeps) {
-    if (NOTABLE_PACKAGES.has(dep)) notable.push(dep);
-  }
-
-  return {
-    direct_count: deps.length,
-    dev_count: devDeps.length,
-    notable: [...new Set(notable)].sort(),
-  };
+  return { direct, dev };
 }
 
-async function detectGoDeps(ctx: ScanContext): Promise<{ direct_count: number; dev_count: number; notable: string[] }> {
-  const gomod = await ctx.readFile("go.mod");
-  if (!gomod) return { direct_count: 0, dev_count: 0, notable: [] };
+function parseGoMod(content: string): string[] {
+  const names: string[] = [];
 
-  const deps: string[] = [];
-  const notable: string[] = [];
-
-  for (const line of gomod.split("\n")) {
-    const match = line.match(/^\s*require\s+([^\s]+)/);
-    if (match) {
-      const pkg = match[1];
-      deps.push(pkg);
-      // Extract package name from path
-      const name = pkg.split("/").pop();
-      if (name && NOTABLE_PACKAGES.has(name)) notable.push(pkg);
+  // require ( ... ) blocks
+  const blockMatches = content.matchAll(/require\s*\(([\s\S]*?)\)/g);
+  for (const m of blockMatches) {
+    for (const line of m[1].split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("//")) continue;
+      const parts = trimmed.split(/\s+/);
+      if (parts[0]) names.push(parts[0]);
     }
   }
 
-  return {
-    direct_count: deps.length,
-    dev_count: 0, // Go doesn't separate dev deps
-    notable: [...new Set(notable)].sort(),
-  };
+  // Single-line: require github.com/foo/bar v1.2.3
+  const singleMatches = content.matchAll(/^require\s+(\S+)[ \t]+\S+/gm);
+  for (const m of singleMatches) {
+    names.push(m[1]);
+  }
+
+  return names;
 }
 
 async function detectRubyDeps(ctx: ScanContext): Promise<{ direct_count: number; dev_count: number; notable: string[] }> {
@@ -292,14 +339,13 @@ async function detectJavaDeps(ctx: ScanContext): Promise<{ direct_count: number;
   const pom = await ctx.readFile("pom.xml");
   const gradle = await ctx.readFile("build.gradle");
   const gradleKts = await ctx.readFile("build.gradle.kts");
-  const content = pom + "\n" + gradle + "\n" + gradleKts;
+  const content = (pom || "") + "\n" + (gradle || "") + "\n" + (gradleKts || "");
 
   if (!content.trim()) return { direct_count: 0, dev_count: 0, notable: [] };
 
   const deps: string[] = [];
   const notable: string[] = [];
 
-  // Simple regex to extract dependencies
   const artifactIdRegex = /<artifactId>([^<]+)<\/artifactId>/g;
   let match;
   while ((match = artifactIdRegex.exec(content)) !== null) {
@@ -307,7 +353,6 @@ async function detectJavaDeps(ctx: ScanContext): Promise<{ direct_count: number;
     if (NOTABLE_PACKAGES.has(match[1])) notable.push(match[1]);
   }
 
-  // Also check for implementation/compile in Gradle
   const gradleDepsRegex = /(?:implementation|compile|api)\s+['"]([^:'"]+)/g;
   while ((match = gradleDepsRegex.exec(content)) !== null) {
     const dep = match[1].split(":").pop();
@@ -325,7 +370,6 @@ async function detectJavaDeps(ctx: ScanContext): Promise<{ direct_count: number;
 }
 
 async function detectCSharpDeps(ctx: ScanContext): Promise<{ direct_count: number; dev_count: number; notable: string[] }> {
-  // .NET dependencies are in .csproj files - check for PackageReference
   const csprojFiles = ctx.files.filter(f => f.endsWith(".csproj"));
   if (csprojFiles.length === 0) return { direct_count: 0, dev_count: 0, notable: [] };
 

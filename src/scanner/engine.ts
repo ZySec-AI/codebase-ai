@@ -3,6 +3,7 @@ import { createScanContext } from "./context.js";
 import { detectors } from "../detectors/index.js";
 import { syncGitHub } from "../github/sync.js";
 import { warn } from "../utils/output.js";
+import { loadCache, saveCache, isCacheValid } from "./cache.js";
 
 export interface ScanOptions {
   depth?: number;
@@ -14,6 +15,14 @@ export interface ScanOptions {
 
 export async function scan(root: string, options: ScanOptions = {}): Promise<Manifest> {
   const ctx = await createScanContext(root, { depth: options.depth });
+
+  // Incremental: return cached manifest if nothing changed
+  if (options.incremental) {
+    const cache = loadCache(root);
+    if (cache && isCacheValid(root, cache, ctx.files.length)) {
+      return cache.manifest;
+    }
+  }
 
   let activeDetectors = detectors;
   if (options.categories?.length) {
@@ -53,6 +62,11 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Man
     } catch {
       if (!options.quiet) warn("GitHub sync failed (is `gh` CLI installed and authenticated?)");
     }
+  }
+
+  // Incremental: save cache for next run
+  if (options.incremental) {
+    saveCache(root, ctx.files.length, manifest);
   }
 
   return manifest;

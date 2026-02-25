@@ -50,6 +50,8 @@ export async function runWatch(options: CLIOptions): Promise<void> {
     }
   };
 
+  let cleanup: () => void;
+
   try {
     const watcher = watch(root, { recursive: true }, (eventType, filename) => {
       if (!filename) return;
@@ -66,19 +68,28 @@ export async function runWatch(options: CLIOptions): Promise<void> {
       }, options.debounce);
     });
 
-    process.on("SIGINT", () => {
-      watcher.close();
-      log("\nStopped watching.");
-      process.exit(0);
-    });
-
-    process.on("SIGTERM", () => {
-      watcher.close();
-      process.exit(0);
-    });
+    cleanup = () => watcher.close();
   } catch {
-    log("Warning: recursive watch not supported. Watching top-level only.");
+    // recursive watch not supported (Linux without inotify) — fall back to polling
+    const pollInterval = Math.max(options.debounce * 5, 10_000);
+    log(`Warning: recursive watch not supported. Polling every ${Math.round(pollInterval / 1000)}s.`);
+    const interval = setInterval(() => {
+      triggerScan();
+    }, pollInterval);
+
+    cleanup = () => clearInterval(interval);
   }
+
+  process.on("SIGINT", () => {
+    cleanup();
+    log("\nStopped watching.");
+    process.exit(0);
+  });
+
+  process.on("SIGTERM", () => {
+    cleanup();
+    process.exit(0);
+  });
 }
 
 /**
