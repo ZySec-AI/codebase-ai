@@ -3,8 +3,9 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type {
   StatusData, RoadmapData, DecisionsData,
-  IssueData, PullRequestData, KanbanView, MilestoneData, DecisionEntry,
+  IssueData, PullRequestData, KanbanView, MilestoneData, DecisionEntry, ReleaseData, ProjectBoardData,
 } from "../types.js";
+import { fetchGitHubGraphQLData, checkGraphQLSupport } from "./graphql.js";
 
 interface GitHubData {
   status: StatusData;
@@ -38,10 +39,47 @@ export async function syncGitHub(root: string): Promise<GitHubData | null> {
     };
   }
 
-  const [issues, prs, milestones, decisionPRs] = await Promise.all([
-    fetchIssues(root),
-    fetchPullRequests(root),
-    fetchMilestones(root),
+  // Try GraphQL first, fall back to REST API
+  const hasGraphQL = await checkGraphQLSupport(root);
+  let issues: IssueData[] = [];
+  let prs: PullRequestData[] = [];
+  let milestones: MilestoneData[] = [];
+  let releases: ReleaseData[] = [];
+  let projectBoards: ProjectBoardData[] = [];
+
+  if (hasGraphQL) {
+    try {
+      const graphqlData = await fetchGitHubGraphQLData(root, remoteUrl, {
+        includeIssues: true,
+        includePRs: true,
+        includeMilestones: true,
+        includeReleases: true,
+        includeProjects: true,
+        limit: 50,
+      });
+
+      issues = (graphqlData.issues || []) as IssueData[];
+      prs = (graphqlData.pull_requests || []) as PullRequestData[];
+      milestones = (graphqlData.milestones || []) as unknown as MilestoneData[];
+      releases = (graphqlData.releases || []) as ReleaseData[];
+      projectBoards = (graphqlData.project_boards || []) as ProjectBoardData[];
+    } catch {
+      // GraphQL failed, fall back to REST
+    }
+  }
+
+  // Fallback to REST API if GraphQL didn't return data
+  if (issues.length === 0) {
+    issues = await fetchIssues(root);
+  }
+  if (prs.length === 0) {
+    prs = await fetchPullRequests(root);
+  }
+  if (milestones.length === 0) {
+    milestones = await fetchMilestones(root);
+  }
+
+  const [decisionPRs] = await Promise.all([
     fetchDecisionPRs(root),
   ]);
 
@@ -57,6 +95,8 @@ export async function syncGitHub(root: string): Promise<GitHubData | null> {
       pull_requests: prs,
       kanban,
       priorities,
+      releases,
+      project_boards: projectBoards,
     },
     roadmap: {
       milestones,
@@ -104,7 +144,7 @@ async function fetchIssues(root: string): Promise<IssueData[]> {
   }
 }
 
-function parseIssue(raw: Record<string, unknown>): IssueData {
+export function parseIssue(raw: Record<string, unknown>): IssueData {
   const labels = (raw.labels as Array<{ name: string }>) || [];
   const assignees = (raw.assignees as Array<{ login: string }>) || [];
   const milestone = raw.milestone as { title: string } | null;
@@ -138,7 +178,7 @@ async function fetchPullRequests(root: string): Promise<PullRequestData[]> {
   }
 }
 
-function parsePR(raw: Record<string, unknown>): PullRequestData {
+export function parsePR(raw: Record<string, unknown>): PullRequestData {
   const labels = (raw.labels as Array<{ name: string }>) || [];
   const reviewRequests = (raw.reviewRequests as Array<{ login?: string; name?: string }>) || [];
   const author = raw.author as { login: string } | null;

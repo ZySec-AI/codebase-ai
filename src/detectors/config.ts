@@ -69,10 +69,13 @@ export const configDetector: Detector = {
 
     const featureFlags = await detectFeatureFlags(ctx);
 
+    const envVars = await detectEnvVars(ctx);
+
     return {
       env_files: envFiles,
       config_files: configFiles,
       feature_flags: featureFlags,
+      env_vars: envVars,
     };
   },
 };
@@ -90,4 +93,66 @@ async function detectFeatureFlags(ctx: ScanContext): Promise<string | null> {
   } catch {}
 
   return null;
+}
+
+async function detectEnvVars(ctx: ScanContext): Promise<Record<string, { description?: string; required: boolean }>> {
+  const envVars: Record<string, { description?: string; required: boolean }> = {};
+
+  // Try .env.example first (most common for documentation)
+  const envExampleContent = await ctx.readFile(".env.example");
+  if (envExampleContent) {
+    parseEnvFile(envExampleContent, envVars, false); // .env.example vars are typically not marked as required
+  }
+
+  // Try .env (may have more vars)
+  const envContent = await ctx.readFile(".env");
+  if (envContent) {
+    parseEnvFile(envContent, envVars, true);
+  }
+
+  // Try .env.sample
+  const envSampleContent = await ctx.readFile(".env.sample");
+  if (envSampleContent) {
+    parseEnvFile(envSampleContent, envVars, false);
+  }
+
+  // Try .env.template
+  const envTemplateContent = await ctx.readFile(".env.template");
+  if (envTemplateContent) {
+    parseEnvFile(envTemplateContent, envVars, false);
+  }
+
+  return envVars;
+}
+
+function parseEnvFile(content: string, envVars: Record<string, { description?: string; required: boolean }>, isProductionEnv: boolean): void {
+  const lines = content.split("\n");
+  let currentComment = "";
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Skip empty lines
+    if (!trimmed) continue;
+
+    // Capture comments as descriptions
+    if (trimmed.startsWith("#")) {
+      currentComment += (currentComment ? " " : "") + trimmed.slice(1).trim();
+      continue;
+    }
+
+    // Parse VAR=value or VAR=value syntax
+    const match = trimmed.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/);
+    if (match) {
+      const [, name, value] = match;
+      const isEmpty = value === '""' || value === "''" || value === "";
+
+      envVars[name] = {
+        description: currentComment || undefined,
+        required: isProductionEnv || isEmpty, // Mark as required if it's empty or from production .env
+      };
+
+      currentComment = ""; // Reset comment for next variable
+    }
+  }
 }

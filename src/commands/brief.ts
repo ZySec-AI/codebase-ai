@@ -11,6 +11,10 @@ import { error } from "../utils/output.js";
  * everything they need to start working: project identity, stack, commands,
  * current status, next task, blockers, decisions, and available actions.
  *
+ * Supports:
+ * - --categories <list>: filter to specific sections (e.g., "stack,commands,status")
+ * - --format <fmt>: output format (text, json, markdown) - default is text (markdown)
+ *
  * No file reading. No JSON parsing. Just run the command, get the answer.
  */
 export async function runBrief(options: CLIOptions): Promise<void> {
@@ -26,5 +30,66 @@ export async function runBrief(options: CLIOptions): Promise<void> {
     process.exit(1);
   }
 
-  process.stdout.write(generateBrief(manifest) + "\n");
+  // Filter by categories if specified
+  let filteredManifest = manifest;
+  if (options.categories.length > 0) {
+    filteredManifest = filterManifest(manifest, options.categories);
+  }
+
+  // Generate output based on format
+  const output = generateOutput(filteredManifest, options.format);
+  process.stdout.write(output + "\n");
+}
+
+/**
+ * Filter manifest to only include specified categories.
+ * Always includes 'project' for title/header context.
+ *
+ * Categories: repo, structure, stack, commands, dependencies,
+ *             config, git, quality, patterns, status, roadmap, decisions
+ */
+function filterManifest(manifest: Manifest, categories: string[]): Manifest {
+  const result: Manifest = {
+    version: manifest.version,
+    generated_at: manifest.generated_at,
+    // Always include project for header
+    project: manifest.project,
+  };
+
+  const categoryMap: Record<string, keyof Manifest> = {
+    "project": "project",
+    "repo": "repo",
+    "structure": "structure",
+    "stack": "stack",
+    "commands": "commands",
+    "dependencies": "dependencies",
+    "config": "config",
+    "git": "git",
+    "quality": "quality",
+    "patterns": "patterns",
+    "status": "status",
+    "roadmap": "roadmap",
+    "decisions": "decisions",
+  };
+
+  for (const cat of categories) {
+    const key = categoryMap[cat.toLowerCase()];
+    if (key && manifest[key]) {
+      (result as any)[key] = manifest[key];
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Generate output in the specified format.
+ */
+function generateOutput(manifest: Manifest, format: string): string {
+  if (format === "json") {
+    return JSON.stringify(manifest, null, 2);
+  }
+
+  // Both "text" and "markdown" use the brief generator (markdown format)
+  return generateBrief(manifest);
 }
