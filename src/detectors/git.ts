@@ -21,16 +21,20 @@ export const gitDetector: Detector = {
 
 async function getRecentCommits(ctx: ScanContext): Promise<string[]> {
   const output = await ctx.exec('git log --oneline -5 --format="%s" 2>/dev/null');
-  if (!output) {return [];}
+  if (!output) {
+    return [];
+  }
   return output.split("\n").filter(Boolean);
 }
 
 async function getLastCommitters(ctx: ScanContext): Promise<string[]> {
   const output = await ctx.exec("git shortlog -sn --no-merges -5 2>/dev/null");
-  if (!output) {return [];}
+  if (!output) {
+    return [];
+  }
   return output
     .split("\n")
-    .map(line => line.replace(/^\s*\d+\s+/, "").trim())
+    .map((line) => line.replace(/^\s*\d+\s+/, "").trim())
     .filter(Boolean);
 }
 

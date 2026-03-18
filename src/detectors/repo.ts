@@ -31,12 +31,18 @@ async function getRemoteUrl(ctx: ScanContext): Promise<string | null> {
 async function getDefaultBranch(ctx: ScanContext): Promise<string | null> {
   // Try symbolic ref first
   const branch = await ctx.exec("git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null");
-  if (branch) {return branch.replace("refs/remotes/origin/", "");}
+  if (branch) {
+    return branch.replace("refs/remotes/origin/", "");
+  }
 
   // Fallback: check if main or master exists
   const branches = await ctx.exec("git branch --list main master 2>/dev/null");
-  if (branches.includes("main")) {return "main";}
-  if (branches.includes("master")) {return "master";}
+  if (branches.includes("main")) {
+    return "main";
+  }
+  if (branches.includes("master")) {
+    return "master";
+  }
 
   // Last resort: current branch
   const current = await ctx.exec("git branch --show-current 2>/dev/null");
@@ -44,13 +50,17 @@ async function getDefaultBranch(ctx: ScanContext): Promise<string | null> {
 }
 
 async function getActiveBranches(ctx: ScanContext): Promise<string[]> {
-  const output = await ctx.exec("git branch -a --sort=-committerdate --format='%(refname:short)' 2>/dev/null");
-  if (!output) {return [];}
+  const output = await ctx.exec(
+    "git branch -a --sort=-committerdate --format='%(refname:short)' 2>/dev/null"
+  );
+  if (!output) {
+    return [];
+  }
 
   return output
     .split("\n")
-    .map(b => b.trim().replace(/^origin\//, ""))
-    .filter(b => b && b !== "HEAD")
+    .map((b) => b.trim().replace(/^origin\//, ""))
+    .filter((b) => b && b !== "HEAD")
     .filter((b, i, arr) => arr.indexOf(b) === i) // dedupe
     .slice(0, 10);
 }
@@ -61,7 +71,9 @@ async function detectMonorepo(ctx: ScanContext): Promise<boolean> {
   if (pkgContent) {
     try {
       const pkg = JSON.parse(pkgContent);
-      if (pkg.workspaces) {return true;}
+      if (pkg.workspaces) {
+        return true;
+      }
     } catch {}
   }
 
@@ -76,17 +88,29 @@ async function detectMonorepo(ctx: ScanContext): Promise<boolean> {
 }
 
 async function detectWorkspaceManager(ctx: ScanContext): Promise<string | null> {
-  if (ctx.fileExists("turbo.json")) {return "turborepo";}
-  if (ctx.fileExists("nx.json")) {return "nx";}
-  if (ctx.fileExists("lerna.json")) {return "lerna";}
-  if (ctx.fileExists("rush.json")) {return "rush";}
-  if (ctx.fileExists("pnpm-workspace.yaml")) {return "pnpm";}
+  if (ctx.fileExists("turbo.json")) {
+    return "turborepo";
+  }
+  if (ctx.fileExists("nx.json")) {
+    return "nx";
+  }
+  if (ctx.fileExists("lerna.json")) {
+    return "lerna";
+  }
+  if (ctx.fileExists("rush.json")) {
+    return "rush";
+  }
+  if (ctx.fileExists("pnpm-workspace.yaml")) {
+    return "pnpm";
+  }
 
   const pkgContent = await ctx.readFile("package.json");
   if (pkgContent) {
     try {
       const pkg = JSON.parse(pkgContent);
-      if (pkg.workspaces) {return "npm/yarn";}
+      if (pkg.workspaces) {
+        return "npm/yarn";
+      }
     } catch {}
   }
 

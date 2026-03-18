@@ -9,8 +9,12 @@ export function queryPath(obj: unknown, path: string): unknown {
   let current: unknown = obj;
 
   for (const part of parts) {
-    if (current === null || current === undefined) {return undefined;}
-    if (typeof current !== "object") {return undefined;}
+    if (current === null || current === undefined) {
+      return undefined;
+    }
+    if (typeof current !== "object") {
+      return undefined;
+    }
     current = (current as Record<string, unknown>)[part];
   }
 
@@ -45,7 +49,9 @@ export function deepDiff(
     } else if (!(key in newObj)) {
       diffs.push({ type: "removed", path, oldValue: oldVal });
     } else if (isObject(oldVal) && isObject(newVal)) {
-      diffs.push(...deepDiff(oldVal as Record<string, unknown>, newVal as Record<string, unknown>, path));
+      diffs.push(
+        ...deepDiff(oldVal as Record<string, unknown>, newVal as Record<string, unknown>, path)
+      );
     } else if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
       diffs.push({ type: "changed", path, oldValue: oldVal, newValue: newVal });
     }

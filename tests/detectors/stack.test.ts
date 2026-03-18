@@ -94,7 +94,7 @@ describe("stackDetector", () => {
         },
       });
       const result = await stackDetector.detect(ctx);
-      const reactEntries = (result.frameworks as string[]).filter(f => f.startsWith("react@"));
+      const reactEntries = (result.frameworks as string[]).filter((f) => f.startsWith("react@"));
       expect(reactEntries).toHaveLength(1);
     });
   });
@@ -295,12 +295,7 @@ datasource db {
   describe("language detection", () => {
     it("detects TypeScript and JavaScript files", async () => {
       const ctx = createMockContext({
-        files: [
-          "src/index.ts",
-          "src/app.tsx",
-          "src/utils.ts",
-          "eslint.config.mjs",
-        ],
+        files: ["src/index.ts", "src/app.tsx", "src/utils.ts", "eslint.config.mjs"],
         fileContents: {},
       });
       const result = await stackDetector.detect(ctx);

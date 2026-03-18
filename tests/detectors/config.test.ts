@@ -78,11 +78,7 @@ describe("configDetector", () => {
 
     it("detects styling config files", async () => {
       const ctx = createMockContext({
-        files: [
-          "tailwind.config.js",
-          "tailwind.config.ts",
-          "postcss.config.js",
-        ],
+        files: ["tailwind.config.js", "tailwind.config.ts", "postcss.config.js"],
         fileContents: {},
       });
       const result = await configDetector.detect(ctx);
@@ -93,12 +89,7 @@ describe("configDetector", () => {
 
     it("detects transpiler config files", async () => {
       const ctx = createMockContext({
-        files: [
-          "babel.config.js",
-          ".babelrc",
-          "swc.config.json",
-          ".swcrc",
-        ],
+        files: ["babel.config.js", ".babelrc", "swc.config.json", ".swcrc"],
         fileContents: {},
       });
       const result = await configDetector.detect(ctx);
@@ -110,12 +101,7 @@ describe("configDetector", () => {
 
     it("detects testing config files", async () => {
       const ctx = createMockContext({
-        files: [
-          "jest.config.js",
-          "vitest.config.ts",
-          "playwright.config.ts",
-          "cypress.config.js",
-        ],
+        files: ["jest.config.js", "vitest.config.ts", "playwright.config.ts", "cypress.config.js"],
         fileContents: {},
       });
       const result = await configDetector.detect(ctx);
@@ -149,13 +135,7 @@ describe("configDetector", () => {
 
     it("detects container and infra config files", async () => {
       const ctx = createMockContext({
-        files: [
-          "docker-compose.yml",
-          "Dockerfile",
-          "fly.toml",
-          "vercel.json",
-          "netlify.toml",
-        ],
+        files: ["docker-compose.yml", "Dockerfile", "fly.toml", "vercel.json", "netlify.toml"],
         fileContents: {},
       });
       const result = await configDetector.detect(ctx);
@@ -168,13 +148,7 @@ describe("configDetector", () => {
 
     it("detects Python config files", async () => {
       const ctx = createMockContext({
-        files: [
-          "pyproject.toml",
-          "setup.cfg",
-          "setup.py",
-          "tox.ini",
-          "ruff.toml",
-        ],
+        files: ["pyproject.toml", "setup.cfg", "setup.py", "tox.ini", "ruff.toml"],
         fileContents: {},
       });
       const result = await configDetector.detect(ctx);
@@ -223,13 +197,7 @@ describe("configDetector", () => {
 
     it("detects misc config files", async () => {
       const ctx = createMockContext({
-        files: [
-          "Makefile",
-          "Taskfile.yml",
-          ".nvmrc",
-          ".node-version",
-          ".python-version",
-        ],
+        files: ["Makefile", "Taskfile.yml", ".nvmrc", ".node-version", ".python-version"],
         fileContents: {},
       });
       const result = await configDetector.detect(ctx);

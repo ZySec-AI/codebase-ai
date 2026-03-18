@@ -1,6 +1,12 @@
 import { resolve } from "node:path";
 import type { CLIOptions } from "../types.js";
-import { createIssue, closeIssue, commentIssue, listIssues, mapIssueToFiles } from "../github/issues.js";
+import {
+  createIssue,
+  closeIssue,
+  commentIssue,
+  listIssues,
+  mapIssueToFiles,
+} from "../github/issues.js";
 import { error } from "../utils/output.js";
 
 export async function runIssue(options: CLIOptions): Promise<void> {
@@ -10,7 +16,7 @@ export async function runIssue(options: CLIOptions): Promise<void> {
     case "create": {
       const title = options.positionals[0];
       if (!title) {
-        error("Usage: codebase issue create \"Issue title\" [--message \"body\"]");
+        error('Usage: codebase issue create "Issue title" [--message "body"]');
         process.exit(1);
       }
       await createIssue(root, title, options.message || undefined);
@@ -19,7 +25,7 @@ export async function runIssue(options: CLIOptions): Promise<void> {
     case "close": {
       const number = options.positionals[0];
       if (!number) {
-        error("Usage: codebase issue close <number> [--reason \"reason\"]");
+        error('Usage: codebase issue close <number> [--reason "reason"]');
         process.exit(1);
       }
       await closeIssue(root, number, options.reason || undefined);
@@ -29,7 +35,7 @@ export async function runIssue(options: CLIOptions): Promise<void> {
       const number = options.positionals[0];
       const body = options.message;
       if (!number || !body) {
-        error("Usage: codebase issue comment <number> --message \"text\"");
+        error('Usage: codebase issue comment <number> --message "text"');
         process.exit(1);
       }
       await commentIssue(root, number, body);

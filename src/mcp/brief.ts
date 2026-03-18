@@ -16,8 +16,6 @@ export function generateBrief(m: Manifest): string {
   }
   sections.push(`\nGenerated: ${m.generated_at}\n`);
 
-
-
   // ─── What is this project? ─────────────────────────────────────
   sections.push("## Technical Overview");
   const projectParts: string[] = [];
@@ -25,25 +23,47 @@ export function generateBrief(m: Manifest): string {
   if (m.repo?.url) {
     projectParts.push(`Repository: ${m.repo.url}`);
     projectParts.push(`Default branch: ${m.repo.default_branch || "unknown"}`);
-    if (m.repo.is_monorepo) {projectParts.push(`Monorepo: yes (${m.repo.workspace_manager || "workspaces"})`);}
+    if (m.repo.is_monorepo) {
+      projectParts.push(`Monorepo: yes (${m.repo.workspace_manager || "workspaces"})`);
+    }
   }
 
   if (m.stack) {
     const techParts: string[] = [];
-    if (m.stack.languages?.length) {techParts.push(`Languages: ${m.stack.languages.join(", ")}`);}
-    if (m.stack.frameworks?.length) {techParts.push(`Frameworks: ${m.stack.frameworks.join(", ")}`);}
-    if (m.stack.package_manager) {techParts.push(`Package manager: ${m.stack.package_manager}`);}
-    if (m.stack.database) {techParts.push(`Database: ${m.stack.database}`);}
-    if (m.stack.orm) {techParts.push(`ORM: ${m.stack.orm}`);}
-    if (m.stack.styling) {techParts.push(`Styling: ${m.stack.styling}`);}
-    if (m.stack.build_tool) {techParts.push(`Build tool: ${m.stack.build_tool}`);}
+    if (m.stack.languages?.length) {
+      techParts.push(`Languages: ${m.stack.languages.join(", ")}`);
+    }
+    if (m.stack.frameworks?.length) {
+      techParts.push(`Frameworks: ${m.stack.frameworks.join(", ")}`);
+    }
+    if (m.stack.package_manager) {
+      techParts.push(`Package manager: ${m.stack.package_manager}`);
+    }
+    if (m.stack.database) {
+      techParts.push(`Database: ${m.stack.database}`);
+    }
+    if (m.stack.orm) {
+      techParts.push(`ORM: ${m.stack.orm}`);
+    }
+    if (m.stack.styling) {
+      techParts.push(`Styling: ${m.stack.styling}`);
+    }
+    if (m.stack.build_tool) {
+      techParts.push(`Build tool: ${m.stack.build_tool}`);
+    }
     projectParts.push(techParts.join("\n"));
   }
 
   if (m.patterns) {
-    if (m.patterns.architecture) {projectParts.push(`Architecture: ${m.patterns.architecture}`);}
-    if (m.patterns.state_management) {projectParts.push(`State management: ${m.patterns.state_management}`);}
-    if (m.patterns.api_style) {projectParts.push(`API style: ${m.patterns.api_style}`);}
+    if (m.patterns.architecture) {
+      projectParts.push(`Architecture: ${m.patterns.architecture}`);
+    }
+    if (m.patterns.state_management) {
+      projectParts.push(`State management: ${m.patterns.state_management}`);
+    }
+    if (m.patterns.api_style) {
+      projectParts.push(`API style: ${m.patterns.api_style}`);
+    }
   }
 
   sections.push(projectParts.join("\n"));
@@ -107,14 +127,18 @@ export function generateBrief(m: Manifest): string {
         const labels = i.labels.length ? ` [${i.labels.join(", ")}]` : "";
         statusParts.push(`- #${i.number}: ${i.title}${labels}`);
       }
-      if (backlog.length > 5) {statusParts.push(`  ... and ${backlog.length - 5} more`);}
+      if (backlog.length > 5) {
+        statusParts.push(`  ... and ${backlog.length - 5} more`);
+      }
     }
 
     // Blockers
-    const blocked = (m.status.issues || []).filter(i =>
-      i.state === "open" && i.labels.some(l =>
-        l.toLowerCase().includes("blocked") || l.toLowerCase().includes("blocker")
-      )
+    const blocked = (m.status.issues || []).filter(
+      (i) =>
+        i.state === "open" &&
+        i.labels.some(
+          (l) => l.toLowerCase().includes("blocked") || l.toLowerCase().includes("blocker")
+        )
     );
     if (blocked.length) {
       statusParts.push("\n### BLOCKERS");
@@ -124,7 +148,7 @@ export function generateBrief(m: Manifest): string {
     }
 
     // Open PRs
-    const openPRs = (m.status.pull_requests || []).filter(pr => pr.state === "open");
+    const openPRs = (m.status.pull_requests || []).filter((pr) => pr.state === "open");
     if (openPRs.length) {
       statusParts.push(`\n### Open PRs (${openPRs.length})`);
       for (const pr of openPRs.slice(0, 5)) {
@@ -146,7 +170,9 @@ export function generateBrief(m: Manifest): string {
     sections.push("\n## Roadmap");
     for (const ms of m.roadmap.milestones) {
       const due = ms.due_date ? ` (due: ${ms.due_date.split("T")[0]})` : "";
-      sections.push(`- ${ms.title}: ${ms.progress.percent}% complete (${ms.progress.closed}/${ms.progress.open + ms.progress.closed} done)${due}`);
+      sections.push(
+        `- ${ms.title}: ${ms.progress.percent}% complete (${ms.progress.closed}/${ms.progress.open + ms.progress.closed} done)${due}`
+      );
     }
   }
 
@@ -160,7 +186,9 @@ export function generateBrief(m: Manifest): string {
     sections.push("\n## Recent Decisions");
     for (const d of allDecisions.slice(0, 5)) {
       sections.push(`- ${d.title} (${d.source})`);
-      if (d.summary) {sections.push(`  ${d.summary.slice(0, 150)}`);}
+      if (d.summary) {
+        sections.push(`  ${d.summary.slice(0, 150)}`);
+      }
     }
   }
 
@@ -184,8 +212,8 @@ export function generateBrief(m: Manifest): string {
   sections.push("- `npx codebase next` — highest-priority task + what's in progress");
   sections.push("- `npx codebase status` — kanban board, priorities, milestones");
   sections.push("- `npx codebase query <path>` — any data point (e.g. `commands.test`)");
-  sections.push("- `npx codebase issue create \"title\"` — track bugs/features/TODOs");
-  sections.push("- `npx codebase issue close <n> --reason \"why\"` — close after fixing");
+  sections.push('- `npx codebase issue create "title"` — track bugs/features/TODOs');
+  sections.push('- `npx codebase issue close <n> --reason "why"` — close after fixing');
   sections.push("- `npx codebase brief` — re-read this briefing after changes");
 
   return sections.join("\n");

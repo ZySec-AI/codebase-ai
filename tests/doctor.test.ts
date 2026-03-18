@@ -7,7 +7,10 @@ import { tmpdir } from "node:os";
 // with various states of setup
 
 function createTempDir(): string {
-  const dir = join(tmpdir(), `codebase-doctor-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const dir = join(
+    tmpdir(),
+    `codebase-doctor-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -19,12 +22,26 @@ function writeManifest(root: string, overrides: Record<string, unknown> = {}): v
     project: { name: "test", description: "test project" },
     repo: { url: null, default_branch: "main", is_monorepo: false, active_branches: [] },
     structure: { entry_points: [], build_output: [], tree: {} },
-    stack: { languages: ["typescript"], frameworks: [], package_manager: "npm", database: null, orm: null, styling: null, build_tool: null },
+    stack: {
+      languages: ["typescript"],
+      frameworks: [],
+      package_manager: "npm",
+      database: null,
+      orm: null,
+      styling: null,
+      build_tool: null,
+    },
     commands: { dev: null, build: "npm run build", test: "npm test", lint: null, format: null },
     dependencies: { direct_count: 0, dev_count: 0, lock_file: null, notable: [] },
     config: { env_files: [], config_files: [], feature_flags: null },
     git: { recent_commits: [], last_committers: [], uncommitted_changes: false },
-    quality: { test_framework: "vitest", linter: null, formatter: null, ci: null, pre_commit_hooks: false },
+    quality: {
+      test_framework: "vitest",
+      linter: null,
+      formatter: null,
+      ci: null,
+      pre_commit_hooks: false,
+    },
     patterns: { architecture: null, state_management: null, api_style: null, key_modules: {} },
     ...overrides,
   };
@@ -35,7 +52,10 @@ function writeGitignore(root: string, content: string): void {
   writeFileSync(join(root, ".gitignore"), content, "utf-8");
 }
 
-function setupGitHooks(root: string, opts: { postCommit?: boolean; postCheckout?: boolean; withSync?: boolean } = {}): void {
+function setupGitHooks(
+  root: string,
+  opts: { postCommit?: boolean; postCheckout?: boolean; withSync?: boolean } = {}
+): void {
   const hooksDir = join(root, ".git", "hooks");
   mkdirSync(hooksDir, { recursive: true });
 
@@ -61,7 +81,9 @@ describe("doctor checks", () => {
   afterEach(() => {
     try {
       rmSync(tempDir, { recursive: true, force: true });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   });
 
   it("detects missing manifest", () => {
@@ -93,10 +115,18 @@ describe("doctor checks", () => {
     writeManifest(tempDir);
     const manifest = JSON.parse(readFileSync(join(tempDir, ".codebase.json"), "utf-8"));
     const expectedCategories = [
-      "project", "repo", "structure", "stack", "commands",
-      "dependencies", "config", "git", "quality", "patterns",
+      "project",
+      "repo",
+      "structure",
+      "stack",
+      "commands",
+      "dependencies",
+      "config",
+      "git",
+      "quality",
+      "patterns",
     ];
-    const present = expectedCategories.filter(c => c in manifest);
+    const present = expectedCategories.filter((c) => c in manifest);
     expect(present.length).toBe(10);
   });
 
@@ -104,10 +134,18 @@ describe("doctor checks", () => {
     writeManifest(tempDir, { stack: undefined, commands: undefined });
     const manifest = JSON.parse(readFileSync(join(tempDir, ".codebase.json"), "utf-8"));
     const expectedCategories = [
-      "project", "repo", "structure", "stack", "commands",
-      "dependencies", "config", "git", "quality", "patterns",
+      "project",
+      "repo",
+      "structure",
+      "stack",
+      "commands",
+      "dependencies",
+      "config",
+      "git",
+      "quality",
+      "patterns",
     ];
-    const missing = expectedCategories.filter(c => !(c in manifest));
+    const missing = expectedCategories.filter((c) => !(c in manifest));
     expect(missing).toContain("stack");
     expect(missing).toContain("commands");
   });
@@ -149,7 +187,11 @@ describe("doctor checks", () => {
 
   it("detects injection markers in markdown files", () => {
     const claudePath = join(tempDir, "CLAUDE.md");
-    writeFileSync(claudePath, "# Rules\n\n<!-- codebase:start -->\ninjected\n<!-- codebase:end -->\n", "utf-8");
+    writeFileSync(
+      claudePath,
+      "# Rules\n\n<!-- codebase:start -->\ninjected\n<!-- codebase:end -->\n",
+      "utf-8"
+    );
     const content = readFileSync(claudePath, "utf-8");
     expect(content.includes("<!-- codebase:start -->")).toBe(true);
   });
@@ -163,11 +205,15 @@ describe("doctor checks", () => {
 
   it("detects MCP configuration", () => {
     const mcpPath = join(tempDir, ".mcp.json");
-    writeFileSync(mcpPath, JSON.stringify({
-      mcpServers: {
-        codebase: { command: "npx", args: ["codebase", "mcp"] },
-      },
-    }), "utf-8");
+    writeFileSync(
+      mcpPath,
+      JSON.stringify({
+        mcpServers: {
+          codebase: { command: "npx", args: ["codebase", "mcp"] },
+        },
+      }),
+      "utf-8"
+    );
     const config = JSON.parse(readFileSync(mcpPath, "utf-8"));
     expect(config.mcpServers.codebase).toBeDefined();
   });

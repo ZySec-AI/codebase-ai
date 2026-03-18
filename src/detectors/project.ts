@@ -29,7 +29,9 @@ async function detectProjectName(ctx: ScanContext): Promise<string> {
   if (pkgContent) {
     try {
       const pkg = JSON.parse(pkgContent);
-      if (pkg.name) {return pkg.name;}
+      if (pkg.name) {
+        return pkg.name;
+      }
     } catch {}
   }
 
@@ -37,21 +39,27 @@ async function detectProjectName(ctx: ScanContext): Promise<string> {
   const cargoContent = await ctx.readFile("Cargo.toml");
   if (cargoContent) {
     const match = cargoContent.match(/^name\s*=\s*"([^"]+)"/m);
-    if (match) {return match[1];}
+    if (match) {
+      return match[1];
+    }
   }
 
   // Try pyproject.toml
   const pyContent = await ctx.readFile("pyproject.toml");
   if (pyContent) {
     const match = pyContent.match(/^name\s*=\s*"([^"]+)"/m);
-    if (match) {return match[1];}
+    if (match) {
+      return match[1];
+    }
   }
 
   // Try go.mod
   const goContent = await ctx.readFile("go.mod");
   if (goContent) {
     const match = goContent.match(/^module\s+(\S+)/m);
-    if (match) {return match[1].split("/").pop() || match[1];}
+    if (match) {
+      return match[1].split("/").pop() || match[1];
+    }
   }
 
   // Fallback: directory name from git remote
@@ -71,7 +79,9 @@ async function detectDescription(ctx: ScanContext): Promise<string | null> {
   if (pkgContent) {
     try {
       const pkg = JSON.parse(pkgContent);
-      if (pkg.description) {return pkg.description;}
+      if (pkg.description) {
+        return pkg.description;
+      }
     } catch {}
   }
 
@@ -79,14 +89,18 @@ async function detectDescription(ctx: ScanContext): Promise<string | null> {
   const cargoContent = await ctx.readFile("Cargo.toml");
   if (cargoContent) {
     const match = cargoContent.match(/^description\s*=\s*"([^"]+)"/m);
-    if (match) {return match[1];}
+    if (match) {
+      return match[1];
+    }
   }
 
   // Try pyproject.toml description
   const pyContent = await ctx.readFile("pyproject.toml");
   if (pyContent) {
     const match = pyContent.match(/^description\s*=\s*"([^"]+)"/m);
-    if (match) {return match[1];}
+    if (match) {
+      return match[1];
+    }
   }
 
   return null;
@@ -99,10 +113,14 @@ async function extractReadmeSummary(ctx: ScanContext): Promise<string | null> {
 
   for (const name of readmeNames) {
     readmeContent = await ctx.readFile(name);
-    if (readmeContent) {break;}
+    if (readmeContent) {
+      break;
+    }
   }
 
-  if (!readmeContent) {return null;}
+  if (!readmeContent) {
+    return null;
+  }
 
   // Extract the first meaningful paragraph (skip title, badges, blank lines)
   const lines = readmeContent.split("\n");
@@ -114,13 +132,22 @@ async function extractReadmeSummary(ctx: ScanContext): Promise<string | null> {
 
     // Skip markdown headers
     if (trimmed.startsWith("#")) {
-      if (foundContent) {break;} // Stop at next header after content
+      if (foundContent) {
+        break;
+      } // Stop at next header after content
       continue;
     }
 
     // Skip badges, images, blank lines before content
-    if (!trimmed || trimmed.startsWith("![") || trimmed.startsWith("[![") || trimmed.startsWith("<")) {
-      if (foundContent) {break;} // Blank line after content = end of paragraph
+    if (
+      !trimmed ||
+      trimmed.startsWith("![") ||
+      trimmed.startsWith("[![") ||
+      trimmed.startsWith("<")
+    ) {
+      if (foundContent) {
+        break;
+      } // Blank line after content = end of paragraph
       continue;
     }
 

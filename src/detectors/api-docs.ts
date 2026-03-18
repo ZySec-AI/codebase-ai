@@ -72,31 +72,46 @@ async function detectOpenAPI(ctx: ScanContext): Promise<OpenAPIData | null> {
 }
 
 async function detectGraphQL(ctx: ScanContext): Promise<GraphQLData | null> {
-  const graphqlFiles = ctx.files.filter(f =>
-    f.endsWith(".graphql") ||
-    f.endsWith(".gql") ||
-    f.includes("/graphql/") ||
-    f.includes("/schema/")
+  const graphqlFiles = ctx.files.filter(
+    (f) =>
+      f.endsWith(".graphql") ||
+      f.endsWith(".gql") ||
+      f.includes("/graphql/") ||
+      f.includes("/schema/")
   );
 
-  if (graphqlFiles.length === 0) {return null;}
+  if (graphqlFiles.length === 0) {
+    return null;
+  }
 
   const schemas: string[] = [];
   const resolvers: string[] = [];
 
   for (const file of graphqlFiles) {
     const content = await ctx.readFile(file);
-    if (!content) {continue;}
+    if (!content) {
+      continue;
+    }
 
-    if (content.includes("type Query") || content.includes("type Mutation") || content.includes("type Subscription")) {
+    if (
+      content.includes("type Query") ||
+      content.includes("type Mutation") ||
+      content.includes("type Subscription")
+    ) {
       schemas.push(file);
     }
-    if (content.includes("Query:") || content.includes("Mutation:") || content.includes("resolver")) {
+    if (
+      content.includes("Query:") ||
+      content.includes("Mutation:") ||
+      content.includes("resolver")
+    ) {
       resolvers.push(file);
     }
   }
 
-  if (schemas.length === 0 && resolvers.length === 0) {return null;}
+  if (schemas.length === 0 && resolvers.length === 0) {
+    return null;
+  }
 
   return {
     schema_files: schemas,
@@ -106,15 +121,19 @@ async function detectGraphQL(ctx: ScanContext): Promise<GraphQLData | null> {
 }
 
 async function detectGRPC(ctx: ScanContext): Promise<GRPCData | null> {
-  const protoFiles = ctx.files.filter(f => f.endsWith(".proto"));
+  const protoFiles = ctx.files.filter((f) => f.endsWith(".proto"));
 
-  if (protoFiles.length === 0) {return null;}
+  if (protoFiles.length === 0) {
+    return null;
+  }
 
   const services: string[] = [];
 
   for (const file of protoFiles) {
     const content = await ctx.readFile(file);
-    if (!content) {continue;}
+    if (!content) {
+      continue;
+    }
 
     if (content.includes("service ")) {
       services.push(file);
@@ -128,18 +147,21 @@ async function detectGRPC(ctx: ScanContext): Promise<GRPCData | null> {
 }
 
 async function detectPostmanCollections(ctx: ScanContext): Promise<PostmanData | null> {
-  const postmanFiles = ctx.files.filter(f =>
-    f.includes("postman") &&
-    (f.endsWith(".json") || f.endsWith(".json.backup"))
+  const postmanFiles = ctx.files.filter(
+    (f) => f.includes("postman") && (f.endsWith(".json") || f.endsWith(".json.backup"))
   );
 
-  if (postmanFiles.length === 0) {return null;}
+  if (postmanFiles.length === 0) {
+    return null;
+  }
 
   const collections: Array<{ file: string; name: string | null }> = [];
 
   for (const file of postmanFiles) {
     const content = await ctx.readFile(file);
-    if (!content) {continue;}
+    if (!content) {
+      continue;
+    }
 
     try {
       const json = JSON.parse(content);
@@ -152,7 +174,9 @@ async function detectPostmanCollections(ctx: ScanContext): Promise<PostmanData |
     } catch {}
   }
 
-  if (collections.length === 0) {return null;}
+  if (collections.length === 0) {
+    return null;
+  }
 
   return {
     collections: collections,

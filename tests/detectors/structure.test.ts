@@ -95,7 +95,9 @@ describe("structureDetector", () => {
     afterEach(() => {
       try {
         rmSync(tempDir, { recursive: true, force: true });
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     });
 
     it("detects dist directory", async () => {
@@ -181,12 +183,7 @@ describe("structureDetector", () => {
 
     it("builds tree with src directory structure", async () => {
       const ctx = createMockContext({
-        files: [
-          "src/index.ts",
-          "src/app.ts",
-          "src/utils/helpers.ts",
-          "src/components/Button.tsx",
-        ],
+        files: ["src/index.ts", "src/app.ts", "src/utils/helpers.ts", "src/components/Button.tsx"],
         fileContents: {},
       });
       const result = await structureDetector.detect(ctx);
@@ -198,12 +195,7 @@ describe("structureDetector", () => {
 
     it("builds tree with multiple top-level directories", async () => {
       const ctx = createMockContext({
-        files: [
-          "src/index.ts",
-          "tests/app.test.ts",
-          "lib/utils.ts",
-          "config/default.json",
-        ],
+        files: ["src/index.ts", "tests/app.test.ts", "lib/utils.ts", "config/default.json"],
         fileContents: {},
       });
       const result = await structureDetector.detect(ctx);

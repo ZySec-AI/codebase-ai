@@ -9,7 +9,7 @@ export function globMatch(pattern: string, filepath: string): boolean {
 
 export function globFilter(files: string[], pattern: string): string[] {
   const regex = globToRegex(pattern);
-  return files.filter(f => regex.test(f));
+  return files.filter((f) => regex.test(f));
 }
 
 function globToRegex(pattern: string): RegExp {

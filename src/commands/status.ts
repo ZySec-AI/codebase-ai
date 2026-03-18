@@ -101,14 +101,16 @@ function printDecisions(decisions: NonNullable<Manifest["decisions"]>): void {
   heading("Decisions");
 
   const all = [
-    ...decisions.from_prs.map(d => ({ ...d, type: "PR" })),
-    ...decisions.from_adrs.map(d => ({ ...d, type: "ADR" })),
-    ...decisions.manual.map(d => ({ ...d, type: "Manual" })),
+    ...decisions.from_prs.map((d) => ({ ...d, type: "PR" })),
+    ...decisions.from_adrs.map((d) => ({ ...d, type: "ADR" })),
+    ...decisions.manual.map((d) => ({ ...d, type: "Manual" })),
   ].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
   for (const d of all.slice(0, 15)) {
     log(`  [${d.type}] ${d.title}`);
-    if (d.summary) {log(`    ${d.summary.slice(0, 100)}`);}
+    if (d.summary) {
+      log(`    ${d.summary.slice(0, 100)}`);
+    }
   }
 }
 

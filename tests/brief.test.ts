@@ -16,9 +16,20 @@ function minimalManifest(overrides: Partial<Manifest> = {}): Manifest {
       styling: "tailwindcss",
       build_tool: "vite",
     },
-    commands: { dev: "npm run dev", build: "npm run build", test: "npm run test", lint: null, format: null },
+    commands: {
+      dev: "npm run dev",
+      build: "npm run build",
+      test: "npm run test",
+      lint: null,
+      format: null,
+    },
     structure: { entry_points: ["src/main.tsx"], build_output: [".next"], tree: {} },
-    patterns: { architecture: "app-router", state_management: "zustand", api_style: null, key_modules: {} },
+    patterns: {
+      architecture: "app-router",
+      state_management: "zustand",
+      api_style: null,
+      key_modules: {},
+    },
     ...overrides,
   };
 }
@@ -41,61 +52,71 @@ describe("generateBrief", () => {
   });
 
   it("hides CURRENT STATUS when github_available but no content", () => {
-    const brief = generateBrief(minimalManifest({
-      status: {
-        synced_at: "2026-02-22T12:00:00.000Z",
-        github_available: true,
-        issues: [],
-        pull_requests: [],
-        kanban: { backlog: [], in_progress: [], done: [] },
-        priorities: [],
-      },
-    }));
+    const brief = generateBrief(
+      minimalManifest({
+        status: {
+          synced_at: "2026-02-22T12:00:00.000Z",
+          github_available: true,
+          issues: [],
+          pull_requests: [],
+          kanban: { backlog: [], in_progress: [], done: [] },
+          priorities: [],
+        },
+      })
+    );
     expect(brief).not.toContain("## CURRENT STATUS");
   });
 
   it("shows CURRENT STATUS when there are issues", () => {
-    const brief = generateBrief(minimalManifest({
-      status: {
-        synced_at: "2026-02-22T12:00:00.000Z",
-        github_available: true,
-        issues: [{
-          number: 1,
-          title: "Fix bug",
-          state: "open",
-          labels: ["bug"],
-          assignee: null,
-          milestone: null,
-          created_at: "2026-02-22T12:00:00.000Z",
-          updated_at: "2026-02-22T12:00:00.000Z",
-        }],
-        pull_requests: [],
-        kanban: {
-          backlog: [{
-            number: 1,
-            title: "Fix bug",
-            state: "open",
-            labels: ["bug"],
-            assignee: null,
-            milestone: null,
-            created_at: "2026-02-22T12:00:00.000Z",
-            updated_at: "2026-02-22T12:00:00.000Z",
-          }],
-          in_progress: [],
-          done: [],
+    const brief = generateBrief(
+      minimalManifest({
+        status: {
+          synced_at: "2026-02-22T12:00:00.000Z",
+          github_available: true,
+          issues: [
+            {
+              number: 1,
+              title: "Fix bug",
+              state: "open",
+              labels: ["bug"],
+              assignee: null,
+              milestone: null,
+              created_at: "2026-02-22T12:00:00.000Z",
+              updated_at: "2026-02-22T12:00:00.000Z",
+            },
+          ],
+          pull_requests: [],
+          kanban: {
+            backlog: [
+              {
+                number: 1,
+                title: "Fix bug",
+                state: "open",
+                labels: ["bug"],
+                assignee: null,
+                milestone: null,
+                created_at: "2026-02-22T12:00:00.000Z",
+                updated_at: "2026-02-22T12:00:00.000Z",
+              },
+            ],
+            in_progress: [],
+            done: [],
+          },
+          priorities: [
+            {
+              number: 1,
+              title: "Fix bug",
+              state: "open",
+              labels: ["bug"],
+              assignee: null,
+              milestone: null,
+              created_at: "2026-02-22T12:00:00.000Z",
+              updated_at: "2026-02-22T12:00:00.000Z",
+            },
+          ],
         },
-        priorities: [{
-          number: 1,
-          title: "Fix bug",
-          state: "open",
-          labels: ["bug"],
-          assignee: null,
-          milestone: null,
-          created_at: "2026-02-22T12:00:00.000Z",
-          updated_at: "2026-02-22T12:00:00.000Z",
-        }],
-      },
-    }));
+      })
+    );
     expect(brief).toContain("## CURRENT STATUS");
     expect(brief).toContain("Fix bug");
   });

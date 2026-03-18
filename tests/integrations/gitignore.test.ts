@@ -15,7 +15,9 @@ describe("gitignore integration", () => {
   afterEach(() => {
     try {
       rmSync(tempDir, { recursive: true, force: true });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   });
 
   describe("updateGitignore", () => {

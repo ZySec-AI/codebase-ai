@@ -16,7 +16,10 @@ const HELP: Record<string, CommandHelp> = {
       { command: "codebase scan", description: "Scan current directory" },
       { command: "codebase scan ./my-project", description: "Scan specific directory" },
       { command: "codebase scan --depth 6", description: "Include deeper directory structure" },
-      { command: "codebase scan --categories stack,commands", description: "Scan only specific categories" },
+      {
+        command: "codebase scan --categories stack,commands",
+        description: "Scan only specific categories",
+      },
     ],
     options: [
       { flag: "--path <dir>", description: "Target project directory (default: current)" },
@@ -33,7 +36,10 @@ const HELP: Record<string, CommandHelp> = {
     usage: "codebase init [options]",
     examples: [
       { command: "codebase init", description: "One-time setup for current project" },
-      { command: "codebase init --dry-run", description: "Preview changes without modifying files" },
+      {
+        command: "codebase init --dry-run",
+        description: "Preview changes without modifying files",
+      },
       { command: "codebase init --sync", description: "Include GitHub data sync" },
     ],
     options: [
@@ -48,11 +54,12 @@ const HELP: Record<string, CommandHelp> = {
     description: "Wire .codebase.json into Claude Code and install slash commands",
     usage: "codebase setup [options]",
     examples: [
-      { command: "codebase setup", description: "Configure Claude Code, git hooks, and slash commands" },
+      {
+        command: "codebase setup",
+        description: "Configure Claude Code, git hooks, and slash commands",
+      },
     ],
-    options: [
-      { flag: "--dry-run", description: "Preview changes" },
-    ],
+    options: [{ flag: "--dry-run", description: "Preview changes" }],
   },
 
   brief: {
@@ -68,9 +75,7 @@ const HELP: Record<string, CommandHelp> = {
   next: {
     description: "Show highest-priority task and what's in progress",
     usage: "codebase next",
-    examples: [
-      { command: "codebase next", description: "Show next task to work on" },
-    ],
+    examples: [{ command: "codebase next", description: "Show next task to work on" }],
     seeAlso: ["brief", "status"],
   },
 
@@ -81,9 +86,7 @@ const HELP: Record<string, CommandHelp> = {
       { command: "codebase status", description: "Full project status" },
       { command: "codebase status --mine", description: "Show only my assigned tasks" },
     ],
-    options: [
-      { flag: "--mine", description: "Show only your assigned items" },
-    ],
+    options: [{ flag: "--mine", description: "Show only your assigned items" }],
     seeAlso: ["brief", "next"],
   },
 
@@ -95,18 +98,22 @@ const HELP: Record<string, CommandHelp> = {
       { command: "codebase query commands.test --raw | sh", description: "Run test command" },
       { command: "codebase query dependencies.notable", description: "List notable packages" },
     ],
-    options: [
-      { flag: "--raw", description: "Plain text output (no JSON)" },
-    ],
+    options: [{ flag: "--raw", description: "Plain text output (no JSON)" }],
   },
 
   issue: {
     description: "Manage GitHub issues",
     usage: "codebase issue <subcommand> [args]",
     examples: [
-      { command: "codebase issue create \"Fix auth bug\"", description: "Create new issue" },
-      { command: "codebase issue close 42 --reason \"Fixed in PR #123\"", description: "Close with reason" },
-      { command: "codebase issue comment 42 --message \"Fixed by refactoring auth flow\"", description: "Add comment" },
+      { command: 'codebase issue create "Fix auth bug"', description: "Create new issue" },
+      {
+        command: 'codebase issue close 42 --reason "Fixed in PR #123"',
+        description: "Close with reason",
+      },
+      {
+        command: 'codebase issue comment 42 --message "Fixed by refactoring auth flow"',
+        description: "Add comment",
+      },
       { command: "codebase issue list", description: "List all issues" },
       { command: "codebase issue list --mine", description: "List your issues" },
     ],
@@ -120,26 +127,20 @@ const HELP: Record<string, CommandHelp> = {
   mcp: {
     description: "Start MCP server for AI tool integration",
     usage: "codebase mcp",
-    examples: [
-      { command: "codebase mcp", description: "Start stdio MCP server" },
-    ],
+    examples: [{ command: "codebase mcp", description: "Start stdio MCP server" }],
   },
 
   doctor: {
     description: "Diagnose setup and configuration issues",
     usage: "codebase doctor",
-    examples: [
-      { command: "codebase doctor", description: "Run health check" },
-    ],
+    examples: [{ command: "codebase doctor", description: "Run health check" }],
     seeAlso: ["fix"],
   },
 
   fix: {
     description: "Auto-repair issues found by doctor",
     usage: "codebase fix",
-    examples: [
-      { command: "codebase fix", description: "Auto-fix all issues" },
-    ],
+    examples: [{ command: "codebase fix", description: "Auto-fix all issues" }],
     seeAlso: ["doctor"],
   },
 
@@ -200,7 +201,7 @@ ${bold("EXAMPLES")}
   ${command("codebase brief")}                            # Project overview
   ${command("codebase next")}                             # Next task
   ${command("codebase query commands.test --raw | sh")}   # Run tests
-  ${command("codebase issue create \"Fix bug\"")}        # Track work
+  ${command('codebase issue create "Fix bug"')}        # Track work
 
 ${bold("GLOBAL OPTIONS")}
   ${code("--path <dir>")}               Target directory (default: current)
@@ -228,16 +229,28 @@ ${bold(commandName)} — ${help.description}
 
 ${bold("USAGE")}
   ${code(help.usage)}
-${help.examples.length > 0 ? `
+${
+  help.examples.length > 0
+    ? `
 ${bold("EXAMPLES")}
-${help.examples.map(ex => `  ${command(ex.command)}${dim(" # " + ex.description)}`).join("\n")}
-` : ""}${help.options ? `
+${help.examples.map((ex) => `  ${command(ex.command)}${dim(" # " + ex.description)}`).join("\n")}
+`
+    : ""
+}${
+    help.options
+      ? `
 ${bold("OPTIONS")}
-${help.options.map(opt => `  ${code(opt.flag.padEnd(25))} ${opt.description}`).join("\n")}
-` : ""}${help.seeAlso ? `
+${help.options.map((opt) => `  ${code(opt.flag.padEnd(25))} ${opt.description}`).join("\n")}
+`
+      : ""
+  }${
+    help.seeAlso
+      ? `
 ${bold("SEE ALSO")}
-  ${help.seeAlso.map(c => command(c)).join(", ")}
-` : ""}${bold("MORE HELP")}
+  ${help.seeAlso.map((c) => command(c)).join(", ")}
+`
+      : ""
+  }${bold("MORE HELP")}
   ${command("codebase --help")}  Show all commands
   ${link("https://github.com/your-repo/codebase/docs", "Full documentation")}
 `);
@@ -271,6 +284,8 @@ export const ERROR_SUGGESTIONS: Record<string, { message: string; suggestion: st
   },
 };
 
-export function getErrorSuggestion(errorCode: string): { message: string; suggestion: string } | undefined {
+export function getErrorSuggestion(
+  errorCode: string
+): { message: string; suggestion: string } | undefined {
   return ERROR_SUGGESTIONS[errorCode];
 }

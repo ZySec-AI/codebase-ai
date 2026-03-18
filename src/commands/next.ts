@@ -50,17 +50,28 @@ export async function runNext(options: CLIOptions): Promise<void> {
 
   log(bold("NEXT TASK:"));
   log(`  #${next.number}: ${next.title}`);
-  if (next.labels.length) {log(`  Labels: ${next.labels.join(", ")}`);}
-  if (next.assignee) {log(`  Assignee: @${next.assignee}`);}
-  if (next.milestone) {log(`  Milestone: ${next.milestone}`);}
-  if (next.mapped_files?.length) {log(`  Start in: ${next.mapped_files.join(", ")}`);}
+  if (next.labels.length) {
+    log(`  Labels: ${next.labels.join(", ")}`);
+  }
+  if (next.assignee) {
+    log(`  Assignee: @${next.assignee}`);
+  }
+  if (next.milestone) {
+    log(`  Milestone: ${next.milestone}`);
+  }
+  if (next.mapped_files?.length) {
+    log(`  Start in: ${next.mapped_files.join(", ")}`);
+  }
 
   // Show blockers
-  const blocked = status.issues?.filter(i =>
-    i.state === "open" && i.labels.some(l =>
-      l.toLowerCase().includes("blocked") || l.toLowerCase().includes("blocker")
-    )
-  ) || [];
+  const blocked =
+    status.issues?.filter(
+      (i) =>
+        i.state === "open" &&
+        i.labels.some(
+          (l) => l.toLowerCase().includes("blocked") || l.toLowerCase().includes("blocker")
+        )
+    ) || [];
 
   if (blocked.length) {
     log(`\n${bold("BLOCKERS:")}`);

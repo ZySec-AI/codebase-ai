@@ -195,10 +195,7 @@ query($owner: String!, $repo: String!) {
 
 function parseOwnerRepo(remoteUrl: string): { owner: string; repo: string } | null {
   // Parse GitHub remote URL to extract owner and repo
-  const patterns = [
-    /github\.com[:/]([^/]+)\/(.+?)(\.git)?$/,
-    /github\.com[:/]([^/]+)\/(.+)$/,
-  ];
+  const patterns = [/github\.com[:/]([^/]+)\/(.+?)(\.git)?$/, /github\.com[:/]([^/]+)\/(.+)$/];
 
   for (const pattern of patterns) {
     const match = remoteUrl.match(pattern);
@@ -210,7 +207,9 @@ function parseOwnerRepo(remoteUrl: string): { owner: string; repo: string } | nu
   return null;
 }
 
-function parseIssueNode(node: Record<string, unknown>): ReturnType<typeof import("./sync").parseIssue> & {
+function parseIssueNode(node: Record<string, unknown>): ReturnType<
+  typeof import("./sync").parseIssue
+> & {
   comments_count?: number;
   reactions?: {
     thumbs_up: number;
@@ -228,7 +227,7 @@ function parseIssueNode(node: Record<string, unknown>): ReturnType<typeof import
   const labels = (node.labels as { nodes: Array<{ name: string }> })?.nodes || [];
   const assignees = (node.assignees as { nodes: Array<{ login: string }> })?.nodes || [];
   const milestone = node.milestone as { title: string } | null;
-  const reactions = node.reactions as Record<string, number> || {};
+  const reactions = (node.reactions as Record<string, number>) || {};
   const comments = node.comments as { totalCount: number } | null;
   const timeline = node.timelineItems as { totalCount: number } | null;
 
@@ -237,7 +236,7 @@ function parseIssueNode(node: Record<string, unknown>): ReturnType<typeof import
     title: node.title as string,
     state: (node.state as string)?.toLowerCase() === "open" ? "open" : "closed",
     url: (node.url as string) || undefined,
-    labels: labels.map(l => l.name),
+    labels: labels.map((l) => l.name),
     assignee: assignees[0]?.login || null,
     milestone: milestone?.title || null,
     created_at: node.createdAt as string,
@@ -268,7 +267,9 @@ function parsePRNode(node: Record<string, unknown>): ReturnType<typeof import(".
   url?: string;
 } {
   const labels = (node.labels as { nodes: Array<{ name: string }> })?.nodes || [];
-  const reviewRequests = (node.reviewRequests as { nodes: Array<{ requestedReviewer?: { login?: string } }> })?.nodes || [];
+  const reviewRequests =
+    (node.reviewRequests as { nodes: Array<{ requestedReviewer?: { login?: string } }> })?.nodes ||
+    [];
   const author = node.author as { login: string } | null;
   const statusCheck = node.statusCheckRollup as { state: string } | null;
   const comments = node.comments as { totalCount: number } | null;
@@ -276,9 +277,13 @@ function parsePRNode(node: Record<string, unknown>): ReturnType<typeof import(".
   let checksStatus: "pending" | "passing" | "failing" | undefined;
   if (statusCheck?.state) {
     const state = statusCheck.state.toLowerCase();
-    if (state === "success" || state === "completed") {checksStatus = "passing";}
-    else if (state === "failure" || state === "error") {checksStatus = "failing";}
-    else {checksStatus = "pending";}
+    if (state === "success" || state === "completed") {
+      checksStatus = "passing";
+    } else if (state === "failure" || state === "error") {
+      checksStatus = "failing";
+    } else {
+      checksStatus = "pending";
+    }
   }
 
   const mergeable = (node.mergeable as string) === "MERGEABLE";
@@ -291,23 +296,24 @@ function parsePRNode(node: Record<string, unknown>): ReturnType<typeof import(".
     url: (node.url as string) || undefined,
     author: author?.login || "unknown",
     branch: (node.headRefName as string) || "",
-    labels: labels.map(l => l.name),
-    reviewers: reviewRequests.map(r => r.requestedReviewer?.login || "").filter(Boolean),
+    labels: labels.map((l) => l.name),
+    reviewers: reviewRequests.map((r) => r.requestedReviewer?.login || "").filter(Boolean),
     created_at: node.createdAt as string,
     updated_at: node.updatedAt as string,
     checks_status: checksStatus,
     mergeable,
     merge_conflicts: mergeConflicts,
-    additions: node.additions as number || 0,
-    deletions: node.deletions as number || 0,
+    additions: (node.additions as number) || 0,
+    deletions: (node.deletions as number) || 0,
     comments_count: comments?.totalCount || 0,
-    review_decision: (node.review_decision as string)?.toLowerCase() === "approved"
-      ? "approved"
-      : (node.review_decision as string)?.toLowerCase() === "changes_requested"
-      ? "changes_requested"
-      : (node.review_decision as string)?.toLowerCase() === "review_required"
-      ? "review_required"
-      : null,
+    review_decision:
+      (node.review_decision as string)?.toLowerCase() === "approved"
+        ? "approved"
+        : (node.review_decision as string)?.toLowerCase() === "changes_requested"
+          ? "changes_requested"
+          : (node.review_decision as string)?.toLowerCase() === "review_required"
+            ? "review_required"
+            : null,
   };
 }
 
@@ -376,11 +382,9 @@ export async function fetchGitHubGraphQLData(
   // Fetch issues with comments and reactions
   if (includeIssues) {
     try {
-      const issueData = await graphqlQuery<{ repository: { issues: { nodes: Record<string, unknown>[] } } }>(
-        cwd,
-        ISSUES_QUERY,
-        { owner, repo, limit }
-      );
+      const issueData = await graphqlQuery<{
+        repository: { issues: { nodes: Record<string, unknown>[] } };
+      }>(cwd, ISSUES_QUERY, { owner, repo, limit });
 
       if (issueData?.repository?.issues?.nodes) {
         result.issues = issueData.repository.issues.nodes.map(parseIssueNode);
@@ -393,11 +397,9 @@ export async function fetchGitHubGraphQLData(
   // Fetch pull requests with checks and reviews
   if (includePRs) {
     try {
-      const prData = await graphqlQuery<{ repository: { pullRequests: { nodes: Record<string, unknown>[] } } }>(
-        cwd,
-        PULL_REQUESTS_QUERY,
-        { owner, repo, limit: Math.min(limit, 30) }
-      );
+      const prData = await graphqlQuery<{
+        repository: { pullRequests: { nodes: Record<string, unknown>[] } };
+      }>(cwd, PULL_REQUESTS_QUERY, { owner, repo, limit: Math.min(limit, 30) });
 
       if (prData?.repository?.pullRequests?.nodes) {
         result.pull_requests = prData.repository.pullRequests.nodes.map(parsePRNode);
@@ -410,14 +412,12 @@ export async function fetchGitHubGraphQLData(
   // Fetch milestones with issue counts
   if (includeMilestones) {
     try {
-      const milestoneData = await graphqlQuery<{ repository: { milestones: { nodes: Record<string, unknown>[] } } }>(
-        cwd,
-        MILESTONES_QUERY,
-        { owner, repo }
-      );
+      const milestoneData = await graphqlQuery<{
+        repository: { milestones: { nodes: Record<string, unknown>[] } };
+      }>(cwd, MILESTONES_QUERY, { owner, repo });
 
       if (milestoneData?.repository?.milestones?.nodes) {
-        result.milestones = milestoneData.repository.milestones.nodes.map(m => {
+        result.milestones = milestoneData.repository.milestones.nodes.map((m) => {
           const issues = (m.issues as { nodes: Array<{ number: number }> })?.nodes || [];
           const closed = (m.closedIssues as { totalCount: number })?.totalCount || 0;
           const total = (m.issues as { totalCount: number })?.totalCount || issues.length;
@@ -432,7 +432,7 @@ export async function fetchGitHubGraphQLData(
               closed,
               percent: total > 0 ? Math.round((closed / total) * 100) : 0,
             },
-            issues: issues.map(i => i.number),
+            issues: issues.map((i) => i.number),
           };
         });
       }
@@ -444,19 +444,17 @@ export async function fetchGitHubGraphQLData(
   // Fetch releases
   if (includeReleases) {
     try {
-      const releaseData = await graphqlQuery<{ repository: { releases: { nodes: Record<string, unknown>[] } } }>(
-        cwd,
-        RELEASES_QUERY,
-        { owner, repo, limit: 10 }
-      );
+      const releaseData = await graphqlQuery<{
+        repository: { releases: { nodes: Record<string, unknown>[] } };
+      }>(cwd, RELEASES_QUERY, { owner, repo, limit: 10 });
 
       if (releaseData?.repository?.releases?.nodes) {
-        result.releases = releaseData.repository.releases.nodes.map(r => ({
+        result.releases = releaseData.repository.releases.nodes.map((r) => ({
           tag_name: r.tagName as string,
-          name: (r.name as string) || r.tagName as string,
+          name: (r.name as string) || (r.tagName as string),
           created_at: r.createdAt as string,
           url: r.url as string,
-          author: ((r.author as { login: string })?.login) || "unknown",
+          author: (r.author as { login: string })?.login || "unknown",
           prerelease: !!r.isPrerelease,
         }));
       }
@@ -468,16 +466,14 @@ export async function fetchGitHubGraphQLData(
   // Fetch project boards
   if (includeProjects) {
     try {
-      const projectData = await graphqlQuery<{ repository: { projectsV2: { nodes: Record<string, unknown>[] } } }>(
-        cwd,
-        PROJECTS_QUERY,
-        { owner, repo }
-      );
+      const projectData = await graphqlQuery<{
+        repository: { projectsV2: { nodes: Record<string, unknown>[] } };
+      }>(cwd, PROJECTS_QUERY, { owner, repo });
 
       if (projectData?.repository?.projectsV2?.nodes) {
         result.project_boards = projectData.repository.projectsV2.nodes
-          .filter(p => p !== null)
-          .map(p => {
+          .filter((p) => p !== null)
+          .map((p) => {
             const columns = (p.columns as { nodes: Array<{ name: string }> })?.nodes || [];
             const itemsCount = (p.items as { totalCount: number })?.totalCount || 0;
 
@@ -486,7 +482,7 @@ export async function fetchGitHubGraphQLData(
               title: p.title as string,
               state: ((p.state as string) || "open").toLowerCase() as "open" | "closed",
               url: p.url as string,
-              columns: columns.map(c => ({
+              columns: columns.map((c) => ({
                 name: c.name,
                 cards_count: itemsCount, // Approximate - actual per-column count requires more complex query
               })),

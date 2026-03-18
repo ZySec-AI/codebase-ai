@@ -9,7 +9,9 @@ const HOOK_MARKER = "# codebase-auto-update";
  * Also installs a pre-commit hook that runs typecheck + lint if available.
  */
 export function installHooks(root: string, ghSync = false): boolean {
-  if (!existsSync(join(root, ".git"))) {return false;}
+  if (!existsSync(join(root, ".git"))) {
+    return false;
+  }
 
   const syncFlag = ghSync ? " --sync" : "";
   const hookCmd = `npx --yes codebase scan-only --incremental --quiet${syncFlag}`;
@@ -42,11 +44,15 @@ function installPreCommitHook(root: string): void {
   const hooksDir = join(root, ".git", "hooks");
   const hookPath = join(hooksDir, "pre-commit");
 
-  if (!existsSync(hooksDir)) {mkdirSync(hooksDir, { recursive: true });}
+  if (!existsSync(hooksDir)) {
+    mkdirSync(hooksDir, { recursive: true });
+  }
 
   // Only install if there's a package.json with a check or typecheck script
   const pkgPath = join(root, "package.json");
-  if (!existsSync(pkgPath)) {return;}
+  if (!existsSync(pkgPath)) {
+    return;
+  }
 
   let hasCheck = false;
   let hasTypecheck = false;
@@ -56,9 +62,13 @@ function installPreCommitHook(root: string): void {
     hasCheck = !!pkg.scripts?.check;
     hasTypecheck = !!pkg.scripts?.typecheck;
     hasLint = !!pkg.scripts?.lint;
-  } catch { return; }
+  } catch {
+    return;
+  }
 
-  if (!hasCheck && !hasTypecheck && !hasLint) {return;}
+  if (!hasCheck && !hasTypecheck && !hasLint) {
+    return;
+  }
 
   // Build the check command: prefer `check` (runs both), else typecheck + lint separately
   let checkCmd: string;
@@ -66,8 +76,12 @@ function installPreCommitHook(root: string): void {
     checkCmd = `npm run check --silent`;
   } else {
     const parts: string[] = [];
-    if (hasTypecheck) {parts.push(`npm run typecheck --silent`);}
-    if (hasLint) {parts.push(`npm run lint --silent`);}
+    if (hasTypecheck) {
+      parts.push(`npm run typecheck --silent`);
+    }
+    if (hasLint) {
+      parts.push(`npm run lint --silent`);
+    }
     checkCmd = parts.join(" && ");
   }
 
@@ -100,7 +114,9 @@ function installSingleHook(root: string, hookName: string, command: string): voi
   const hooksDir = join(root, ".git", "hooks");
   const hookPath = join(hooksDir, hookName);
 
-  if (!existsSync(hooksDir)) {mkdirSync(hooksDir, { recursive: true });}
+  if (!existsSync(hooksDir)) {
+    mkdirSync(hooksDir, { recursive: true });
+  }
 
   if (existsSync(hookPath)) {
     const content = readFileSync(hookPath, "utf-8");
@@ -114,17 +130,9 @@ function installSingleHook(root: string, hookName: string, command: string): voi
       return;
     }
     // Append to existing hook
-    writeFileSync(
-      hookPath,
-      content.trimEnd() + `\n\n${HOOK_MARKER}\n${command}\n`,
-      "utf-8"
-    );
+    writeFileSync(hookPath, content.trimEnd() + `\n\n${HOOK_MARKER}\n${command}\n`, "utf-8");
   } else {
-    writeFileSync(
-      hookPath,
-      `#!/bin/sh\n\n${HOOK_MARKER}\n${command}\n`,
-      "utf-8"
-    );
+    writeFileSync(hookPath, `#!/bin/sh\n\n${HOOK_MARKER}\n${command}\n`, "utf-8");
   }
 
   chmodSync(hookPath, 0o755);
@@ -132,10 +140,14 @@ function installSingleHook(root: string, hookName: string, command: string): voi
 
 function removeSingleHook(root: string, hookName: string): boolean {
   const hookPath = join(root, ".git", "hooks", hookName);
-  if (!existsSync(hookPath)) {return false;}
+  if (!existsSync(hookPath)) {
+    return false;
+  }
 
   let content = readFileSync(hookPath, "utf-8");
-  if (!content.includes(HOOK_MARKER)) {return false;}
+  if (!content.includes(HOOK_MARKER)) {
+    return false;
+  }
 
   // Remove the marker and the line after it
   const lines = content.split("\n");

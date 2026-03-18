@@ -22,14 +22,14 @@ export function createMockContext(options: MockContextOptions = {}): ScanContext
     },
     glob(pattern: string): string[] {
       // Simple glob matching for tests
-      const regex = new RegExp(
-        "^" + pattern.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*") + "$"
-      );
-      return files.filter(f => regex.test(f));
+      const regex = new RegExp("^" + pattern.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*") + "$");
+      return files.filter((f) => regex.test(f));
     },
     async exec(cmd: string): Promise<string> {
       for (const [key, value] of Object.entries(execResults)) {
-        if (cmd.includes(key)) {return value;}
+        if (cmd.includes(key)) {
+          return value;
+        }
       }
       return "";
     },

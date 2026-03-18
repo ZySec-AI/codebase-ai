@@ -87,7 +87,9 @@ function readManifestSummary(root: string): ManifestSummary | null {
 
 function buildDynamicBlockMd(root: string): string {
   const summary = readManifestSummary(root);
-  if (!summary) {return INJECT_BLOCK_MD;}
+  if (!summary) {
+    return INJECT_BLOCK_MD;
+  }
 
   const stackParts = [...summary.languages, ...summary.frameworks].filter(Boolean);
   const stack = stackParts.length ? stackParts.join(", ") : "unknown";
@@ -133,16 +135,16 @@ ${END_MARKER}`;
 
 function buildDynamicBlockPlain(root: string): string {
   const summary = readManifestSummary(root);
-  if (!summary) {return INJECT_BLOCK_PLAIN;}
+  if (!summary) {
+    return INJECT_BLOCK_PLAIN;
+  }
 
   const stackParts = [...summary.languages, ...summary.frameworks].filter(Boolean);
   const stack = stackParts.length ? stackParts.join(", ") : "unknown";
 
   const cmdEntries = Object.entries(summary.commands).filter(([, v]) => v);
   const cmdLines = cmdEntries.map(([k, v]) => `#   ${k}: ${v}`).join("\n");
-  const cmdSection = cmdLines
-    ? `#\n# PROJECT COMMANDS:\n${cmdLines}\n`
-    : "";
+  const cmdSection = cmdLines ? `#\n# PROJECT COMMANDS:\n${cmdLines}\n` : "";
 
   return `
 ${HASH_START_MARKER}
@@ -212,7 +214,9 @@ export function injectPlaintext(root: string, file: string): void {
 
 export function removeMarkdown(root: string, file: string): void {
   const path = join(root, file);
-  if (!existsSync(path)) {return;}
+  if (!existsSync(path)) {
+    return;
+  }
 
   let content = readFileSync(path, "utf-8");
   const startIdx = content.indexOf(START_MARKER);
@@ -228,7 +232,9 @@ export function removeMarkdown(root: string, file: string): void {
 
 export function removePlaintext(root: string, file: string): void {
   const path = join(root, file);
-  if (!existsSync(path)) {return;}
+  if (!existsSync(path)) {
+    return;
+  }
 
   let content = readFileSync(path, "utf-8");
   const startIdx = content.indexOf(HASH_START_MARKER);

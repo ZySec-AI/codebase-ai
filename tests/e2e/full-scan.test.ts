@@ -127,7 +127,9 @@ fastapi = "^0.109.0"
     expect(manifest.stack).toBeDefined();
     expect(manifest.stack.languages).toBeDefined();
     // Should detect Python
-    expect(manifest.stack.languages.some((lang: string) => lang.toLowerCase().includes("python"))).toBe(true);
+    expect(
+      manifest.stack.languages.some((lang: string) => lang.toLowerCase().includes("python"))
+    ).toBe(true);
   });
 
   it("should detect commands correctly", () => {
@@ -217,7 +219,7 @@ fastapi = "^0.109.0"
     const manifest1 = JSON.parse(readFileSync(join(tempDir, ".codebase.json"), "utf-8"));
 
     // Wait a bit (to ensure different generated_at timestamp)
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Second scan
     execSync(`node ${cliPath} scan`, { cwd: tempDir, stdio: "pipe" });

@@ -26,7 +26,7 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Man
 
   let activeDetectors = detectors;
   if (options.categories?.length) {
-    activeDetectors = detectors.filter(d => options.categories!.includes(d.category));
+    activeDetectors = detectors.filter((d) => options.categories!.includes(d.category));
   }
 
   // Run all detectors in parallel
@@ -60,7 +60,9 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Man
         manifest.decisions = ghData.decisions;
       }
     } catch {
-      if (!options.quiet) {warn("GitHub sync failed (is `gh` CLI installed and authenticated?)");}
+      if (!options.quiet) {
+        warn("GitHub sync failed (is `gh` CLI installed and authenticated?)");
+      }
     }
   }
 
@@ -89,11 +91,17 @@ export function summarizeCategory(category: string, data: Record<string, unknown
       const entries = data.entry_points as string[];
       const tree = data.tree as Record<string, string[]>;
       const buildOut = data.build_output as string[];
-      const dirs = Object.keys(tree || {}).filter(k => k !== "./");
+      const dirs = Object.keys(tree || {}).filter((k) => k !== "./");
       const parts: string[] = [];
-      if (entries?.length) {parts.push(`${entries.length} entry points`);}
-      if (dirs.length) {parts.push(`${dirs.length} top-level dirs`);}
-      if (buildOut?.length) {parts.push(`build: ${buildOut.join(", ")}`);}
+      if (entries?.length) {
+        parts.push(`${entries.length} entry points`);
+      }
+      if (dirs.length) {
+        parts.push(`${dirs.length} top-level dirs`);
+      }
+      if (buildOut?.length) {
+        parts.push(`build: ${buildOut.join(", ")}`);
+      }
       return parts.join(", ") || "empty";
     }
     case "stack": {
@@ -101,11 +109,15 @@ export function summarizeCategory(category: string, data: Record<string, unknown
       const frameworks = data.frameworks as string[];
       const buildTool = data.build_tool as string | null;
       const parts = [...(langs || []), ...(frameworks || [])];
-      if (buildTool) {parts.push(buildTool);}
+      if (buildTool) {
+        parts.push(buildTool);
+      }
       return parts.join(", ") || "unknown";
     }
     case "commands": {
-      const cmds = Object.entries(data).filter(([, v]) => v).map(([k]) => k);
+      const cmds = Object.entries(data)
+        .filter(([, v]) => v)
+        .map(([k]) => k);
       return cmds.join(", ") || "none detected";
     }
     case "dependencies": {
@@ -113,10 +125,18 @@ export function summarizeCategory(category: string, data: Record<string, unknown
       const devCount = data.dev_count as number;
       const lock = data.lock_file as string;
       const parts: string[] = [];
-      if (count) {parts.push(`${count} direct`);}
-      if (devCount) {parts.push(`${devCount} dev`);}
-      if (!count && !devCount) {parts.push("0 deps");}
-      if (lock) {parts.push(lock);}
+      if (count) {
+        parts.push(`${count} direct`);
+      }
+      if (devCount) {
+        parts.push(`${devCount} dev`);
+      }
+      if (!count && !devCount) {
+        parts.push("0 deps");
+      }
+      if (lock) {
+        parts.push(lock);
+      }
       return parts.join(", ");
     }
     case "config": {
@@ -130,9 +150,15 @@ export function summarizeCategory(category: string, data: Record<string, unknown
     }
     case "quality": {
       const parts: string[] = [];
-      if (data.test_framework) {parts.push(data.test_framework as string);}
-      if (data.linter) {parts.push(data.linter as string);}
-      if (data.ci) {parts.push(data.ci as string);}
+      if (data.test_framework) {
+        parts.push(data.test_framework as string);
+      }
+      if (data.linter) {
+        parts.push(data.linter as string);
+      }
+      if (data.ci) {
+        parts.push(data.ci as string);
+      }
       return parts.join(", ") || "none detected";
     }
     case "patterns": {

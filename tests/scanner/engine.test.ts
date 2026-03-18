@@ -20,30 +20,40 @@ describe("scan engine", () => {
   afterEach(() => {
     try {
       rmSync(tempDir, { recursive: true, force: true });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   });
 
   describe("basic scan", () => {
-    it("scans project and returns manifest with all detector categories", { timeout: 30000 }, async () => {
-      writeFileSync(join(tempDir, "package.json"), JSON.stringify({
-        name: "test-project",
-        description: "A test project",
-        scripts: { dev: "vite", build: "tsup", test: "vitest" },
-      }), "utf-8");
+    it(
+      "scans project and returns manifest with all detector categories",
+      { timeout: 30000 },
+      async () => {
+        writeFileSync(
+          join(tempDir, "package.json"),
+          JSON.stringify({
+            name: "test-project",
+            description: "A test project",
+            scripts: { dev: "vite", build: "tsup", test: "vitest" },
+          }),
+          "utf-8"
+        );
 
-      mkdirSync(join(tempDir, "src"), { recursive: true });
-      writeFileSync(join(tempDir, "src", "index.ts"), "export {}", "utf-8");
+        mkdirSync(join(tempDir, "src"), { recursive: true });
+        writeFileSync(join(tempDir, "src", "index.ts"), "export {}", "utf-8");
 
-      const manifest = await scan(tempDir);
+        const manifest = await scan(tempDir);
 
-      expect(manifest.version).toBe("1.0");
-      expect(manifest.generated_at).toBeDefined();
-      expect(manifest.project).toBeDefined();
-      expect(manifest.stack).toBeDefined();
-      expect(manifest.commands).toBeDefined();
-      expect(manifest.dependencies).toBeDefined();
-      expect(manifest.structure).toBeDefined();
-    });
+        expect(manifest.version).toBe("1.0");
+        expect(manifest.generated_at).toBeDefined();
+        expect(manifest.project).toBeDefined();
+        expect(manifest.stack).toBeDefined();
+        expect(manifest.commands).toBeDefined();
+        expect(manifest.dependencies).toBeDefined();
+        expect(manifest.structure).toBeDefined();
+      }
+    );
 
     it("includes version and timestamp", { timeout: 30000 }, async () => {
       const manifest = await scan(tempDir);
@@ -62,10 +72,14 @@ describe("scan engine", () => {
 
   describe("category filtering", () => {
     it("scans only specified categories", { timeout: 30000 }, async () => {
-      writeFileSync(join(tempDir, "package.json"), JSON.stringify({
-        name: "test",
-        scripts: { build: "tsup" },
-      }), "utf-8");
+      writeFileSync(
+        join(tempDir, "package.json"),
+        JSON.stringify({
+          name: "test",
+          scripts: { build: "tsup" },
+        }),
+        "utf-8"
+      );
 
       const manifest = await scan(tempDir, { categories: ["project", "stack"] });
 
@@ -82,7 +96,9 @@ describe("scan engine", () => {
       expect(manifest.version).toBe("1.0");
       expect(manifest.generated_at).toBeDefined();
       // No detector data should be present
-      expect(Object.keys(manifest).filter(k => !["version", "generated_at"].includes(k))).toEqual([]);
+      expect(Object.keys(manifest).filter((k) => !["version", "generated_at"].includes(k))).toEqual(
+        []
+      );
     });
 
     it("handles empty categories array", { timeout: 30000 }, async () => {
@@ -99,11 +115,15 @@ describe("scan engine", () => {
     it("runs all detectors in parallel", { timeout: 30000 }, async () => {
       const startTime = Date.now();
 
-      writeFileSync(join(tempDir, "package.json"), JSON.stringify({
-        name: "test",
-        scripts: { test: "vitest" },
-        devDependencies: { vitest: "^1.0.0" },
-      }), "utf-8");
+      writeFileSync(
+        join(tempDir, "package.json"),
+        JSON.stringify({
+          name: "test",
+          scripts: { test: "vitest" },
+          devDependencies: { vitest: "^1.0.0" },
+        }),
+        "utf-8"
+      );
 
       await scan(tempDir);
 
@@ -154,7 +174,6 @@ describe("scan engine", () => {
 
   describe("GitHub sync", () => {
     it("does not call syncGitHub when sync option is false", { timeout: 30000 }, async () => {
-
       const manifest = await scan(tempDir, { sync: false });
 
       expect(manifest.status).toBeUndefined();
@@ -162,14 +181,18 @@ describe("scan engine", () => {
       expect(manifest.decisions).toBeUndefined();
     });
 
-    it("includes GitHub data when sync option is true and gh CLI works", { timeout: 30000 }, async () => {
-      // Mock is already set up at top of file
+    it(
+      "includes GitHub data when sync option is true and gh CLI works",
+      { timeout: 30000 },
+      async () => {
+        // Mock is already set up at top of file
 
-      const manifest = await scan(tempDir, { sync: true });
+        const manifest = await scan(tempDir, { sync: true });
 
-      // With our mock returning null, these should be undefined
-      expect(manifest.status).toBeUndefined();
-    });
+        // With our mock returning null, these should be undefined
+        expect(manifest.status).toBeUndefined();
+      }
+    );
 
     it("handles GitHub sync failure gracefully", { timeout: 30000 }, async () => {
       const manifest = await scan(tempDir, { sync: true, quiet: true });

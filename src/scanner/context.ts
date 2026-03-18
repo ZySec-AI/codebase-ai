@@ -6,10 +6,29 @@ import type { ScanContext } from "../types.js";
 import { globFilter } from "../utils/glob.js";
 
 const DEFAULT_IGNORE = new Set([
-  "node_modules", ".git", "dist", "build", ".next", ".nuxt", ".output",
-  "__pycache__", "vendor", ".venv", "venv", "target", "coverage",
-  ".cache", ".turbo", ".vercel", ".netlify", ".parcel-cache",
-  ".svelte-kit", ".angular", "out", "bin", "obj",
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  ".next",
+  ".nuxt",
+  ".output",
+  "__pycache__",
+  "vendor",
+  ".venv",
+  "venv",
+  "target",
+  "coverage",
+  ".cache",
+  ".turbo",
+  ".vercel",
+  ".netlify",
+  ".parcel-cache",
+  ".svelte-kit",
+  ".angular",
+  "out",
+  "bin",
+  "obj",
 ]);
 
 export interface ContextOptions {
@@ -39,7 +58,9 @@ export async function createScanContext(
 
     fileExists(path: string): boolean {
       // Fast O(1) check against walked files first
-      if (fileSet.has(path)) {return true;}
+      if (fileSet.has(path)) {
+        return true;
+      }
       // Fallback: actual filesystem check (for files in ignored dirs or outside walk depth)
       return existsSync(join(root, path));
     },
@@ -65,7 +86,9 @@ async function walkDirectory(
   maxDepth: number,
   currentDepth = 0
 ): Promise<string[]> {
-  if (currentDepth > maxDepth) {return [];}
+  if (currentDepth > maxDepth) {
+    return [];
+  }
 
   const results: string[] = [];
 
@@ -73,11 +96,15 @@ async function walkDirectory(
     const entries = await readdir(dir, { withFileTypes: true });
 
     for (const entry of entries) {
-      if (ignore.has(entry.name)) {continue;}
+      if (ignore.has(entry.name)) {
+        continue;
+      }
       if (entry.isDirectory() && entry.name.startsWith(".")) {
         // Allow .github, .husky, .circleci — skip other hidden dirs
         const allowedDotDirs = new Set([".github", ".husky", ".circleci"]);
-        if (!allowedDotDirs.has(entry.name)) {continue;}
+        if (!allowedDotDirs.has(entry.name)) {
+          continue;
+        }
       }
 
       const fullPath = join(dir, entry.name);

@@ -32,7 +32,9 @@ export async function runBrief(options: CLIOptions): Promise<void> {
 
   // Warn if GitHub data is absent
   if (!options.quiet && !manifest.status && !manifest.roadmap) {
-    warn("GitHub data unavailable (gh not authenticated or --sync not used). Issues, PRs and milestones not included.");
+    warn(
+      "GitHub data unavailable (gh not authenticated or --sync not used). Issues, PRs and milestones not included."
+    );
   }
 
   // Filter by categories if specified
@@ -62,19 +64,19 @@ function filterManifest(manifest: Manifest, categories: string[]): Manifest {
   };
 
   const categoryMap: Record<string, keyof Manifest> = {
-    "project": "project",
-    "repo": "repo",
-    "structure": "structure",
-    "stack": "stack",
-    "commands": "commands",
-    "dependencies": "dependencies",
-    "config": "config",
-    "git": "git",
-    "quality": "quality",
-    "patterns": "patterns",
-    "status": "status",
-    "roadmap": "roadmap",
-    "decisions": "decisions",
+    project: "project",
+    repo: "repo",
+    structure: "structure",
+    stack: "stack",
+    commands: "commands",
+    dependencies: "dependencies",
+    config: "config",
+    git: "git",
+    quality: "quality",
+    patterns: "patterns",
+    status: "status",
+    roadmap: "roadmap",
+    decisions: "decisions",
   };
 
   for (const cat of categories) {

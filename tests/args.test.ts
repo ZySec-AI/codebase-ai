@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { parseArgs } from "../src/utils/args.js";
 
 // Mock process.exit to prevent test termination
-vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+vi.spyOn(process, "exit").mockImplementation(() => {
+  throw new Error("exit");
+});
 
 describe("parseArgs", () => {
   it("parses default command as scan", () => {

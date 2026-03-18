@@ -15,7 +15,9 @@ describe("claudeIntegration", () => {
   afterEach(() => {
     try {
       rmSync(tempDir, { recursive: true, force: true });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   });
 
   describe("detect", () => {
@@ -57,7 +59,8 @@ describe("claudeIntegration", () => {
     });
 
     it("replaces existing codebase block in CLAUDE.md", () => {
-      const oldContent = "# Rules\n\n<!-- codebase:start -->\nOld instructions\n<!-- codebase:end -->\n";
+      const oldContent =
+        "# Rules\n\n<!-- codebase:start -->\nOld instructions\n<!-- codebase:end -->\n";
       writeFileSync(join(tempDir, "CLAUDE.md"), oldContent, "utf-8");
 
       claudeIntegration.inject(tempDir);
@@ -84,7 +87,8 @@ describe("claudeIntegration", () => {
 
   describe("remove", () => {
     it("removes codebase block from CLAUDE.md", () => {
-      const content = "# Rules\n\n<!-- codebase:start -->\nAI instructions\n<!-- codebase:end -->\n## More Rules\n";
+      const content =
+        "# Rules\n\n<!-- codebase:start -->\nAI instructions\n<!-- codebase:end -->\n## More Rules\n";
       writeFileSync(join(tempDir, "CLAUDE.md"), content, "utf-8");
 
       claudeIntegration.remove(tempDir);

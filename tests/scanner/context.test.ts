@@ -15,7 +15,9 @@ describe("createScanContext", () => {
   afterEach(() => {
     try {
       rmSync(tempDir, { recursive: true, force: true });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   });
 
   describe("file walking", () => {
@@ -54,7 +56,7 @@ describe("createScanContext", () => {
       // Should include files up to depth 10
       expect(ctx.files.length).toBeGreaterThan(0);
       // level11 and level12 should be beyond depth limit
-      expect(ctx.files.some(f => f.includes("level10"))).toBe(true);
+      expect(ctx.files.some((f) => f.includes("level10"))).toBe(true);
     });
 
     it("ignores default ignore patterns", async () => {

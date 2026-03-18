@@ -60,76 +60,114 @@ const LANG_EXTENSIONS: Record<string, string> = {
 };
 
 const FRAMEWORK_MAP: Record<string, string> = {
-  "next": "next.js", "react": "react", "react-dom": "react",
-  "vue": "vue", "nuxt": "nuxt",
-  "@angular/core": "angular", "svelte": "svelte", "@sveltejs/kit": "sveltekit",
-  "express": "express", "fastify": "fastify", "hono": "hono", "koa": "koa",
-  "nestjs": "nestjs", "@nestjs/core": "nestjs",
-  "remix": "remix", "@remix-run/react": "remix",
-  "astro": "astro", "gatsby": "gatsby",
-  "electron": "electron", "tauri": "tauri",
-  "react-native": "react-native", "expo": "expo",
-  "@trpc/server": "trpc", "@trpc/client": "trpc",
+  next: "next.js",
+  react: "react",
+  "react-dom": "react",
+  vue: "vue",
+  nuxt: "nuxt",
+  "@angular/core": "angular",
+  svelte: "svelte",
+  "@sveltejs/kit": "sveltekit",
+  express: "express",
+  fastify: "fastify",
+  hono: "hono",
+  koa: "koa",
+  nestjs: "nestjs",
+  "@nestjs/core": "nestjs",
+  remix: "remix",
+  "@remix-run/react": "remix",
+  astro: "astro",
+  gatsby: "gatsby",
+  electron: "electron",
+  tauri: "tauri",
+  "react-native": "react-native",
+  expo: "expo",
+  "@trpc/server": "trpc",
+  "@trpc/client": "trpc",
 };
 
 const DB_MARKERS: Record<string, string> = {
-  "pg": "postgresql", "postgres": "postgresql", "pg-promise": "postgresql",
-  "mysql2": "mysql", "mysql": "mysql", "@mysql/xdevapi": "mysql",
-  "better-sqlite3": "sqlite", "sqlite3": "sqlite", "sql.js": "sqlite",
-  "mongodb": "mongodb", "mongoose": "mongodb", "mongoodb": "mongodb",
-  "redis": "redis", "ioredis": "redis", "@redis/client": "redis", "redis-mock": "redis",
-  "cassandra-driver": "cassandra", "express-cassandra": "cassandra",
-  "elasticsearch": "elasticsearch", "@elastic/elasticsearch": "elasticsearch",
+  pg: "postgresql",
+  postgres: "postgresql",
+  "pg-promise": "postgresql",
+  mysql2: "mysql",
+  mysql: "mysql",
+  "@mysql/xdevapi": "mysql",
+  "better-sqlite3": "sqlite",
+  sqlite3: "sqlite",
+  "sql.js": "sqlite",
+  mongodb: "mongodb",
+  mongoose: "mongodb",
+  mongoodb: "mongodb",
+  redis: "redis",
+  ioredis: "redis",
+  "@redis/client": "redis",
+  "redis-mock": "redis",
+  "cassandra-driver": "cassandra",
+  "express-cassandra": "cassandra",
+  elasticsearch: "elasticsearch",
+  "@elastic/elasticsearch": "elasticsearch",
   "@elastic/elasticsearch-ng": "elasticsearch",
-  "neo4j-driver": "neo4j", "neo4j": "neo4j",
-  "couchbase": "couchbase", "ottoman": "couchbase",
-  "rethinkdb": "rethinkdb", "rethinkdbdash": "rethinkdb",
-  "level": "leveldb", "levelup": "leveldb",
-  "aws-sdk": "dynamodb", "@aws-sdk/client-dynamodb": "dynamodb",
-  "mssql": "mssql", "tedious": "mssql", "msnodesqlv8": "mssql",
-  "oracledb": "oracle", "node-oracledb": "oracle",
+  "neo4j-driver": "neo4j",
+  neo4j: "neo4j",
+  couchbase: "couchbase",
+  ottoman: "couchbase",
+  rethinkdb: "rethinkdb",
+  rethinkdbdash: "rethinkdb",
+  level: "leveldb",
+  levelup: "leveldb",
+  "aws-sdk": "dynamodb",
+  "@aws-sdk/client-dynamodb": "dynamodb",
+  mssql: "mssql",
+  tedious: "mssql",
+  msnodesqlv8: "mssql",
+  oracledb: "oracle",
+  "node-oracledb": "oracle",
   "pg-copy-streams": "postgresql",
-  "pg-pool": "postgresql", "pg-native": "postgresql",
+  "pg-pool": "postgresql",
+  "pg-native": "postgresql",
   " knex": "knex",
-  "minio": "minio",
-  "firebird": "firebird", "node-firebird": "firebird",
+  minio: "minio",
+  firebird: "firebird",
+  "node-firebird": "firebird",
   "hdb-pool": "sap-hana",
   "snowflake-sdk": "snowflake",
   "cassandra-client": "scylladb",
 };
 
 const ORM_MARKERS: Record<string, string> = {
-  "prisma": "prisma", "@prisma/client": "prisma",
+  prisma: "prisma",
+  "@prisma/client": "prisma",
   "drizzle-orm": "drizzle",
-  "typeorm": "typeorm",
-  "sequelize": "sequelize",
+  typeorm: "typeorm",
+  sequelize: "sequelize",
   "@mikro-orm/core": "mikro-orm",
-  "knex": "knex",
-  "mongoose": "mongoose",
+  knex: "knex",
+  mongoose: "mongoose",
 };
 
 const STYLING_MARKERS: Record<string, string> = {
-  "tailwindcss": "tailwindcss",
+  tailwindcss: "tailwindcss",
   "styled-components": "styled-components",
   "@emotion/react": "emotion",
-  "sass": "sass",
+  sass: "sass",
   "@chakra-ui/react": "chakra-ui",
   "@mui/material": "material-ui",
   "@mantine/core": "mantine",
 };
 
 const BUILD_TOOL_MARKERS: Record<string, string> = {
-  "vite": "vite",
-  "webpack": "webpack",
-  "esbuild": "esbuild",
-  "tsup": "tsup",
-  "rollup": "rollup",
-  "parcel": "parcel",
-  "turbopack": "turbopack",
-  "unbuild": "unbuild",
-  "pkgroll": "pkgroll",
+  vite: "vite",
+  webpack: "webpack",
+  esbuild: "esbuild",
+  tsup: "tsup",
+  rollup: "rollup",
+  parcel: "parcel",
+  turbopack: "turbopack",
+  unbuild: "unbuild",
+  pkgroll: "pkgroll",
   "@swc/core": "swc",
-  "snowpack": "snowpack",
+  snowpack: "snowpack",
 };
 
 export const stackDetector: Detector = {
@@ -163,7 +201,15 @@ export const stackDetector: Detector = {
     }
 
     // Multi-language framework detection
-    const [pyFramework, goFramework, rustFramework, javaFramework, rubyFramework, phpFramework, csharpFramework] = await Promise.all([
+    const [
+      pyFramework,
+      goFramework,
+      rustFramework,
+      javaFramework,
+      rubyFramework,
+      phpFramework,
+      csharpFramework,
+    ] = await Promise.all([
       detectPythonFramework(ctx),
       detectGoFramework(ctx),
       detectRustFramework(ctx),
@@ -173,13 +219,27 @@ export const stackDetector: Detector = {
       detectCSharpFramework(ctx),
     ]);
 
-    if (pyFramework) {frameworks.push(pyFramework);}
-    if (goFramework) {frameworks.push(goFramework);}
-    if (rustFramework) {frameworks.push(rustFramework);}
-    if (javaFramework) {frameworks.push(javaFramework);}
-    if (rubyFramework) {frameworks.push(rubyFramework);}
-    if (phpFramework) {frameworks.push(phpFramework);}
-    if (csharpFramework) {frameworks.push(csharpFramework);}
+    if (pyFramework) {
+      frameworks.push(pyFramework);
+    }
+    if (goFramework) {
+      frameworks.push(goFramework);
+    }
+    if (rustFramework) {
+      frameworks.push(rustFramework);
+    }
+    if (javaFramework) {
+      frameworks.push(javaFramework);
+    }
+    if (rubyFramework) {
+      frameworks.push(rubyFramework);
+    }
+    if (phpFramework) {
+      frameworks.push(phpFramework);
+    }
+    if (csharpFramework) {
+      frameworks.push(csharpFramework);
+    }
 
     return {
       languages: [...new Set(languages)],
@@ -197,10 +257,14 @@ function detectLanguages(ctx: ScanContext): string[] {
   const counts: Record<string, number> = {};
 
   for (const file of ctx.files) {
-    if (file.endsWith("/")) {continue;}
+    if (file.endsWith("/")) {
+      continue;
+    }
     const ext = "." + file.split(".").pop();
     const lang = LANG_EXTENSIONS[ext];
-    if (lang) {counts[lang] = (counts[lang] || 0) + 1;}
+    if (lang) {
+      counts[lang] = (counts[lang] || 0) + 1;
+    }
   }
 
   // Sort by frequency, return names
@@ -211,7 +275,9 @@ function detectLanguages(ctx: ScanContext): string[] {
 
 async function parsePkgJson(ctx: ScanContext): Promise<Record<string, string>> {
   const content = await ctx.readFile("package.json");
-  if (!content) {return {};}
+  if (!content) {
+    return {};
+  }
 
   try {
     const pkg = JSON.parse(content);
@@ -230,7 +296,11 @@ function detectFrameworks(deps: Record<string, string>): string[] {
   for (const [dep, version] of Object.entries(deps)) {
     const name = FRAMEWORK_MAP[dep];
     if (name) {
-      const cleanVersion = version.replace(/^[\^~>=<]+/, "").split(".").slice(0, 2).join(".");
+      const cleanVersion = version
+        .replace(/^[\^~>=<]+/, "")
+        .split(".")
+        .slice(0, 2)
+        .join(".");
       frameworks.push(`${name}@${cleanVersion}`);
     }
   }
@@ -251,7 +321,11 @@ function detectEnhancedFrameworks(deps: Record<string, string>): string[] {
 
   // Next.js detection (app router vs pages router)
   if (allDeps.includes("next")) {
-    const version = deps["next"]?.replace(/^[\^~>=<]+/, "").split(".").slice(0, 2).join(".");
+    const version = deps["next"]
+      ?.replace(/^[\^~>=<]+/, "")
+      .split(".")
+      .slice(0, 2)
+      .join(".");
     const details = [];
 
     if (version) {
@@ -280,7 +354,9 @@ function detectEnhancedFrameworks(deps: Record<string, string>): string[] {
       const nuxtVersion = deps["nuxt"]?.replace(/^[\^~>=<]+/, "");
       if (nuxtVersion) {
         const majorVersion = parseInt(nuxtVersion.split(".")[0], 10);
-        frameworks.push(majorVersion >= 3 ? `nuxt@${nuxtVersion} (Nuxt 3)` : `nuxt@${nuxtVersion} (Nuxt 2)`);
+        frameworks.push(
+          majorVersion >= 3 ? `nuxt@${nuxtVersion} (Nuxt 3)` : `nuxt@${nuxtVersion} (Nuxt 2)`
+        );
       } else {
         frameworks.push("nuxt");
       }
@@ -299,14 +375,28 @@ function detectEnhancedFrameworks(deps: Record<string, string>): string[] {
     const integrations: string[] = [];
 
     // Detect Astro integrations
-    if (deps["@astrojs/react"]) {integrations.push("react");}
-    if (deps["@astrojs/vue"]) {integrations.push("vue");}
-    if (deps["@astrojs/svelte"]) {integrations.push("svelte");}
-    if (deps["@astrojs/preact"]) {integrations.push("preact");}
-    if (deps["@astrojs/solid-js"]) {integrations.push("solid");}
+    if (deps["@astrojs/react"]) {
+      integrations.push("react");
+    }
+    if (deps["@astrojs/vue"]) {
+      integrations.push("vue");
+    }
+    if (deps["@astrojs/svelte"]) {
+      integrations.push("svelte");
+    }
+    if (deps["@astrojs/preact"]) {
+      integrations.push("preact");
+    }
+    if (deps["@astrojs/solid-js"]) {
+      integrations.push("solid");
+    }
 
     if (integrations.length > 0) {
-      frameworks.push(version ? `astro@${version} (${integrations.join(", ")})` : `astro (${integrations.join(", ")})`);
+      frameworks.push(
+        version
+          ? `astro@${version} (${integrations.join(", ")})`
+          : `astro (${integrations.join(", ")})`
+      );
     } else {
       frameworks.push(version ? `astro@${version}` : "astro");
     }
@@ -314,13 +404,19 @@ function detectEnhancedFrameworks(deps: Record<string, string>): string[] {
 
   // Remix detection
   if (allDeps.includes("@remix-run/react") || allDeps.includes("@remix-run/node")) {
-    const version = deps["@remix-run/react"]?.replace(/^[\^~>=<]+/, "") || deps["@remix-run/node"]?.replace(/^[\^~>=<]+/, "");
+    const version =
+      deps["@remix-run/react"]?.replace(/^[\^~>=<]+/, "") ||
+      deps["@remix-run/node"]?.replace(/^[\^~>=<]+/, "");
     frameworks.push(version ? `remix@${version}` : "remix");
   }
 
   // Angular detection
   if (allDeps.includes("@angular/core")) {
-    const version = deps["@angular/core"]?.replace(/^[\^~>=<]+/, "").split(".").slice(0, 2).join(".");
+    const version = deps["@angular/core"]
+      ?.replace(/^[\^~>=<]+/, "")
+      .split(".")
+      .slice(0, 2)
+      .join(".");
     frameworks.push(version ? `angular@${version}` : "angular");
   }
 
@@ -334,24 +430,51 @@ function detectEnhancedFrameworks(deps: Record<string, string>): string[] {
 }
 
 function detectPackageManager(ctx: ScanContext, deps: Record<string, string>): string | null {
-  if (ctx.fileExists("pnpm-lock.yaml")) {return "pnpm";}
-  if (ctx.fileExists("yarn.lock")) {return "yarn";}
-  if (ctx.fileExists("bun.lockb") || ctx.fileExists("bun.lock")) {return "bun";}
-  if (ctx.fileExists("package-lock.json")) {return "npm";}
-  if (ctx.fileExists("Cargo.lock")) {return "cargo";}
-  if (ctx.fileExists("poetry.lock")) {return "poetry";}
-  if (ctx.fileExists("Pipfile.lock")) {return "pipenv";}
-  if (ctx.fileExists("go.sum")) {return "go modules";}
-  if (ctx.fileExists("Gemfile.lock")) {return "bundler";}
-  if (ctx.fileExists("composer.lock")) {return "composer";}
+  if (ctx.fileExists("pnpm-lock.yaml")) {
+    return "pnpm";
+  }
+  if (ctx.fileExists("yarn.lock")) {
+    return "yarn";
+  }
+  if (ctx.fileExists("bun.lockb") || ctx.fileExists("bun.lock")) {
+    return "bun";
+  }
+  if (ctx.fileExists("package-lock.json")) {
+    return "npm";
+  }
+  if (ctx.fileExists("Cargo.lock")) {
+    return "cargo";
+  }
+  if (ctx.fileExists("poetry.lock")) {
+    return "poetry";
+  }
+  if (ctx.fileExists("Pipfile.lock")) {
+    return "pipenv";
+  }
+  if (ctx.fileExists("go.sum")) {
+    return "go modules";
+  }
+  if (ctx.fileExists("Gemfile.lock")) {
+    return "bundler";
+  }
+  if (ctx.fileExists("composer.lock")) {
+    return "composer";
+  }
   // Fallback: if package.json has deps, npm is the default
-  if (Object.keys(deps).length > 0) {return "npm";}
+  if (Object.keys(deps).length > 0) {
+    return "npm";
+  }
   return null;
 }
 
-function detectFirstFromMap(deps: Record<string, string>, markers: Record<string, string>): string | null {
+function detectFirstFromMap(
+  deps: Record<string, string>,
+  markers: Record<string, string>
+): string | null {
   for (const dep of Object.keys(deps)) {
-    if (markers[dep]) {return markers[dep];}
+    if (markers[dep]) {
+      return markers[dep];
+    }
   }
   return null;
 }
@@ -359,29 +482,49 @@ function detectFirstFromMap(deps: Record<string, string>, markers: Record<string
 function detectAllFromMap(deps: Record<string, string>, markers: Record<string, string>): string[] {
   const found = new Set<string>();
   for (const dep of Object.keys(deps)) {
-    if (markers[dep]) {found.add(markers[dep]);}
+    if (markers[dep]) {
+      found.add(markers[dep]);
+    }
   }
   return [...found];
 }
 
 async function detectPrismaProvider(ctx: ScanContext): Promise<string | null> {
   const schema = await ctx.readFile("prisma/schema.prisma");
-  if (!schema) {return null;}
+  if (!schema) {
+    return null;
+  }
 
   // Extract the datasource block specifically (not generator)
   const datasourceBlock = schema.match(/datasource\s+\w+\s*\{([^}]+)\}/);
-  if (!datasourceBlock) {return null;}
+  if (!datasourceBlock) {
+    return null;
+  }
 
   const match = datasourceBlock[1].match(/provider\s*=\s*"(.*?)"/);
-  if (!match) {return null;}
+  if (!match) {
+    return null;
+  }
 
   const provider = match[1].toLowerCase();
-  if (provider === "postgresql" || provider === "postgres") {return "postgresql";}
-  if (provider === "mysql") {return "mysql";}
-  if (provider === "sqlite") {return "sqlite";}
-  if (provider === "sqlserver") {return "sqlserver";}
-  if (provider === "mongodb") {return "mongodb";}
-  if (provider === "cockroachdb") {return "cockroachdb";}
+  if (provider === "postgresql" || provider === "postgres") {
+    return "postgresql";
+  }
+  if (provider === "mysql") {
+    return "mysql";
+  }
+  if (provider === "sqlite") {
+    return "sqlite";
+  }
+  if (provider === "sqlserver") {
+    return "sqlserver";
+  }
+  if (provider === "mongodb") {
+    return "mongodb";
+  }
+  if (provider === "cockroachdb") {
+    return "cockroachdb";
+  }
   return provider;
 }
 
@@ -403,7 +546,7 @@ async function detectDatabasesFromFiles(ctx: ScanContext): Promise<string[]> {
   ];
 
   for (const dir of migrationDirs) {
-    if (ctx.files.some(f => f.startsWith(dir))) {
+    if (ctx.files.some((f) => f.startsWith(dir))) {
       // Try to detect DB type from migration files
       const dbType = await detectDBFromMigrations(ctx, dir);
       if (dbType && !databases.includes(dbType)) {
@@ -440,20 +583,34 @@ async function detectDatabasesFromFiles(ctx: ScanContext): Promise<string[]> {
 }
 
 async function detectDBFromMigrations(ctx: ScanContext, dir: string): Promise<string | null> {
-  const files = ctx.files.filter(f => f.startsWith(dir));
+  const files = ctx.files.filter((f) => f.startsWith(dir));
 
   for (const file of files) {
     const content = await ctx.readFile(file);
-    if (!content) {continue;}
+    if (!content) {
+      continue;
+    }
 
     const lower = content.toLowerCase();
     if (lower.includes("create table") || lower.includes("alter table")) {
-      if (lower.includes("postgresql") || lower.includes("serial") || lower.includes("bigserial")) {return "postgresql";}
-      if (lower.includes("mysql") || lower.includes("engine=innodb")) {return "mysql";}
-      if (lower.includes("sqlite")) {return "sqlite";}
-      if (lower.includes("mongodb") || lower.includes("mongoose")) {return "mongodb";}
-      if (lower.includes("redis")) {return "redis";}
-      if (lower.includes("elasticsearch")) {return "elasticsearch";}
+      if (lower.includes("postgresql") || lower.includes("serial") || lower.includes("bigserial")) {
+        return "postgresql";
+      }
+      if (lower.includes("mysql") || lower.includes("engine=innodb")) {
+        return "mysql";
+      }
+      if (lower.includes("sqlite")) {
+        return "sqlite";
+      }
+      if (lower.includes("mongodb") || lower.includes("mongoose")) {
+        return "mongodb";
+      }
+      if (lower.includes("redis")) {
+        return "redis";
+      }
+      if (lower.includes("elasticsearch")) {
+        return "elasticsearch";
+      }
     }
   }
 
@@ -472,25 +629,51 @@ async function detectDBFromDockerCompose(ctx: ScanContext): Promise<string[]> {
   ];
 
   for (const file of composeFiles) {
-    if (!ctx.fileExists(file)) {continue;}
+    if (!ctx.fileExists(file)) {
+      continue;
+    }
 
     const content = await ctx.readFile(file);
-    if (!content) {continue;}
+    if (!content) {
+      continue;
+    }
 
     const lower = content.toLowerCase();
 
     // Detect database services
-    if (lower.includes("postgres") || lower.includes("postgresql")) {found.push("postgresql");}
-    if (lower.includes("mysql")) {found.push("mysql");}
-    if (lower.includes("mariadb")) {found.push("mariadb");}
-    if (lower.includes("mongodb") || lower.includes("mongo")) {found.push("mongodb");}
-    if (lower.includes("redis")) {found.push("redis");}
-    if (lower.includes("elasticsearch")) {found.push("elasticsearch");}
-    if (lower.includes("cassandra")) {found.push("cassandra");}
-    if (lower.includes("couchdb")) {found.push("couchdb");}
-    if (lower.includes("neo4j")) {found.push("neo4j");}
-    if (lower.includes("rabbitmq")) {found.push("rabbitmq");}
-    if (lower.includes("dynamodb")) {found.push("dynamodb");}
+    if (lower.includes("postgres") || lower.includes("postgresql")) {
+      found.push("postgresql");
+    }
+    if (lower.includes("mysql")) {
+      found.push("mysql");
+    }
+    if (lower.includes("mariadb")) {
+      found.push("mariadb");
+    }
+    if (lower.includes("mongodb") || lower.includes("mongo")) {
+      found.push("mongodb");
+    }
+    if (lower.includes("redis")) {
+      found.push("redis");
+    }
+    if (lower.includes("elasticsearch")) {
+      found.push("elasticsearch");
+    }
+    if (lower.includes("cassandra")) {
+      found.push("cassandra");
+    }
+    if (lower.includes("couchdb")) {
+      found.push("couchdb");
+    }
+    if (lower.includes("neo4j")) {
+      found.push("neo4j");
+    }
+    if (lower.includes("rabbitmq")) {
+      found.push("rabbitmq");
+    }
+    if (lower.includes("dynamodb")) {
+      found.push("dynamodb");
+    }
   }
 
   return found;
@@ -500,15 +683,24 @@ async function detectDBFromORMConfigs(ctx: ScanContext): Promise<string[]> {
   const found: string[] = [];
 
   // TypeORM
-  const typeormConfig = await ctx.readFile("ormconfig.json") ||
-                         await ctx.readFile("ormconfig.js") ||
-                         await ctx.readFile("src/data-source.ts");
+  const typeormConfig =
+    (await ctx.readFile("ormconfig.json")) ||
+    (await ctx.readFile("ormconfig.js")) ||
+    (await ctx.readFile("src/data-source.ts"));
   if (typeormConfig) {
     const lower = typeormConfig.toLowerCase();
-    if (lower.includes("postgres") || lower.includes("pg")) {found.push("postgresql");}
-    if (lower.includes("mysql")) {found.push("mysql");}
-    if (lower.includes("sqlite")) {found.push("sqlite");}
-    if (lower.includes("mongodb")) {found.push("mongodb");}
+    if (lower.includes("postgres") || lower.includes("pg")) {
+      found.push("postgresql");
+    }
+    if (lower.includes("mysql")) {
+      found.push("mysql");
+    }
+    if (lower.includes("sqlite")) {
+      found.push("sqlite");
+    }
+    if (lower.includes("mongodb")) {
+      found.push("mongodb");
+    }
   }
 
   // Sequelize config
@@ -517,22 +709,38 @@ async function detectDBFromORMConfigs(ctx: ScanContext): Promise<string[]> {
     const content = await ctx.readFile(file);
     if (content) {
       const lower = content.toLowerCase();
-      if (lower.includes("postgres")) {found.push("postgresql");}
-      if (lower.includes("mysql")) {found.push("mysql");}
-      if (lower.includes("sqlite")) {found.push("sqlite");}
-      if (lower.includes("mariadb")) {found.push("mariadb");}
+      if (lower.includes("postgres")) {
+        found.push("postgresql");
+      }
+      if (lower.includes("mysql")) {
+        found.push("mysql");
+      }
+      if (lower.includes("sqlite")) {
+        found.push("sqlite");
+      }
+      if (lower.includes("mariadb")) {
+        found.push("mariadb");
+      }
     }
   }
 
   // MikroORM
-  const mikroOrmConfig = await ctx.readFile("mikro-orm.config.ts") ||
-                          await ctx.readFile("mikro-orm.config.js");
+  const mikroOrmConfig =
+    (await ctx.readFile("mikro-orm.config.ts")) || (await ctx.readFile("mikro-orm.config.js"));
   if (mikroOrmConfig) {
     const lower = mikroOrmConfig.toLowerCase();
-    if (lower.includes("postgres")) {found.push("postgresql");}
-    if (lower.includes("mysql")) {found.push("mysql");}
-    if (lower.includes("sqlite")) {found.push("sqlite");}
-    if (lower.includes("mongodb")) {found.push("mongodb");}
+    if (lower.includes("postgres")) {
+      found.push("postgresql");
+    }
+    if (lower.includes("mysql")) {
+      found.push("mysql");
+    }
+    if (lower.includes("sqlite")) {
+      found.push("sqlite");
+    }
+    if (lower.includes("mongodb")) {
+      found.push("mongodb");
+    }
   }
 
   // Drizzle config
@@ -541,9 +749,15 @@ async function detectDBFromORMConfigs(ctx: ScanContext): Promise<string[]> {
     const content = await ctx.readFile(file);
     if (content) {
       const lower = content.toLowerCase();
-      if (lower.includes("postgres") || lower.includes("pg")) {found.push("postgresql");}
-      if (lower.includes("mysql")) {found.push("mysql");}
-      if (lower.includes("sqlite")) {found.push("sqlite");}
+      if (lower.includes("postgres") || lower.includes("pg")) {
+        found.push("postgresql");
+      }
+      if (lower.includes("mysql")) {
+        found.push("mysql");
+      }
+      if (lower.includes("sqlite")) {
+        found.push("sqlite");
+      }
     }
   }
 
@@ -554,36 +768,51 @@ async function detectDBFromSchemas(ctx: ScanContext): Promise<string[]> {
   const found: string[] = [];
 
   // Look for SQL schema files
-  const schemaFiles = ctx.files.filter(f =>
-    f.endsWith(".sql") ||
-    f.includes("schema") ||
-    f.includes("migrate") ||
-    f.includes("migration")
+  const schemaFiles = ctx.files.filter(
+    (f) =>
+      f.endsWith(".sql") || f.includes("schema") || f.includes("migrate") || f.includes("migration")
   );
 
   for (const file of schemaFiles) {
     const content = await ctx.readFile(file);
-    if (!content) {continue;}
+    if (!content) {
+      continue;
+    }
 
     const lower = content.toLowerCase();
 
     // PostgreSQL-specific patterns
-    if (lower.includes("serial") || lower.includes("bigserial") ||
-        lower.includes("text[]") || lower.includes("jsonb") ||
-        lower.includes("create extension") || lower.includes("pg_")) {
-      if (!found.includes("postgresql")) {found.push("postgresql");}
+    if (
+      lower.includes("serial") ||
+      lower.includes("bigserial") ||
+      lower.includes("text[]") ||
+      lower.includes("jsonb") ||
+      lower.includes("create extension") ||
+      lower.includes("pg_")
+    ) {
+      if (!found.includes("postgresql")) {
+        found.push("postgresql");
+      }
     }
 
     // MySQL-specific patterns
-    if (lower.includes("engine=innodb") || lower.includes("auto_increment") ||
-        lower.includes("tinyint") || lower.includes("mediumint") ||
-        lower.includes("enum(")) {
-      if (!found.includes("mysql")) {found.push("mysql");}
+    if (
+      lower.includes("engine=innodb") ||
+      lower.includes("auto_increment") ||
+      lower.includes("tinyint") ||
+      lower.includes("mediumint") ||
+      lower.includes("enum(")
+    ) {
+      if (!found.includes("mysql")) {
+        found.push("mysql");
+      }
     }
 
     // SQLite-specific patterns
     if (lower.includes("autoincrement") || lower.includes("integer primary key")) {
-      if (!found.includes("sqlite")) {found.push("sqlite");}
+      if (!found.includes("sqlite")) {
+        found.push("sqlite");
+      }
     }
   }
 
@@ -604,7 +833,9 @@ async function detectPythonFramework(ctx: ScanContext): Promise<string | null> {
   if (combined.includes("django")) {
     const version = extractVersion(requirements, "django") || extractVersion(pyproject, "django");
     const djangoDetails: string[] = [];
-    if (version) {djangoDetails.push(version);}
+    if (version) {
+      djangoDetails.push(version);
+    }
 
     // Detect Django apps
     const djangoApps = await detectDjangoApps(ctx);
@@ -618,33 +849,71 @@ async function detectPythonFramework(ctx: ScanContext): Promise<string | null> {
       djangoDetails.push(settingsModule);
     }
 
-    return djangoDetails.length > 0 ? `django@${djangoDetails.join(" ")}` : (version ? `django@${version}` : "django");
+    return djangoDetails.length > 0
+      ? `django@${djangoDetails.join(" ")}`
+      : version
+        ? `django@${version}`
+        : "django";
   }
   if (combined.includes("flask")) {
     const version = extractVersion(requirements, "flask") || extractVersion(pyproject, "flask");
     return version ? `flask@${version}` : "flask";
   }
-  if (combined.includes("starlette")) {return "starlette";}
-  if (combined.includes("tornado")) {return "tornado";}
-  if (combined.includes("aiohttp")) {return "aiohttp";}
-  if (combined.includes("sanic")) {return "sanic";}
-  if (combined.includes("pyramid")) {return "pyramid";}
-  if (combined.includes("bottle")) {return "bottle";}
-  if (combined.includes("cherrypy")) {return "cherrypy";}
-  if (combined.includes("falcon")) {return "falcon";}
-  if (combined.includes("masonite")) {return "masonite";}
+  if (combined.includes("starlette")) {
+    return "starlette";
+  }
+  if (combined.includes("tornado")) {
+    return "tornado";
+  }
+  if (combined.includes("aiohttp")) {
+    return "aiohttp";
+  }
+  if (combined.includes("sanic")) {
+    return "sanic";
+  }
+  if (combined.includes("pyramid")) {
+    return "pyramid";
+  }
+  if (combined.includes("bottle")) {
+    return "bottle";
+  }
+  if (combined.includes("cherrypy")) {
+    return "cherrypy";
+  }
+  if (combined.includes("falcon")) {
+    return "falcon";
+  }
+  if (combined.includes("masonite")) {
+    return "masonite";
+  }
 
   // ML frameworks
-  if (combined.includes("torch") || combined.includes("pytorch")) {return "pytorch";}
-  if (combined.includes("tensorflow")) {return "tensorflow";}
-  if (combined.includes("keras")) {return "keras";}
-  if (combined.includes("scikit-learn")) {return "scikit-learn";}
-  if (combined.includes("pandas")) {return "pandas";}
-  if (combined.includes("numpy")) {return "numpy";}
+  if (combined.includes("torch") || combined.includes("pytorch")) {
+    return "pytorch";
+  }
+  if (combined.includes("tensorflow")) {
+    return "tensorflow";
+  }
+  if (combined.includes("keras")) {
+    return "keras";
+  }
+  if (combined.includes("scikit-learn")) {
+    return "scikit-learn";
+  }
+  if (combined.includes("pandas")) {
+    return "pandas";
+  }
+  if (combined.includes("numpy")) {
+    return "numpy";
+  }
 
   // Task queues
-  if (combined.includes("celery")) {return "celery";}
-  if (combined.includes("rq")) {return "rq";}
+  if (combined.includes("celery")) {
+    return "celery";
+  }
+  if (combined.includes("rq")) {
+    return "rq";
+  }
 
   return null;
 }
@@ -656,16 +925,17 @@ async function detectDjangoApps(ctx: ScanContext): Promise<string[]> {
   const apps: string[] = [];
 
   // Try to find settings file
-  const settingsFiles = ctx.files.filter(f =>
-    f.includes("settings.py") ||
-    f.includes("settings/") ||
-    f.match(/settings.*\.py$/)
+  const settingsFiles = ctx.files.filter(
+    (f) => f.includes("settings.py") || f.includes("settings/") || f.match(/settings.*\.py$/)
   );
 
-  for (const file of settingsFiles.slice(0, 3)) { // Check at most 3 files
+  for (const file of settingsFiles.slice(0, 3)) {
+    // Check at most 3 files
     try {
       const content = await ctx.readFile(file);
-      if (!content) {continue;}
+      if (!content) {
+        continue;
+      }
 
       // Find INSTALLED_APPS
       const installedAppsMatch = content.match(/INSTALLED_APPS\s*=\s*\[([\s\S]*?)\]/);
@@ -674,10 +944,10 @@ async function detectDjangoApps(ctx: ScanContext): Promise<string[]> {
         // Extract app names (simple extraction)
         const appMatches = appsContent.match(/'([^']+)'/g) || appsContent.match(/"([^"]+)"/g) || [];
         for (const app of appMatches) {
-          const appName = app.replace(/['"]/g, '');
+          const appName = app.replace(/['"]/g, "");
           // Filter out django apps and third-party apps
-          if (!appName.startsWith('django.') && appName.includes('.')) {
-            apps.push(appName.split('.')[0]);
+          if (!appName.startsWith("django.") && appName.includes(".")) {
+            apps.push(appName.split(".")[0]);
           }
         }
       }
@@ -693,20 +963,30 @@ async function detectDjangoApps(ctx: ScanContext): Promise<string[]> {
  * Detect Django settings module
  */
 async function detectDjangoSettings(ctx: ScanContext): Promise<string | null> {
-  const hasSettingsPy = ctx.files.some(f => f.endsWith("settings.py"));
-  const hasSettingsDir = ctx.files.some(f => f.includes("settings/") && f.endsWith(".py"));
-  const hasDevSettings = ctx.files.some(f => f.includes("settings_dev.py") || f.includes("settings.dev"));
+  const hasSettingsPy = ctx.files.some((f) => f.endsWith("settings.py"));
+  const hasSettingsDir = ctx.files.some((f) => f.includes("settings/") && f.endsWith(".py"));
+  const hasDevSettings = ctx.files.some(
+    (f) => f.includes("settings_dev.py") || f.includes("settings.dev")
+  );
 
-  if (hasDevSettings) {return "settings:dev";}
-  if (hasSettingsDir) {return "settings:dir";}
-  if (hasSettingsPy) {return "settings:py";}
+  if (hasDevSettings) {
+    return "settings:dev";
+  }
+  if (hasSettingsDir) {
+    return "settings:dir";
+  }
+  if (hasSettingsPy) {
+    return "settings:py";
+  }
 
   return null;
 }
 
 async function detectGoFramework(ctx: ScanContext): Promise<string | null> {
   const gomod = await ctx.readFile("go.mod");
-  if (!gomod) {return null;}
+  if (!gomod) {
+    return null;
+  }
 
   const versions: string[] = [];
 
@@ -742,7 +1022,9 @@ async function detectGoFramework(ctx: ScanContext): Promise<string | null> {
 
 async function detectRustFramework(ctx: ScanContext): Promise<string | null> {
   const cargo = await ctx.readFile("Cargo.toml");
-  if (!cargo) {return null;}
+  if (!cargo) {
+    return null;
+  }
 
   const versions: string[] = [];
 
@@ -782,15 +1064,20 @@ async function detectJavaFramework(ctx: ScanContext): Promise<string | null> {
   const combined = pom + "\n" + buildGradle + "\n" + buildGradleKts;
 
   if (combined.includes("spring-boot")) {
-    const version = extractFromXml(pom, "spring-boot-starter-parent") || extractFromGradle(buildGradle, "org.springframework.boot");
+    const version =
+      extractFromXml(pom, "spring-boot-starter-parent") ||
+      extractFromGradle(buildGradle, "org.springframework.boot");
     return version ? `spring boot@${version}` : "spring boot";
   }
   if (combined.includes("spring-framework") || combined.includes("spring-core")) {
-    const version = extractFromXml(pom, "spring-framework") || extractFromGradle(buildGradle, "org.springframework");
+    const version =
+      extractFromXml(pom, "spring-framework") ||
+      extractFromGradle(buildGradle, "org.springframework");
     return version ? `spring@${version}` : "spring";
   }
   if (combined.includes("micronaut")) {
-    const version = extractFromXml(pom, "micronaut") || extractFromGradle(buildGradle, "io.micronaut");
+    const version =
+      extractFromXml(pom, "micronaut") || extractFromGradle(buildGradle, "io.micronaut");
     return version ? `micronaut@${version}` : "micronaut";
   }
   if (combined.includes("quarkus")) {
@@ -821,7 +1108,9 @@ async function detectRubyFramework(ctx: ScanContext): Promise<string | null> {
   if (combined.includes("rails")) {
     const version = extractGemVersion(combined, "rails");
     const details: string[] = [];
-    if (version) {details.push(version);}
+    if (version) {
+      details.push(version);
+    }
 
     // Detect Rails middleware stack
     const middlewareStack = await detectRailsMiddleware(ctx);
@@ -872,21 +1161,51 @@ async function detectRailsMiddleware(ctx: ScanContext): Promise<string[]> {
   // Check for common Rails gems
   const gemfile = await ctx.readFile("Gemfile");
   if (gemfile) {
-    if (gemfile.includes("devise")) {middleware.push("devise");}
-    if (gemfile.includes("pundit")) {middleware.push("pundit");}
-    if (gemfile.includes("cancancan")) {middleware.push("cancancan");}
-    if (gemfile.includes("rspec-rails")) {middleware.push("rspec");}
-    if (gemfile.includes("minitest")) {middleware.push("minitest");}
-    if (gemfile.includes("factory_bot_rails")) {middleware.push("factory_bot");}
-    if (gemfile.includes("faker")) {middleware.push("faker");}
-    if (gemfile.includes("sidekiq")) {middleware.push("sidekiq");}
-    if (gemfile.includes("redis") || gemfile.includes("redis-rails")) {middleware.push("redis");}
-    if (gemfile.includes("pg")) {middleware.push("postgresql");}
-    if (gemfile.includes("mysql2")) {middleware.push("mysql");}
-    if (gemfile.includes("sqlite3")) {middleware.push("sqlite");}
-    if (gemfile.includes("aws-sdk")) {middleware.push("aws");}
-    if (gemfile.includes("bootstrap")) {middleware.push("bootstrap");}
-    if (gemfile.includes("tailwindcss-rails")) {middleware.push("tailwind");}
+    if (gemfile.includes("devise")) {
+      middleware.push("devise");
+    }
+    if (gemfile.includes("pundit")) {
+      middleware.push("pundit");
+    }
+    if (gemfile.includes("cancancan")) {
+      middleware.push("cancancan");
+    }
+    if (gemfile.includes("rspec-rails")) {
+      middleware.push("rspec");
+    }
+    if (gemfile.includes("minitest")) {
+      middleware.push("minitest");
+    }
+    if (gemfile.includes("factory_bot_rails")) {
+      middleware.push("factory_bot");
+    }
+    if (gemfile.includes("faker")) {
+      middleware.push("faker");
+    }
+    if (gemfile.includes("sidekiq")) {
+      middleware.push("sidekiq");
+    }
+    if (gemfile.includes("redis") || gemfile.includes("redis-rails")) {
+      middleware.push("redis");
+    }
+    if (gemfile.includes("pg")) {
+      middleware.push("postgresql");
+    }
+    if (gemfile.includes("mysql2")) {
+      middleware.push("mysql");
+    }
+    if (gemfile.includes("sqlite3")) {
+      middleware.push("sqlite");
+    }
+    if (gemfile.includes("aws-sdk")) {
+      middleware.push("aws");
+    }
+    if (gemfile.includes("bootstrap")) {
+      middleware.push("bootstrap");
+    }
+    if (gemfile.includes("tailwindcss-rails")) {
+      middleware.push("tailwind");
+    }
   }
 
   return middleware.slice(0, 5); // Return up to 5 middleware components
@@ -894,7 +1213,9 @@ async function detectRailsMiddleware(ctx: ScanContext): Promise<string[]> {
 
 async function detectPhpFramework(ctx: ScanContext): Promise<string | null> {
   const composer = await ctx.readFile("composer.json");
-  if (!composer) {return null;}
+  if (!composer) {
+    return null;
+  }
 
   try {
     const pkg = JSON.parse(composer);
@@ -926,15 +1247,16 @@ async function detectPhpFramework(ctx: ScanContext): Promise<string | null> {
     if (combined.includes("lumen")) {
       return "lumen";
     }
-
   } catch {}
 
   return null;
 }
 
 async function detectCSharpFramework(ctx: ScanContext): Promise<string | null> {
-  const csprojFiles = ctx.files.filter(f => f.endsWith(".csproj"));
-  if (csprojFiles.length === 0) {return null;}
+  const csprojFiles = ctx.files.filter((f) => f.endsWith(".csproj"));
+  if (csprojFiles.length === 0) {
+    return null;
+  }
 
   const frameworks: string[] = [];
 
@@ -965,7 +1287,9 @@ async function detectCSharpFramework(ctx: ScanContext): Promise<string | null> {
 // Helper functions for version extraction
 
 function extractVersion(content: string, packageName: string): string | null {
-  if (!content) {return null;}
+  if (!content) {
+    return null;
+  }
 
   // Match patterns like "package==1.2.3", "package>=1.2.3", "package@1.2.3"
   const patterns = [
@@ -1002,26 +1326,34 @@ function extractCargoVersion(content: string, packageName: string): string | nul
 }
 
 function extractFromXml(content: string, artifactId: string): string | null {
-  if (!content) {return null;}
+  if (!content) {
+    return null;
+  }
 
   // Match <version>1.2.3</version> within a dependency with matching artifactId
-  const pattern = new RegExp(`<artifactId>${artifactId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</artifactId>[\\s\\S]*?<version>([\\d.]+)</version>`);
+  const pattern = new RegExp(
+    `<artifactId>${artifactId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</artifactId>[\\s\\S]*?<version>([\\d.]+)</version>`
+  );
   const match = content.match(pattern);
   return match ? match[1] : null;
 }
 
 function extractFromGradle(content: string, group: string): string | null {
-  if (!content) {return null;}
+  if (!content) {
+    return null;
+  }
 
   // Match version: "group:version:1.2.3" or group/version patterns
   const patterns = [
-    new RegExp(`${group.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:[^:]*:([\\d.]+)`),
-    new RegExp(`${group.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:([\\d.]+)`),
+    new RegExp(`${group.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:[^:]*:([\\d.]+)`),
+    new RegExp(`${group.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:([\\d.]+)`),
   ];
 
   for (const pattern of patterns) {
     const match = content.match(pattern);
-    if (match) {return match[1];}
+    if (match) {
+      return match[1];
+    }
   }
 
   return null;
@@ -1036,7 +1368,9 @@ function extractGemVersion(content: string, gemName: string): string | null {
 
 function extractCsprojVersion(content: string, packageRef: string): string | null {
   // .csproj format: <PackageReference Include="..." Version="1.2.3" />
-  const pattern = new RegExp(`<PackageReference\\s+Include="${packageRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*Version="([\\d.]+)"`);
+  const pattern = new RegExp(
+    `<PackageReference\\s+Include="${packageRef.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*Version="([\\d.]+)"`
+  );
   const match = content.match(pattern);
   return match ? match[1] : null;
 }

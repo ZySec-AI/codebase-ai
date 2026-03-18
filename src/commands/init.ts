@@ -58,9 +58,15 @@ export async function runInit(options: CLIOptions): Promise<void> {
   });
 
   for (const [category, data] of Object.entries(manifest)) {
-    if (category === "version" || category === "generated_at") {continue;}
-    if (typeof data !== "object" || data === null) {continue;}
-    success(`${capitalize(category)} (${summarizeCategory(category, data as Record<string, unknown>)})`);
+    if (category === "version" || category === "generated_at") {
+      continue;
+    }
+    if (typeof data !== "object" || data === null) {
+      continue;
+    }
+    success(
+      `${capitalize(category)} (${summarizeCategory(category, data as Record<string, unknown>)})`
+    );
   }
 
   // Write manifest
@@ -78,7 +84,7 @@ export async function runInit(options: CLIOptions): Promise<void> {
   const globalTools = detectGlobalTools();
 
   // Merge: project-level detection + global config detection
-  const toolNames = new Set(tools.map(t => t.name));
+  const toolNames = new Set(tools.map((t) => t.name));
   for (const gt of globalTools) {
     if (!toolNames.has(gt.name)) {
       tools.push(gt);
@@ -93,7 +99,7 @@ export async function runInit(options: CLIOptions): Promise<void> {
     writeFileSync(join(root, "CLAUDE.md"), "# Project Rules\n\n", "utf-8");
     tools = [claudeIntegration];
   } else {
-    log(`  Detected: ${tools.map(t => t.name).join(", ")}`);
+    log(`  Detected: ${tools.map((t) => t.name).join(", ")}`);
   }
 
   for (const tool of tools) {
@@ -144,8 +150,8 @@ export async function runInit(options: CLIOptions): Promise<void> {
   log("  AI can              → create issues, close issues, get next task, check blockers\n");
 
   if (ghAvailable) {
-    const issueCount = manifest.status?.issues?.filter(i => i.state === "open").length || 0;
-    const prCount = manifest.status?.pull_requests?.filter(pr => pr.state === "open").length || 0;
+    const issueCount = manifest.status?.issues?.filter((i) => i.state === "open").length || 0;
+    const prCount = manifest.status?.pull_requests?.filter((pr) => pr.state === "open").length || 0;
     if (issueCount || prCount) {
       log(`  GitHub synced: ${issueCount} open issues, ${prCount} open PRs`);
     }
@@ -174,14 +180,19 @@ export function checkGhDetailed(): Promise<GhStatus> {
         return;
       }
       // gh exists, check auth
-      execFile("sh", ["-c", "gh auth status 2>&1"], { timeout: 10_000 }, (authErr, stdout, stderr) => {
-        const output = (stdout || "") + (stderr || "");
-        if (!authErr && output.includes("Logged in")) {
-          resolve("authenticated");
-        } else {
-          resolve("not-authenticated");
+      execFile(
+        "sh",
+        ["-c", "gh auth status 2>&1"],
+        { timeout: 10_000 },
+        (authErr, stdout, stderr) => {
+          const output = (stdout || "") + (stderr || "");
+          if (!authErr && output.includes("Logged in")) {
+            resolve("authenticated");
+          } else {
+            resolve("not-authenticated");
+          }
         }
-      });
+      );
     });
   });
 }
@@ -238,10 +249,14 @@ export function configureMcpFile(
 
     // Already configured?
     const servers = config.mcpServers as Record<string, unknown> | undefined;
-    if (servers && servers[serverName]) {return false;}
+    if (servers && servers[serverName]) {
+      return false;
+    }
   }
 
-  if (!config.mcpServers) {config.mcpServers = {};}
+  if (!config.mcpServers) {
+    config.mcpServers = {};
+  }
   (config.mcpServers as Record<string, unknown>)[serverName] = entry;
 
   writeFileSync(filePath, JSON.stringify(config, null, 2) + "\n", "utf-8");

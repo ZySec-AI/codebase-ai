@@ -6,12 +6,22 @@ const CACHE_FILE = ".codebase.cache.json";
 const CACHE_VERSION = 1;
 
 const TRACKED_FILES = [
-  "package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
-  "tsconfig.json", "tsconfig.build.json",
-  "Cargo.toml", "Cargo.lock",
-  "pyproject.toml", "requirements.txt", "poetry.lock",
-  "go.mod", "go.sum",
-  "Makefile", "Dockerfile", "docker-compose.yml",
+  "package.json",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "tsconfig.json",
+  "tsconfig.build.json",
+  "Cargo.toml",
+  "Cargo.lock",
+  "pyproject.toml",
+  "requirements.txt",
+  "poetry.lock",
+  "go.mod",
+  "go.sum",
+  "Makefile",
+  "Dockerfile",
+  "docker-compose.yml",
 ];
 
 interface CacheData {
@@ -26,7 +36,9 @@ export function loadCache(root: string): CacheData | null {
   try {
     const raw = readFileSync(join(root, CACHE_FILE), "utf-8");
     const data = JSON.parse(raw) as CacheData;
-    if (data.cache_version !== CACHE_VERSION) {return null;}
+    if (data.cache_version !== CACHE_VERSION) {
+      return null;
+    }
     return data;
   } catch {
     return null;
@@ -50,12 +62,16 @@ export function saveCache(root: string, fileCount: number, manifest: Manifest): 
 
 export function isCacheValid(root: string, cache: CacheData, currentFileCount: number): boolean {
   // File count changed → something was added or deleted
-  if (cache.file_count !== currentFileCount) {return false;}
+  if (cache.file_count !== currentFileCount) {
+    return false;
+  }
 
   // Check tracked file mtimes
   const currentMtimes = snapshotMtimes(root);
   for (const file of Object.keys({ ...cache.file_mtimes, ...currentMtimes })) {
-    if ((cache.file_mtimes[file] ?? 0) !== (currentMtimes[file] ?? 0)) {return false;}
+    if ((cache.file_mtimes[file] ?? 0) !== (currentMtimes[file] ?? 0)) {
+      return false;
+    }
   }
 
   return true;

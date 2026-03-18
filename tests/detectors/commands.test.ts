@@ -180,7 +180,7 @@ describe("commandsDetector", () => {
       const ctx = createMockContext({
         files: ["Makefile"],
         fileContents: {
-          "Makefile": `
+          Makefile: `
 .PHONY: dev build test lint format
 
 dev:
@@ -212,7 +212,7 @@ format:
       const ctx = createMockContext({
         files: ["Makefile"],
         fileContents: {
-          "Makefile": `
+          Makefile: `
 run:
   npm start
 
@@ -230,7 +230,7 @@ build:
       const ctx = createMockContext({
         files: ["Makefile"],
         fileContents: {
-          "Makefile": `
+          Makefile: `
 fmt:
   prettier --write .
 `,
@@ -244,7 +244,7 @@ fmt:
       const ctx = createMockContext({
         files: ["Makefile"],
         fileContents: {
-          "Makefile": `
+          Makefile: `
 clean:
   rm -rf dist
 `,
@@ -360,7 +360,7 @@ clean:
           "package.json": JSON.stringify({
             scripts: { dev: "vite", build: "tsup" },
           }),
-          "Makefile": "dev:\n  npm start",
+          Makefile: "dev:\n  npm start",
         },
       });
       const result = await commandsDetector.detect(ctx);
@@ -373,7 +373,7 @@ clean:
         files: ["package.json", "Makefile"],
         fileContents: {
           "package.json": JSON.stringify({ name: "test" }),
-          "Makefile": "dev:\n  npm start\nbuild:\n  npm run build",
+          Makefile: "dev:\n  npm start\nbuild:\n  npm run build",
         },
       });
       const result = await commandsDetector.detect(ctx);

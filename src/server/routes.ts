@@ -24,7 +24,9 @@ export async function handleRoute(url: string, method: string, root: string): Pr
       return { status: 400, body: { error: "Missing 'path' query parameter" } };
     }
     const manifest = await loadManifest(root);
-    if (!manifest) {return { status: 404, body: { error: "No manifest. POST /codebase/scan first." } };}
+    if (!manifest) {
+      return { status: 404, body: { error: "No manifest. POST /codebase/scan first." } };
+    }
     const value = queryPath(manifest, queryStr);
     return { status: 200, body: value ?? null };
   }
@@ -39,7 +41,9 @@ export async function handleRoute(url: string, method: string, root: string): Pr
   // Full manifest
   if (path === "/codebase" && method === "GET") {
     const manifest = await loadManifest(root);
-    if (!manifest) {return { status: 404, body: { error: "No manifest. POST /codebase/scan first." } };}
+    if (!manifest) {
+      return { status: 404, body: { error: "No manifest. POST /codebase/scan first." } };
+    }
     return { status: 200, body: manifest };
   }
 
@@ -47,9 +51,13 @@ export async function handleRoute(url: string, method: string, root: string): Pr
   if (path.startsWith("/codebase/") && method === "GET") {
     const category = path.split("/")[2];
     const manifest = await loadManifest(root);
-    if (!manifest) {return { status: 404, body: { error: "No manifest." } };}
+    if (!manifest) {
+      return { status: 404, body: { error: "No manifest." } };
+    }
     const data = (manifest as Record<string, unknown>)[category];
-    if (data === undefined) {return { status: 404, body: { error: `Category '${category}' not found.` } };}
+    if (data === undefined) {
+      return { status: 404, body: { error: `Category '${category}' not found.` } };
+    }
     return { status: 200, body: data };
   }
 

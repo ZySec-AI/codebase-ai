@@ -25,9 +25,19 @@ const DEFAULTS: CLIOptions = {
 };
 
 const COMMANDS = new Set([
-  "scan", "setup", "query", "mcp",
-  "issue", "status", "init", "scan-only",
-  "brief", "next", "doctor", "fix", "release",
+  "scan",
+  "setup",
+  "query",
+  "mcp",
+  "issue",
+  "status",
+  "init",
+  "scan-only",
+  "brief",
+  "next",
+  "doctor",
+  "fix",
+  "release",
 ]);
 
 export function parseArgs(argv: string[]): CLIOptions {
@@ -65,28 +75,64 @@ export function parseArgs(argv: string[]): CLIOptions {
     if (arg.startsWith("--")) {
       const key = arg.slice(2);
 
-      if (key === "quiet" || key === "q") { opts.quiet = true; continue; }
-      if (key === "raw") { opts.raw = true; continue; }
-      if (key === "verbose" || key === "V") { opts.verbose = true; continue; }
-      if (key === "incremental") { opts.incremental = true; continue; }
-      if (key === "dry-run") { opts.dryRun = true; continue; }
-      if (key === "sync") { opts.sync = true; continue; }
-      if (key === "examples") { opts.examples = true; continue; }
-      if (key === "mine") { positionals.push("mine"); continue; }
+      if (key === "quiet" || key === "q") {
+        opts.quiet = true;
+        continue;
+      }
+      if (key === "raw") {
+        opts.raw = true;
+        continue;
+      }
+      if (key === "verbose" || key === "V") {
+        opts.verbose = true;
+        continue;
+      }
+      if (key === "incremental") {
+        opts.incremental = true;
+        continue;
+      }
+      if (key === "dry-run") {
+        opts.dryRun = true;
+        continue;
+      }
+      if (key === "sync") {
+        opts.sync = true;
+        continue;
+      }
+      if (key === "examples") {
+        opts.examples = true;
+        continue;
+      }
+      if (key === "mine") {
+        positionals.push("mine");
+        continue;
+      }
 
       const next = argv[i + 1];
-      if (!next || next.startsWith("--")) {continue;}
+      if (!next || next.startsWith("--")) {
+        continue;
+      }
       i++;
 
-      if (key === "path") {opts.path = next;}
-      else if (key === "format") {opts.format = next;}
-      else if (key === "depth") {opts.depth = parseInt(next, 10) || 4;}
-      else if (key === "categories") {opts.categories = next.split(",").map(s => s.trim());}
-      else if (key === "port") {opts.port = parseInt(next, 10) || 7432;}
-      else if (key === "tools") {opts.tools = next.split(",").map(s => s.trim());}
-      else if (key === "since") {opts.since = next;}
-      else if (key === "message" || key === "m") {opts.message = next;}
-      else if (key === "reason") {opts.reason = next;}
+      if (key === "path") {
+        opts.path = next;
+      } else if (key === "format") {
+        opts.format = next;
+      } else if (key === "depth") {
+        opts.depth = parseInt(next, 10) || 4;
+      } else if (key === "categories") {
+        opts.categories = next.split(",").map((s) => s.trim());
+      } else if (key === "port") {
+        opts.port = parseInt(next, 10) || 7432;
+      } else if (key === "tools") {
+        opts.tools = next.split(",").map((s) => s.trim());
+      } else if (key === "since") {
+        opts.since = next;
+      } else if (key === "message" || key === "m") {
+        opts.message = next;
+      } else if (key === "reason") {
+        opts.reason = next;
+      }
 
       continue;
     }
@@ -115,10 +161,18 @@ export function parseArgs(argv: string[]): CLIOptions {
   }
 
   // Env var overrides
-  if (process.env.CODEBASE_OUTPUT) {opts.path = process.env.CODEBASE_OUTPUT;}
-  if (process.env.CODEBASE_PORT) {opts.port = parseInt(process.env.CODEBASE_PORT, 10) || 7432;}
-  if (process.env.CODEBASE_DEPTH) {opts.depth = parseInt(process.env.CODEBASE_DEPTH, 10) || 4;}
-  if (process.env.CODEBASE_QUIET === "true") {opts.quiet = true;}
+  if (process.env.CODEBASE_OUTPUT) {
+    opts.path = process.env.CODEBASE_OUTPUT;
+  }
+  if (process.env.CODEBASE_PORT) {
+    opts.port = parseInt(process.env.CODEBASE_PORT, 10) || 7432;
+  }
+  if (process.env.CODEBASE_DEPTH) {
+    opts.depth = parseInt(process.env.CODEBASE_DEPTH, 10) || 4;
+  }
+  if (process.env.CODEBASE_QUIET === "true") {
+    opts.quiet = true;
+  }
 
   return opts;
 }
@@ -127,4 +181,3 @@ export function showCommandHelp(commandName: string): void {
   printCommandHelp(commandName);
   process.exit(0);
 }
-

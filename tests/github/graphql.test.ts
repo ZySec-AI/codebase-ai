@@ -94,10 +94,7 @@ describe("GitHub GraphQL Integration", () => {
         return {} as any;
       });
 
-      const result = await fetchGitHubGraphQLData(
-        "/test/cwd",
-        "https://github.com/owner/repo.git"
-      );
+      const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
 
       // Should have called execFile with GraphQL query
       expect(execFile).toHaveBeenCalled();
@@ -123,10 +120,7 @@ describe("GitHub GraphQL Integration", () => {
         return {} as any;
       });
 
-      const result = await fetchGitHubGraphQLData(
-        "/test/cwd",
-        "git@github.com:owner/repo.git"
-      );
+      const result = await fetchGitHubGraphQLData("/test/cwd", "git@github.com:owner/repo.git");
 
       expect(execFile).toHaveBeenCalled();
       expect(result).toBeDefined();
@@ -137,18 +131,13 @@ describe("GitHub GraphQL Integration", () => {
 
       vi.mocked(execFile).mockImplementation((cmd, args, options, callback) => {
         const response = {
-          errors: [
-            { message: "Could not resolve to a Repository" },
-          ],
+          errors: [{ message: "Could not resolve to a Repository" }],
         };
         callback(null, JSON.stringify(response), "");
         return {} as any;
       });
 
-      const result = await fetchGitHubGraphQLData(
-        "/test/cwd",
-        "https://github.com/owner/repo.git"
-      );
+      const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
 
       // Should return empty object on error
       expect(result).toEqual({});
@@ -162,10 +151,7 @@ describe("GitHub GraphQL Integration", () => {
         return {} as any;
       });
 
-      const result = await fetchGitHubGraphQLData(
-        "/test/cwd",
-        "https://github.com/owner/repo.git"
-      );
+      const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
 
       // Should return empty object on CLI error
       expect(result).toEqual({});
@@ -214,10 +200,7 @@ describe("GitHub GraphQL Integration", () => {
         return {} as any;
       });
 
-      const result = await fetchGitHubGraphQLData(
-        "/test/cwd",
-        "https://github.com/owner/repo.git"
-      );
+      const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
 
       expect(result.issues).toHaveLength(1);
       expect(result.issues?.[0]).toMatchObject({
@@ -277,10 +260,7 @@ describe("GitHub GraphQL Integration", () => {
         return {} as any;
       });
 
-      const result = await fetchGitHubGraphQLData(
-        "/test/cwd",
-        "https://github.com/owner/repo.git"
-      );
+      const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
 
       expect(result.pull_requests).toHaveLength(1);
       expect(result.pull_requests?.[0]).toMatchObject({
@@ -320,17 +300,13 @@ describe("GitHub GraphQL Integration", () => {
       });
 
       // Only fetch issues and PRs
-      await fetchGitHubGraphQLData(
-        "/test/cwd",
-        "https://github.com/owner/repo.git",
-        {
-          includeIssues: true,
-          includePRs: true,
-          includeMilestones: false,
-          includeReleases: false,
-          includeProjects: false,
-        }
-      );
+      await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git", {
+        includeIssues: true,
+        includePRs: true,
+        includeMilestones: false,
+        includeReleases: false,
+        includeProjects: false,
+      });
 
       // Should only call once (combined query) or fewer times
       // In the actual implementation, each type has its own query
@@ -365,10 +341,7 @@ describe("GitHub GraphQL Integration", () => {
         return {} as any;
       });
 
-      const result = await fetchGitHubGraphQLData(
-        "/test/cwd",
-        "https://github.com/owner/repo.git"
-      );
+      const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
 
       expect(result.releases).toHaveLength(1);
       expect(result.releases?.[0]).toMatchObject({
@@ -388,11 +361,7 @@ describe("GitHub GraphQL Integration", () => {
         state: "OPEN",
         url: "https://github.com/owner/repo/projects/1",
         columns: {
-          nodes: [
-            { name: "To Do" },
-            { name: "In Progress" },
-            { name: "Done" },
-          ],
+          nodes: [{ name: "To Do" }, { name: "In Progress" }, { name: "Done" }],
         },
         items: { totalCount: 15 },
       };
@@ -413,10 +382,7 @@ describe("GitHub GraphQL Integration", () => {
         return {} as any;
       });
 
-      const result = await fetchGitHubGraphQLData(
-        "/test/cwd",
-        "https://github.com/owner/repo.git"
-      );
+      const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
 
       expect(result.project_boards).toHaveLength(1);
       expect(result.project_boards?.[0]).toMatchObject({

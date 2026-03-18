@@ -67,7 +67,9 @@ export async function runFix(options: CLIOptions): Promise<void> {
       if (existsSync(join(root, "src"))) {
         const { statSync } = await import("node:fs");
         const srcStat = statSync(join(root, "src"));
-        if (srcStat.mtimeMs > generatedAt) {needsScan = true;}
+        if (srcStat.mtimeMs > generatedAt) {
+          needsScan = true;
+        }
       }
     } catch {
       needsScan = true;
@@ -109,15 +111,24 @@ export async function runFix(options: CLIOptions): Promise<void> {
     const postCheckoutOk = checkHook(root, "post-checkout");
     const hookHasSync = checkHookSync(root);
     const preCommitOk = checkPreCommitHook(root);
-    const needsReinstall = !postCommitOk || !postCheckoutOk || (ghAvailable && !hookHasSync) || !preCommitOk;
+    const needsReinstall =
+      !postCommitOk || !postCheckoutOk || (ghAvailable && !hookHasSync) || !preCommitOk;
 
     if (needsReinstall) {
       installHooks(root, ghAvailable);
       const fixes: string[] = [];
-      if (!postCommitOk) {fixes.push("post-commit");}
-      if (!postCheckoutOk) {fixes.push("post-checkout");}
-      if (ghAvailable && !hookHasSync) {fixes.push("--sync flag");}
-      if (!preCommitOk) {fixes.push("pre-commit");}
+      if (!postCommitOk) {
+        fixes.push("post-commit");
+      }
+      if (!postCheckoutOk) {
+        fixes.push("post-checkout");
+      }
+      if (ghAvailable && !hookHasSync) {
+        fixes.push("--sync flag");
+      }
+      if (!preCommitOk) {
+        fixes.push("pre-commit");
+      }
       fixed(`Installed ${fixes.join(" + ")} hook${fixes.length > 1 ? "s" : ""}`);
       fixCount++;
     }
@@ -142,18 +153,22 @@ export async function runFix(options: CLIOptions): Promise<void> {
   }
 
   // ─── 8. Claude Code hooks ─────────────────────────────────
-  const guardHook    = join(root, ".claude", "hooks", "git-guard.sh");
-  const postHook     = join(root, ".claude", "hooks", "git-post.sh");
+  const guardHook = join(root, ".claude", "hooks", "git-guard.sh");
+  const postHook = join(root, ".claude", "hooks", "git-post.sh");
   const settingsFile = join(root, ".claude", "settings.json");
   const hooksOk = existsSync(guardHook) && existsSync(postHook);
   const settingsOk = (() => {
-    if (!existsSync(settingsFile)) {return false;}
+    if (!existsSync(settingsFile)) {
+      return false;
+    }
     try {
       const s = JSON.parse(readFileSync(settingsFile, "utf-8"));
-      const pre  = JSON.stringify(s.hooks?.PreToolUse  ?? "");
+      const pre = JSON.stringify(s.hooks?.PreToolUse ?? "");
       const post = JSON.stringify(s.hooks?.PostToolUse ?? "");
       return pre.includes("git-guard") && post.includes("git-post");
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   })();
   if (!hooksOk || !settingsOk) {
     const { installClaudeHooksForFix } = await import("./setup.js");
@@ -176,28 +191,36 @@ export async function runFix(options: CLIOptions): Promise<void> {
 
 function checkInjection(root: string): boolean {
   const filePath = join(root, "CLAUDE.md");
-  if (!existsSync(filePath)) {return false;}
+  if (!existsSync(filePath)) {
+    return false;
+  }
   const content = readFileSync(filePath, "utf-8");
   return content.includes("<!-- codebase:start -->");
 }
 
 function checkHook(root: string, hookName: string): boolean {
   const hookPath = join(root, ".git", "hooks", hookName);
-  if (!existsSync(hookPath)) {return false;}
+  if (!existsSync(hookPath)) {
+    return false;
+  }
   const content = readFileSync(hookPath, "utf-8");
   return content.includes(HOOK_MARKER);
 }
 
 function checkHookSync(root: string): boolean {
   const hookPath = join(root, ".git", "hooks", "post-commit");
-  if (!existsSync(hookPath)) {return false;}
+  if (!existsSync(hookPath)) {
+    return false;
+  }
   const content = readFileSync(hookPath, "utf-8");
   return content.includes("--sync");
 }
 
 function checkPreCommitHook(root: string): boolean {
   const hookPath = join(root, ".git", "hooks", "pre-commit");
-  if (!existsSync(hookPath)) {return false;}
+  if (!existsSync(hookPath)) {
+    return false;
+  }
   const content = readFileSync(hookPath, "utf-8");
   return content.includes("codebase-pre-commit");
 }

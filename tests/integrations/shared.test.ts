@@ -13,14 +13,19 @@ describe("Integration shared functions", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = join(tmpdir(), `integration-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    tempDir = join(
+      tmpdir(),
+      `integration-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    );
     mkdirSync(tempDir, { recursive: true });
   });
 
   afterEach(() => {
     try {
       rmSync(tempDir, { recursive: true, force: true });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   });
 
   describe("injectMarkdown", () => {
@@ -142,7 +147,8 @@ describe("Integration shared functions", () => {
   describe("removeMarkdown", () => {
     it("removes markdown block from file", () => {
       const file = "CLAUDE.md";
-      const content = "# Rules\n\n<!-- codebase:start -->\nInjected content\n<!-- codebase:end -->\n## More rules\n";
+      const content =
+        "# Rules\n\n<!-- codebase:start -->\nInjected content\n<!-- codebase:end -->\n## More rules\n";
       writeFileSync(join(tempDir, file), content, "utf-8");
 
       removeMarkdown(tempDir, file);

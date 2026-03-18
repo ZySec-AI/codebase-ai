@@ -102,7 +102,6 @@ describe("E2E: Init Workflow", () => {
     expect(claudeContent).toContain("codebase:end");
   });
 
-
   it("should handle --dry-run flag", () => {
     // Create a fresh directory for this test
     const dryRunDir = join(tempDir, "dryrun-test");
@@ -161,7 +160,10 @@ describe("E2E: Init Workflow", () => {
     execSync(`git commit -m "Initial commit"`, { cwd: githubTestDir, stdio: "pipe" });
 
     // Add GitHub remote
-    execSync(`git remote add origin https://github.com/test/repo.git`, { cwd: githubTestDir, stdio: "pipe" });
+    execSync(`git remote add origin https://github.com/test/repo.git`, {
+      cwd: githubTestDir,
+      stdio: "pipe",
+    });
 
     // Run init (without --sync since gh CLI may not be available in test env)
     execSync(`node ${cliPath} init`, { cwd: githubTestDir, stdio: "pipe" });

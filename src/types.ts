@@ -169,7 +169,16 @@ export interface IssueData {
   mapped_files?: string[];
   // Enhanced fields
   comments_count?: number;
-  reactions?: { thumbs_up: number; thumbs_down: number; laugh: number; hooray: number; confused: number; heart: number; rocket: number; eyes: number };
+  reactions?: {
+    thumbs_up: number;
+    thumbs_down: number;
+    laugh: number;
+    hooray: number;
+    confused: number;
+    heart: number;
+    rocket: number;
+    eyes: number;
+  };
   timeline_events?: number;
   url?: string;
 }

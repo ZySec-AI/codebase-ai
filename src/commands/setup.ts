@@ -1,5 +1,13 @@
 import { resolve, dirname, join } from "node:path";
-import { writeFileSync, existsSync, mkdirSync, readFileSync, chmodSync, readdirSync, copyFileSync } from "node:fs";
+import {
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  chmodSync,
+  readdirSync,
+  copyFileSync,
+} from "node:fs";
 import { execFile } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
 import { runScan } from "./scan.js";
@@ -10,19 +18,19 @@ import { log, success, info, warn, heading } from "../utils/output.js";
 
 // ─── Vibekit labels ──────────────────────────────────────────────
 const VIBEKIT_LABELS = [
-  { name: "bug",         color: "d73a4a", description: "Something isn't working" },
-  { name: "arch",        color: "0075ca", description: "Architectural change needed" },
-  { name: "sim",         color: "e4e669", description: "Found by simulation" },
-  { name: "carry",       color: "ff6b35", description: "Bug surviving 2+ cycles" },
-  { name: "cycle",       color: "c5def5", description: "Simulation cycle summary" },
-  { name: "critical",    color: "b60205", description: "Critical severity" },
-  { name: "high",        color: "d93f0b", description: "High severity" },
-  { name: "medium",      color: "e99695", description: "Medium severity" },
-  { name: "low",         color: "fef2c0", description: "Low severity" },
-  { name: "highlight",   color: "0e8a16", description: "Positive product signal" },
-  { name: "vibekit",     color: "7057ff", description: "Queued for autonomous build" },
+  { name: "bug", color: "d73a4a", description: "Something isn't working" },
+  { name: "arch", color: "0075ca", description: "Architectural change needed" },
+  { name: "sim", color: "e4e669", description: "Found by simulation" },
+  { name: "carry", color: "ff6b35", description: "Bug surviving 2+ cycles" },
+  { name: "cycle", color: "c5def5", description: "Simulation cycle summary" },
+  { name: "critical", color: "b60205", description: "Critical severity" },
+  { name: "high", color: "d93f0b", description: "High severity" },
+  { name: "medium", color: "e99695", description: "Medium severity" },
+  { name: "low", color: "fef2c0", description: "Low severity" },
+  { name: "highlight", color: "0e8a16", description: "Positive product signal" },
+  { name: "vibekit", color: "7057ff", description: "Queued for autonomous build" },
   { name: "performance", color: "ff8c00", description: "Performance issue" },
-  { name: "review",      color: "1d76db", description: "Found by code review" },
+  { name: "review", color: "1d76db", description: "Found by code review" },
 ];
 
 export async function runSetup(options: CLIOptions): Promise<void> {
@@ -71,11 +79,7 @@ export async function runSetup(options: CLIOptions): Promise<void> {
 
   // ── Step 5: Gitignore ─────────────────────────────────────────
   updateGitignore(root);
-  appendToGitignore(root, [
-    ".vibekit/daemon.lock",
-    ".vibekit/daemon.log",
-    ".vibekit/build.lock",
-  ]);
+  appendToGitignore(root, [".vibekit/daemon.lock", ".vibekit/daemon.log", ".vibekit/build.lock"]);
   success(".gitignore updated");
 
   // ── Step 6: .vibekit/ dir ─────────────────────────────────────
@@ -102,7 +106,9 @@ export async function runSetup(options: CLIOptions): Promise<void> {
   // ── Step 8: docs/PRODUCT.md ───────────────────────────────────
   heading("Product Brief");
   const docsDir = join(root, "docs");
-  if (!existsSync(docsDir)) {mkdirSync(docsDir, { recursive: true });}
+  if (!existsSync(docsDir)) {
+    mkdirSync(docsDir, { recursive: true });
+  }
 
   const productPath = join(docsDir, "PRODUCT.md");
   if (!existsSync(productPath)) {
@@ -138,7 +144,7 @@ function installClaudeCommands(root: string): void {
   const destDir = join(root, ".claude", "commands");
   mkdirSync(destDir, { recursive: true });
 
-  const files = readdirSync(commandsSource).filter(f => f.endsWith(".md"));
+  const files = readdirSync(commandsSource).filter((f) => f.endsWith(".md"));
   let installed = 0;
   let updated = 0;
   let skipped = 0;
@@ -163,9 +169,15 @@ function installClaudeCommands(root: string): void {
   }
 
   const parts: string[] = [];
-  if (installed > 0) {parts.push(`${installed} new`);}
-  if (updated > 0) {parts.push(`${updated} updated`);}
-  if (skipped > 0) {parts.push(`${skipped} unchanged`);}
+  if (installed > 0) {
+    parts.push(`${installed} new`);
+  }
+  if (updated > 0) {
+    parts.push(`${updated} updated`);
+  }
+  if (skipped > 0) {
+    parts.push(`${skipped} unchanged`);
+  }
 
   if (installed > 0 || updated > 0) {
     success(`Claude commands installed → .claude/commands/ (${parts.join(", ")})`);
@@ -299,13 +311,17 @@ exit 0
   const settingsPath = join(root, ".claude", "settings.json");
   let settings: Record<string, unknown> = {};
   if (existsSync(settingsPath)) {
-    try { settings = JSON.parse(readFileSync(settingsPath, "utf-8")); } catch { /* ignore */ }
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    } catch {
+      /* ignore */
+    }
   }
 
   const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
 
   const guardCmd = `bash .claude/hooks/git-guard.sh`;
-  const postCmd  = `bash .claude/hooks/git-post.sh`;
+  const postCmd = `bash .claude/hooks/git-post.sh`;
 
   // PreToolUse — add guard if not already present
   const preHooks = (hooks["PreToolUse"] as unknown[]) ?? [];
@@ -370,14 +386,16 @@ fi
 function appendToGitignore(root: string, lines: string[]): void {
   const p = join(root, ".gitignore");
   const existing = existsSync(p) ? readFileSync(p, "utf-8") : "";
-  const toAdd = lines.filter(l => !existing.includes(l)).join("\n");
-  if (toAdd) {writeFileSync(p, existing.trimEnd() + "\n" + toAdd + "\n", "utf-8");}
+  const toAdd = lines.filter((l) => !existing.includes(l)).join("\n");
+  if (toAdd) {
+    writeFileSync(p, existing.trimEnd() + "\n" + toAdd + "\n", "utf-8");
+  }
 }
 
 // ─── gh helpers ──────────────────────────────────────────────────
 
 function execGh(root: string, args: string[]): Promise<{ ok: boolean; stdout: string }> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     execFile("gh", args, { cwd: root, timeout: 15_000 }, (err, stdout) => {
       resolve({ ok: !err, stdout: (stdout || "").trim() });
     });
@@ -385,63 +403,101 @@ function execGh(root: string, args: string[]): Promise<{ ok: boolean; stdout: st
 }
 
 async function installAgentBrowser(): Promise<void> {
-  const installed = await new Promise<boolean>(resolve => {
-    execFile("agent-browser", ["--version"], { timeout: 5_000 }, err => resolve(!err));
+  const installed = await new Promise<boolean>((resolve) => {
+    execFile("agent-browser", ["--version"], { timeout: 5_000 }, (err) => resolve(!err));
   });
-  if (installed) { info("agent-browser already installed"); return; }
+  if (installed) {
+    info("agent-browser already installed");
+    return;
+  }
 
   log("Installing agent-browser...");
-  const ok = await new Promise<boolean>(resolve => {
-    execFile("npm", ["install", "-g", "agent-browser"], { timeout: 120_000 }, err => resolve(!err));
+  const ok = await new Promise<boolean>((resolve) => {
+    execFile("npm", ["install", "-g", "agent-browser"], { timeout: 120_000 }, (err) =>
+      resolve(!err)
+    );
   });
-  if (!ok) { warn("agent-browser install failed — run: npm install -g agent-browser"); return; }
+  if (!ok) {
+    warn("agent-browser install failed — run: npm install -g agent-browser");
+    return;
+  }
 
-  const chrome = await new Promise<boolean>(resolve => {
-    execFile("agent-browser", ["install"], { timeout: 300_000 }, err => resolve(!err));
+  const chrome = await new Promise<boolean>((resolve) => {
+    execFile("agent-browser", ["install"], { timeout: 300_000 }, (err) => resolve(!err));
   });
-  if (chrome) { success("agent-browser installed (Chrome for Testing downloaded)"); }
-  else { warn("agent-browser installed but Chrome download failed — run: agent-browser install"); }
+  if (chrome) {
+    success("agent-browser installed (Chrome for Testing downloaded)");
+  } else {
+    warn("agent-browser installed but Chrome download failed — run: agent-browser install");
+  }
 }
 
 async function checkClaude(): Promise<boolean> {
-  return new Promise(resolve => {
-    execFile("claude", ["--version"], { timeout: 5_000 }, err => resolve(!err));
+  return new Promise((resolve) => {
+    execFile("claude", ["--version"], { timeout: 5_000 }, (err) => resolve(!err));
   });
 }
 
 async function checkGh(): Promise<boolean> {
-  return new Promise(resolve => {
-    execFile("gh", ["auth", "status"], { timeout: 5_000 }, err => resolve(!err));
+  return new Promise((resolve) => {
+    execFile("gh", ["auth", "status"], { timeout: 5_000 }, (err) => resolve(!err));
   });
 }
 
 async function installLabels(root: string): Promise<void> {
   const { stdout } = await execGh(root, [
-    "label", "list", "--limit", "100", "--json", "name", "--jq", ".[].name",
+    "label",
+    "list",
+    "--limit",
+    "100",
+    "--json",
+    "name",
+    "--jq",
+    ".[].name",
   ]);
   const existing = new Set(stdout.split("\n").filter(Boolean));
 
   let created = 0;
   for (const label of VIBEKIT_LABELS) {
-    if (existing.has(label.name)) {continue;}
+    if (existing.has(label.name)) {
+      continue;
+    }
     const { ok } = await execGh(root, [
-      "label", "create", label.name,
-      "--color", label.color,
-      "--description", label.description,
+      "label",
+      "create",
+      label.name,
+      "--color",
+      label.color,
+      "--description",
+      label.description,
     ]);
-    if (ok) {created++;}
+    if (ok) {
+      created++;
+    }
   }
 
   const skipped = VIBEKIT_LABELS.length - created;
-  if (created > 0) {success(`${created} GitHub labels created (${skipped} already existed)`);}
-  else {info(`All ${VIBEKIT_LABELS.length} labels already exist`);}
+  if (created > 0) {
+    success(`${created} GitHub labels created (${skipped} already existed)`);
+  } else {
+    info(`All ${VIBEKIT_LABELS.length} labels already exist`);
+  }
 }
 
 async function ensureHighlightsIndex(root: string): Promise<void> {
   const { stdout } = await execGh(root, [
-    "issue", "list", "--search", "Highlights Index",
-    "--state", "all", "--limit", "1",
-    "--json", "number", "--jq", ".[0].number // empty",
+    "issue",
+    "list",
+    "--search",
+    "Highlights Index",
+    "--state",
+    "all",
+    "--limit",
+    "1",
+    "--json",
+    "number",
+    "--jq",
+    ".[0].number // empty",
   ]);
   if (stdout) {
     info("Highlights Index issue already exists");
@@ -456,13 +512,20 @@ Tracks positive signals from /simulate cycles. Updated automatically — do not 
 <!-- /simulate appends here -->`;
 
   const { ok } = await execGh(root, [
-    "issue", "create",
-    "--title", "Highlights Index",
-    "--label", "highlight",
-    "--body", body,
+    "issue",
+    "create",
+    "--title",
+    "Highlights Index",
+    "--label",
+    "highlight",
+    "--body",
+    body,
   ]);
-  if (ok) {success("Highlights Index issue created on GitHub");}
-  else {warn("Could not create Highlights Index issue");}
+  if (ok) {
+    success("Highlights Index issue created on GitHub");
+  } else {
+    warn("Could not create Highlights Index issue");
+  }
 }
 
 // ─── PRODUCT.md skeleton from manifest ───────────────────────────
@@ -471,7 +534,11 @@ function generateProductMd(root: string, outputPath: string): void {
   const manifestPath = join(root, ".codebase.json");
   let manifest: Manifest | null = null;
   if (existsSync(manifestPath)) {
-    try { manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as Manifest; } catch { /* ignore */ }
+    try {
+      manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as Manifest;
+    } catch {
+      /* ignore */
+    }
   }
 
   const name = manifest?.project?.name ?? "[INFERRED: project name]";
@@ -482,7 +549,9 @@ function generateProductMd(root: string, outputPath: string): void {
   const buildCmd = manifest?.commands?.build ?? "[INFERRED]";
   const testCmd = manifest?.commands?.test ?? "[INFERRED]";
 
-  writeFileSync(outputPath, `# PRODUCT.md — ${name}
+  writeFileSync(
+    outputPath,
+    `# PRODUCT.md — ${name}
 
 > Auto-generated by \`codebase setup\`. Fill in any [INFERRED] sections.
 
@@ -531,5 +600,7 @@ ${description}
 ## Known Constraints
 
 - [INFERRED: e.g. multi-tenant, RBAC, GDPR]
-`, "utf-8");
+`,
+    "utf-8"
+  );
 }

@@ -7,16 +7,28 @@ import { log, success, error } from "../utils/output.js";
 function ghExec(cwd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile("gh", args, { cwd, timeout: 30_000 }, (err, stdout, stderr) => {
-      if (err) {reject(new Error(stderr || err.message));}
-      else {resolve(stdout.trim());}
+      if (err) {
+        reject(new Error(stderr || err.message));
+      } else {
+        resolve(stdout.trim());
+      }
     });
   });
 }
 
-export async function createIssue(root: string, title: string, body?: string, labels?: string[]): Promise<void> {
-  const issueBody = body || `## Summary\n\n${title}\n\n## Steps to Reproduce\n\n1. \n\n## Expected\n\n\n\n## Actual\n\n`;
+export async function createIssue(
+  root: string,
+  title: string,
+  body?: string,
+  labels?: string[]
+): Promise<void> {
+  const issueBody =
+    body ||
+    `## Summary\n\n${title}\n\n## Steps to Reproduce\n\n1. \n\n## Expected\n\n\n\n## Actual\n\n`;
   const args = ["issue", "create", "--title", title, "--body", issueBody];
-  if (labels?.length) {args.push("--label", labels.join(","));}
+  if (labels?.length) {
+    args.push("--label", labels.join(","));
+  }
 
   try {
     const url = await ghExec(root, args);
@@ -72,7 +84,7 @@ export async function mapIssueToFiles(
   files: string[]
 ): Promise<void> {
   try {
-    const body = `**Mapped files:**\n${files.map(f => `- \`${f}\``).join("\n")}`;
+    const body = `**Mapped files:**\n${files.map((f) => `- \`${f}\``).join("\n")}`;
     await ghExec(root, ["issue", "comment", issueNumber, "--body", body]);
     success(`Mapped issue #${issueNumber} to ${files.length} files`);
   } catch (e) {

@@ -17,7 +17,9 @@ describe("githook integration", () => {
   afterEach(() => {
     try {
       rmSync(tempDir, { recursive: true, force: true });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   });
 
   describe("installHooks", () => {
@@ -75,11 +77,7 @@ describe("githook integration", () => {
 
     it("updates existing post-commit hook with codebase marker", () => {
       const hookPath = join(tempDir, ".git", "hooks", "post-commit");
-      writeFileSync(
-        hookPath,
-        "#!/bin/sh\n\n# Existing hook\necho 'Running tests'\n",
-        "utf-8"
-      );
+      writeFileSync(hookPath, "#!/bin/sh\n\n# Existing hook\necho 'Running tests'\n", "utf-8");
 
       installHooks(tempDir, false);
 
@@ -106,11 +104,7 @@ describe("githook integration", () => {
 
     it("appends to existing hook without codebase marker", () => {
       const hookPath = join(tempDir, ".git", "hooks", "post-commit");
-      writeFileSync(
-        hookPath,
-        "#!/bin/sh\n\nnpm run build\n",
-        "utf-8"
-      );
+      writeFileSync(hookPath, "#!/bin/sh\n\nnpm run build\n", "utf-8");
 
       installHooks(tempDir, false);
 
@@ -176,8 +170,16 @@ describe("githook integration", () => {
       const postCommitPath = join(tempDir, ".git", "hooks", "post-commit");
       const postCheckoutPath = join(tempDir, ".git", "hooks", "post-checkout");
 
-      writeFileSync(postCommitPath, "#!/bin/sh\n\n# codebase-auto-update\nnpx codebase scan\n", "utf-8");
-      writeFileSync(postCheckoutPath, "#!/bin/sh\n\n# codebase-auto-update\nnpx codebase scan\n", "utf-8");
+      writeFileSync(
+        postCommitPath,
+        "#!/bin/sh\n\n# codebase-auto-update\nnpx codebase scan\n",
+        "utf-8"
+      );
+      writeFileSync(
+        postCheckoutPath,
+        "#!/bin/sh\n\n# codebase-auto-update\nnpx codebase scan\n",
+        "utf-8"
+      );
 
       const result = uninstallHook(tempDir);
       expect(result).toBe(true);
@@ -198,11 +200,7 @@ describe("githook integration", () => {
 
     it("preserves existing shebang when updating", () => {
       const hookPath = join(tempDir, ".git", "hooks", "post-commit");
-      writeFileSync(
-        hookPath,
-        "#!/bin/bash\n\nnpm test\n",
-        "utf-8"
-      );
+      writeFileSync(hookPath, "#!/bin/bash\n\nnpm test\n", "utf-8");
 
       installHooks(tempDir, false);
 
