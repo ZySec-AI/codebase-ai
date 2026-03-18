@@ -13,8 +13,10 @@ function ghExec(cwd: string, args: string[]): Promise<string> {
   });
 }
 
-export async function createIssue(root: string, title: string, body?: string): Promise<void> {
-  const args = ["issue", "create", "--title", title, "--body", body || title];
+export async function createIssue(root: string, title: string, body?: string, labels?: string[]): Promise<void> {
+  const issueBody = body || `## Summary\n\n${title}\n\n## Steps to Reproduce\n\n1. \n\n## Expected\n\n\n\n## Actual\n\n`;
+  const args = ["issue", "create", "--title", title, "--body", issueBody];
+  if (labels?.length) args.push("--label", labels.join(","));
 
   try {
     const url = await ghExec(root, args);

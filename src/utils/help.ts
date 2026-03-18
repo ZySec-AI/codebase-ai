@@ -214,6 +214,21 @@ const HELP: Record<string, CommandHelp> = {
     ],
     seeAlso: ["doctor"],
   },
+
+  release: {
+    description: "Gate check → tag → merge develop→main → GitHub release",
+    usage: "codebase release [version] [options]",
+    examples: [
+      { command: "codebase release", description: "Auto-increment version and release" },
+      { command: "codebase release v1.2.0", description: "Release with explicit version" },
+      { command: "codebase release --dry-run", description: "Preview release without tagging" },
+      { command: "codebase release generate", description: "Generate release notes only (legacy)" },
+    ],
+    options: [
+      { flag: "--dry-run", description: "Preview release notes without creating tag or merge" },
+    ],
+    seeAlso: ["doctor"],
+  },
 };
 
 export function printMainHelp(): void {
@@ -231,9 +246,22 @@ ${bold("AI INTERFACE")}
   ${command("codebase status")}            Kanban board, priorities, milestones
   ${command("codebase query <path>")}      Query any field (e.g. ${code("stack.languages")})
 
+${bold("AUTONOMOUS LOOP")}
+  After ${command("codebase setup")}, these slash commands are available in Claude Code:
+
+  ${command("/setup")}                     Bootstrap project — labels, milestone, PRODUCT.md
+  ${command("/simulate")}                  AI customer journeys (Playwright) + UX audit
+  ${command("/build")}                     Autonomous loop — build → test → simulate → repeat
+  ${command("/launch")}                    Gate check → tag → release → merge to main
+  ${command("/review")}                    Security, quality, deps, accessibility audit
+  ${command("/pitch")}                     GTM docs, dev docs, investor deck
+  ${command("/daemon")}                    Background worker — ships automatically
+
 ${bold("HUMAN COMMANDS")}
   ${command("codebase init")}              Full setup (scan + AI tools + hooks)
   ${command("codebase scan")}              Generate/update .codebase.json
+  ${command("codebase setup")}             Wire AI tools + install slash commands
+  ${command("codebase release")}           Gate check → tag → develop→main
   ${command("codebase watch")}             Auto-update on file changes
   ${command("codebase doctor")}            Health check & diagnostics
   ${command("codebase serve")}             Start HTTP API server

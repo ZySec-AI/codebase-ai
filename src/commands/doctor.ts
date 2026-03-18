@@ -1,5 +1,5 @@
 import { resolve, join } from "node:path";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, readdirSync } from "node:fs";
 import type { CLIOptions, Manifest } from "../types.js";
 import { detectTools } from "../integrations/index.js";
 import { checkGhDetailed, detectGlobalTools } from "./init.js";
@@ -170,6 +170,33 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
     results.push({ label: "Git Hooks", ok: true, detail: "Not a git repo — skipped" });
   }
 
+  // ─── 10b. commit-msg hook (branch enforcement) ────────────
+  if (existsSync(join(root, ".git"))) {
+    const commitMsgOk = checkCommitMsgHook(root);
+    if (commitMsgOk) {
+      results.push({ label: "Branch Hook", ok: true, detail: "commit-msg blocks direct commits to main/master" });
+    } else {
+      results.push({ label: "Branch Hook", ok: false, detail: "commit-msg hook missing — run `codebase fix`" });
+    }
+  }
+
+  // ─── 10c. Claude commands ──────────────────────────────────
+  const claudeCommandsDir = join(root, ".claude", "commands");
+  if (existsSync(claudeCommandsDir)) {
+    const cmdFiles = readdirSync(claudeCommandsDir).filter(f => f.endsWith(".md"));
+    results.push({ label: "Claude Commands", ok: cmdFiles.length > 0, detail: `${cmdFiles.length} commands in .claude/commands/` });
+  } else {
+    results.push({ label: "Claude Commands", ok: false, detail: ".claude/commands/ missing — run `codebase setup`" });
+  }
+
+  // ─── 10d. GitHub Actions ──────────────────────────────────
+  const actionsWorkflow = join(root, ".github", "workflows", "codebase.yml");
+  if (existsSync(actionsWorkflow)) {
+    results.push({ label: "GitHub Actions", ok: true, detail: ".github/workflows/codebase.yml present" });
+  } else {
+    results.push({ label: "GitHub Actions", ok: false, detail: "No workflow — run `codebase setup` to generate" });
+  }
+
   // ─── 11. Gitignore ────────────────────────────────────────
   const gitignorePath = join(root, ".gitignore");
   if (existsSync(gitignorePath)) {
@@ -277,6 +304,13 @@ function checkHook(root: string, hookName: string): boolean {
   if (!existsSync(hookPath)) return false;
   const content = readFileSync(hookPath, "utf-8");
   return content.includes(HOOK_MARKER);
+}
+
+function checkCommitMsgHook(root: string): boolean {
+  const hookPath = join(root, ".git", "hooks", "commit-msg");
+  if (!existsSync(hookPath)) return false;
+  const content = readFileSync(hookPath, "utf-8");
+  return content.includes("codebase-branch-check");
 }
 
 function checkHookSync(root: string): boolean {

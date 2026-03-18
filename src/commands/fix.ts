@@ -141,6 +141,24 @@ export async function runFix(options: CLIOptions): Promise<void> {
     fixCount++;
   }
 
+  // ─── 7. GitHub Actions workflow ───────────────────────────
+  const actionsWorkflow = join(root, ".github", "workflows", "codebase.yml");
+  if (!existsSync(actionsWorkflow) && ghAvailable) {
+    const { installGitHubActionsForFix } = await import("./setup.js");
+    installGitHubActionsForFix(root);
+    fixed("Created .github/workflows/codebase.yml");
+    fixCount++;
+  }
+
+  // ─── 8. Claude commands ───────────────────────────────────
+  const claudeCommandsDir = join(root, ".claude", "commands");
+  if (!existsSync(claudeCommandsDir)) {
+    const { installClaudeCommandsForFix } = await import("./setup.js");
+    installClaudeCommandsForFix(root);
+    fixed("Installed Claude commands → .claude/commands/");
+    fixCount++;
+  }
+
   // ─── Summary ──────────────────────────────────────────────
   log("");
   if (fixCount === 0) {

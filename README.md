@@ -8,83 +8,126 @@
 </p>
 
 <p align="center">
-  <b>One command. Every AI tool understands your project instantly.</b>
+  <b>Zero-dependency project intelligence for AI tools.<br>One command. Instant context. Autonomous development loop.</b>
 </p>
 
 ---
 
-## 🚀 Quick Start (30 seconds)
+## Quick Start
 
 ```bash
 npx codebase
 ```
 
-That's it. Your project is now AI-ready.
+That's it. Your project is AI-ready — and you get the full autonomous development loop.
 
-**What happens:**
-1. Scans your project (stack, commands, structure, patterns)
-2. Syncs GitHub data (issues, PRs, milestones) if `gh` CLI is available
-3. Writes `.codebase.json` (~4KB, ~500 tokens)
-4. Injects smart instructions into all detected AI tools
-5. Installs auto-update git hooks
-6. Configures MCP server for native AI tool access
+**What happens in one command:**
+1. Scans your project → writes `.codebase.json` (~4KB, ~500 tokens)
+2. Injects context into all detected AI tools (Claude, Cursor, Windsurf, Copilot, Aider, Cline, Continue + 4 more)
+3. Configures MCP server for native AI tool access
+4. Installs git hooks (auto-updates manifest on every commit)
+5. Sets up GitHub labels, milestone, and Highlights Index issue
+6. Installs 7 Claude Code slash commands into your project
 
 **After this, you never run it again.** The manifest auto-updates on every commit.
 
 ---
 
-## 💡 Why codebase?
+## The Autonomous Loop
 
-Every AI coding session wastes **5,000-15,000 tokens** re-discovering your project.
+Once set up, your project runs itself:
 
-### Without codebase:
 ```
-Session start → AI explores files → 30 seconds + ~10K tokens
-```
-
-### With codebase:
-```
-Session start → AI reads .codebase.json → ~1 second + ~500 tokens
+/setup      ← run once per project
+/simulate   ← AI customer journeys find & fix bugs (Playwright)
+/build      ← implement architectural issues autonomously
+/launch     ← gate check → tag → release → merge to main
 ```
 
-**Result:** ~95% fewer discovery tokens, instant project context.
+```
+/review     ← security, quality, deps, accessibility audit
+/pitch      ← GTM docs, dev docs, investor deck, metrics
+/daemon     ← background worker — polls GitHub every 3 min, ships automatically
+```
+
+These 7 slash commands are installed into your project by `codebase setup` and work in any Claude Code session.
+
+> **Tip:** Commit `.claude/commands/` to your repo so the whole team shares the same commands.
 
 ---
 
-## 🎯 Key Features
+## Why codebase?
 
-### Zero Configuration
+Every AI coding session wastes **5,000–15,000 tokens** re-discovering your project.
 
-No setup file needed. Works on any project:
-- JavaScript/TypeScript
-- Python
-- Go
-- Rust
-- Java
-- C#
-- Ruby
-- PHP
-- Swift
-- And 20+ more
+```
+Without codebase:  session start → AI explores files → 30s + ~10K tokens
+With codebase:     session start → AI reads .codebase.json → ~1s + ~500 tokens
+```
 
-### Universal AI Tool Support
+**~95% fewer discovery tokens. Instant context. Every session.**
 
-Auto-wires into **7 AI tools**:
-- Claude Code
-- Cursor
-- Windsurf
-- GitHub Copilot
-- Aider
-- Cline
-- Continue
+But codebase is more than a manifest. It's the connective tissue between your codebase and the full autonomous development workflow — project intelligence that every command in the loop reads first.
 
-### Native MCP Server
+---
+
+## What Gets Captured
+
+| Category | Data |
+|----------|------|
+| **Project** | Name, description |
+| **Repo** | URL, default branch, monorepo detection, active branches |
+| **Structure** | Directory tree, entry points, build output paths |
+| **Stack** | 30+ languages, 100+ frameworks, package manager, database, ORM |
+| **Commands** | Dev, build, test, lint, format (auto-detected, 15+ languages) |
+| **Dependencies** | Direct/dev counts, lock file, notable packages |
+| **Config** | Env files, feature flags, env vars |
+| **Git** | Recent commits, last committers, uncommitted changes |
+| **Quality** | Test framework, linter, formatter, CI pipeline, pre-commit hooks |
+| **Patterns** | Architecture style, state management, API style, key modules |
+| **GitHub** | Issues, PRs, milestones, releases, project boards, priorities |
+
+---
+
+## AI Interface
+
+These are the commands your AI tools call:
+
+```bash
+codebase brief              # Full project briefing — call this first every session
+codebase next               # Highest-priority task + what's in progress
+codebase status             # Kanban board, priorities, milestones
+codebase query <path>       # Any field (e.g. stack.languages, commands.test)
+codebase issue create "title"           # Track a bug or feature
+codebase issue close <n> --reason "…"  # Close after fixing
+```
+
+---
+
+## Human Commands
+
+```bash
+codebase init       # Full setup (scan + AI tools + hooks + commands)
+codebase scan       # Refresh .codebase.json
+codebase watch      # Auto-update on file changes
+codebase diff       # Show changes since last scan
+codebase doctor     # Health check — diagnose setup issues
+codebase fix        # Auto-repair anything doctor flags
+codebase release    # Gate check → tag → develop→main → GitHub release
+codebase serve      # Start HTTP API server (localhost:7432)
+codebase mcp        # Start MCP server (stdio)
+```
+
+---
+
+## MCP Server
 
 ```bash
 codebase mcp  # Start MCP server
 ```
 
 Add to your AI tool's MCP config:
+
 ```json
 {
   "mcpServers": {
@@ -96,100 +139,112 @@ Add to your AI tool's MCP config:
 }
 ```
 
-Now your AI tools have `project_brief`, `query_codebase`, `create_issue` as native tools.
+Exposes 10 native tools: `project_brief`, `get_manifest`, `query_field`, `get_next_task`, `get_blockers`, `create_issue`, `close_issue`, `rescan`, and more.
 
-### Self-Updating
+---
 
-```bash
-codebase hook install  # Auto-updates on every commit
-codebase watch          # Auto-updates on file changes
+## Slash Commands (Claude Code)
+
+After `codebase setup`, these 7 commands are available in any Claude Code session in your project:
+
+| Command | What it does |
+|---------|-------------|
+| `/setup` | Bootstrap project — labels, milestone, PRODUCT.md, daemon script |
+| `/simulate` | AI customer journeys via Playwright, UX audit, fixes bugs inline |
+| `/build` | Autonomous loop — build → test → simulate → poll → repeat |
+| `/launch` | Gate check (bugs, tests, UX score, GTM docs) → release → merge |
+| `/review` | Security, quality, deps health, accessibility → GitHub Issues |
+| `/pitch` | GTM docs, dev docs, investor deck, metrics from project data |
+| `/daemon` | Install/manage background worker (launchd/cron, polls every 3 min) |
+
+The daemon runs `claude --print "/build --once"` in the background — your product ships while you sleep.
+
+---
+
+## GitHub Actions
+
+`codebase setup` generates `.github/workflows/codebase.yml` — a workflow that runs the autonomous build loop in the cloud:
+
+```yaml
+on:
+  push:
+    branches: [develop]   # runs on every push
+  schedule:
+    - cron: '*/15 * * * *'  # polls every 15 minutes
+  workflow_dispatch:        # manual trigger from GitHub UI
 ```
 
-### Pipe-Friendly CLI
+**To activate:** Add `ANTHROPIC_API_KEY` to your repo's GitHub Secrets (Settings → Secrets → Actions).
 
-```bash
-# Query and execute
-codebase query commands.test --raw | sh
+Once active, the daemon runs in the cloud — no local process needed. Every 15 minutes, it:
+1. Reads `codebase brief` for project context
+2. Checks `codebase next` for the highest-priority open issue
+3. Runs `/build --once` — implements the fix, commits, creates/closes issues
 
-# Filter with jq
-codebase --json | jq '.stack.frameworks'
+---
 
-# Check stack
-codebase query stack.languages  # ["typescript"]
-```
+## Git Workflow
 
-### HTTP API
+codebase enforces a clean git convention:
+
+- **All commits go to `develop`** — no feature branches
+- **Direct commits to `main`/`master` blocked** via `commit-msg` hook
+- **`develop → main` only at release** via `codebase release` (no-ff merge)
+- **One commit per verified fix** — never batch unrelated changes
+
+---
+
+## Supported AI Tools
+
+Auto-detected and wired on `codebase init`:
+
+| Tool | Config |
+|------|--------|
+| Claude Code | `CLAUDE.md` |
+| Cursor | `.cursorrules` |
+| Windsurf | `.windsurfrules` |
+| GitHub Copilot | `.github/copilot-instructions.md` |
+| Aider | `.aider.conf.yml` |
+| Cline | `.clinerules` |
+| Continue | `.continue/config.json` |
+| VS Code | `.vscode/settings.json` |
+| WebStorm | `.idea/` |
+| Neovim | `init.lua` |
+| Copilot Enterprise | `.github/` |
+
+---
+
+## HTTP API
 
 ```bash
 codebase serve  # localhost:7432
 
-curl localhost:7432/codebase              # Full manifest
-curl localhost:7432/codebase/stack        # Just stack
-curl localhost:7432/codebase/commands     # Just commands
+curl localhost:7432/codebase           # Full manifest
+curl localhost:7432/codebase/stack     # Just stack
+curl localhost:7432/codebase/commands  # Just commands
+curl localhost:7432/codebase/status    # GitHub status
 ```
 
 ---
 
-## 📊 What It Captures
-
-| Category | Data |
-|----------|------|
-| **Repo** | URL, default branch, monorepo detection, active branches |
-| **Structure** | Directory tree, entry points, build output paths |
-| **Stack** | 30+ languages, 100+ frameworks, package manager, database, ORM |
-| **Commands** | Dev, build, test, lint, format (15+ languages) |
-| **Dependencies** | Direct deps, lock files, notable packages |
-| **Config** | Environment files, feature flags, config locations |
-| **Git** | Recent commits, active branches, last committers |
-| **Quality** | Test framework, coverage, CI pipeline, hooks |
-| **Patterns** | Architecture style, state management, modules |
-| **GitHub** (optional) | Issues, PRs, milestones, releases, project boards |
-
----
-
-## 🛠️ Installation
+## Installation
 
 ```bash
-# Global (recommended)
-npm install -g codebase
-
-# Or run without installing
-npx codebase
-
-# With pnpm
+npm install -g codebase    # Global (recommended)
+npx codebase               # Run without installing
 pnpm add -g codebase
-
-# With yarn
-yarn global add codebase
 ```
 
----
-
-## 📚 Documentation
-
-| Document | Description |
-|----------|-------------|
-| [USAGE.md](docs/USAGE.md) | Complete CLI reference with all commands |
-| [examples.md](docs/examples.md) | Real output examples for 10+ project types |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design and extension points |
-| [WHY.md](docs/WHY.md) | The problem quantified |
-| [COMPARISON.md](docs/COMPARISON.md) | vs other approaches |
-| [INTEGRATIONS.md](docs/INTEGRATIONS.md) | How each AI tool connects |
+**Requirements:** Node.js 18+, optional: `gh` CLI for GitHub features
 
 ---
 
-## 🤝 Contributing
+## Zero Dependencies
 
-We welcome contributions! See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
-
----
-
-## 📄 License
-
-MIT © [Your Name]
+No runtime dependencies. Node.js built-ins only. Works everywhere Node 18+ runs.
 
 ---
 
-<p align="center">
-  <sub>Built with ❤️ for the AI-assisted development community</sub>
-</p>
+## License
+
+MIT

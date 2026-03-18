@@ -1,5 +1,6 @@
 import { createInterface } from "node:readline";
 import { readFile, writeFile } from "node:fs/promises";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { queryPath } from "../utils/json-path.js";
@@ -107,6 +108,16 @@ const TOOL_DEFINITIONS = [
         comment: { type: "string" as const, description: "Comment explaining resolution" },
       },
       required: ["number"],
+    },
+  },
+
+  // ─── Commands ──────────────────────────────────────────────────
+  {
+    name: "list_commands",
+    description: "List installed Claude Code slash commands in this project. Returns names and descriptions of available /setup, /simulate, /build, /launch, /review, /pitch, /daemon commands.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
     },
   },
 
@@ -237,6 +248,20 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
         const result = await ghCloseIssue(root, args);
         return respond(req.id, {
           content: [{ type: "text", text: result }],
+        });
+      }
+
+      case "list_commands": {
+        const commandsDir = join(root, ".claude", "commands");
+        if (!existsSync(commandsDir)) {
+          return respond(req.id, {
+            content: [{ type: "text", text: "No slash commands installed. Run: codebase setup" }],
+          });
+        }
+        const files = readdirSync(commandsDir).filter(f => f.endsWith(".md"));
+        const names = files.map(f => "/" + f.replace(/\.md$/, "")).join(", ");
+        return respond(req.id, {
+          content: [{ type: "text", text: `Installed commands (${files.length}): ${names}\n\nLoop: /simulate → /build → /launch` }],
         });
       }
 

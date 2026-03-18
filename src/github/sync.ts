@@ -348,8 +348,10 @@ function buildPriorities(issues: IssueData[]): IssueData[] {
     for (const label of i.labels) {
       const l = label.toLowerCase();
       if (l.includes("p0") || l.includes("critical") || l.includes("urgent")) return 0;
+      if (l === "vibekit") return 1;           // queued for autonomous build — top of queue
       if (l.includes("p1") || l.includes("high")) return 1;
       if (l.includes("p2") || l.includes("medium")) return 2;
+      if (l === "arch") return 2;             // architectural issues — high value
       if (l.includes("p3") || l.includes("low")) return 3;
       if (l.includes("bug")) return 1;
       if (l.includes("feature")) return 2;
