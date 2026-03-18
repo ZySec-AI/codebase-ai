@@ -1,0 +1,21 @@
+# Source — never published
+src/
+tests/
+docs/
+.claude/
+.vibekit/
+
+# Config / tooling
+tsconfig.json
+tsup.config.ts
+eslint.config.js
+.prettierrc
+.editorconfig
+.nvmrc
+vitest.config.ts
+
+# Misc
+*.log
+*.lock
+.env*
+coverage/
