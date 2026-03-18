@@ -22,7 +22,7 @@ describe("E2E: Init Workflow", () => {
   beforeAll(() => {
     // Build the CLI if not already built
     if (!existsSync(join(process.cwd(), "dist/index.js"))) {
-      execSync("pnpm run build", { cwd: process.cwd(), stdio: "pipe" });
+      execSync("npm run build", { cwd: process.cwd(), stdio: "pipe" });
     }
 
     cliPath = join(process.cwd(), "dist/index.js");

@@ -18,7 +18,7 @@ describe("E2E: Full Scan Workflow", () => {
   beforeAll(() => {
     // Build the CLI if not already built
     if (!existsSync(join(process.cwd(), "dist/index.js"))) {
-      execSync("pnpm run build", { cwd: process.cwd() });
+      execSync("npm run build", { cwd: process.cwd() });
     }
 
     cliPath = join(process.cwd(), "dist/index.js");
