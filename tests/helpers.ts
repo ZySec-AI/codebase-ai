@@ -29,7 +29,7 @@ export function createMockContext(options: MockContextOptions = {}): ScanContext
     },
     async exec(cmd: string): Promise<string> {
       for (const [key, value] of Object.entries(execResults)) {
-        if (cmd.includes(key)) return value;
+        if (cmd.includes(key)) {return value;}
       }
       return "";
     },

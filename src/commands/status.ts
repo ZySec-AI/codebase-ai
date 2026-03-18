@@ -108,7 +108,7 @@ function printDecisions(decisions: NonNullable<Manifest["decisions"]>): void {
 
   for (const d of all.slice(0, 15)) {
     log(`  [${d.type}] ${d.title}`);
-    if (d.summary) log(`    ${d.summary.slice(0, 100)}`);
+    if (d.summary) {log(`    ${d.summary.slice(0, 100)}`);}
   }
 }
 

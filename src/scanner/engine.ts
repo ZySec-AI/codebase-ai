@@ -1,4 +1,4 @@
-import type { Manifest, ScanContext } from "../types.js";
+import type { Manifest } from "../types.js";
 import { createScanContext } from "./context.js";
 import { detectors } from "../detectors/index.js";
 import { syncGitHub } from "../github/sync.js";
@@ -60,7 +60,7 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Man
         manifest.decisions = ghData.decisions;
       }
     } catch {
-      if (!options.quiet) warn("GitHub sync failed (is `gh` CLI installed and authenticated?)");
+      if (!options.quiet) {warn("GitHub sync failed (is `gh` CLI installed and authenticated?)");}
     }
   }
 
@@ -91,9 +91,9 @@ export function summarizeCategory(category: string, data: Record<string, unknown
       const buildOut = data.build_output as string[];
       const dirs = Object.keys(tree || {}).filter(k => k !== "./");
       const parts: string[] = [];
-      if (entries?.length) parts.push(`${entries.length} entry points`);
-      if (dirs.length) parts.push(`${dirs.length} top-level dirs`);
-      if (buildOut?.length) parts.push(`build: ${buildOut.join(", ")}`);
+      if (entries?.length) {parts.push(`${entries.length} entry points`);}
+      if (dirs.length) {parts.push(`${dirs.length} top-level dirs`);}
+      if (buildOut?.length) {parts.push(`build: ${buildOut.join(", ")}`);}
       return parts.join(", ") || "empty";
     }
     case "stack": {
@@ -101,7 +101,7 @@ export function summarizeCategory(category: string, data: Record<string, unknown
       const frameworks = data.frameworks as string[];
       const buildTool = data.build_tool as string | null;
       const parts = [...(langs || []), ...(frameworks || [])];
-      if (buildTool) parts.push(buildTool);
+      if (buildTool) {parts.push(buildTool);}
       return parts.join(", ") || "unknown";
     }
     case "commands": {
@@ -113,10 +113,10 @@ export function summarizeCategory(category: string, data: Record<string, unknown
       const devCount = data.dev_count as number;
       const lock = data.lock_file as string;
       const parts: string[] = [];
-      if (count) parts.push(`${count} direct`);
-      if (devCount) parts.push(`${devCount} dev`);
-      if (!count && !devCount) parts.push("0 deps");
-      if (lock) parts.push(lock);
+      if (count) {parts.push(`${count} direct`);}
+      if (devCount) {parts.push(`${devCount} dev`);}
+      if (!count && !devCount) {parts.push("0 deps");}
+      if (lock) {parts.push(lock);}
       return parts.join(", ");
     }
     case "config": {
@@ -130,9 +130,9 @@ export function summarizeCategory(category: string, data: Record<string, unknown
     }
     case "quality": {
       const parts: string[] = [];
-      if (data.test_framework) parts.push(data.test_framework as string);
-      if (data.linter) parts.push(data.linter as string);
-      if (data.ci) parts.push(data.ci as string);
+      if (data.test_framework) {parts.push(data.test_framework as string);}
+      if (data.linter) {parts.push(data.linter as string);}
+      if (data.ci) {parts.push(data.ci as string);}
       return parts.join(", ") || "none detected";
     }
     case "patterns": {

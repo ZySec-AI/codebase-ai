@@ -2,14 +2,14 @@
 description: Autonomous development loop — builds arch issues, simulates, watches for new issues, repeats until production-ready. Uses codebase context.
 argument-hint: [--dry-run] [--issue N] [--once] [--interval N] [--max-rounds N]
 model: sonnet
-allowed-tools: Agent, Bash(gh:*), Bash(git:*), Bash(pnpm:*), Bash(npx:*), Bash(npm:*), Bash(node:*), Bash(uv:*), Read, Write, Edit, Glob, Grep
+allowed-tools: Agent, Bash(gh:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git checkout:*), Bash(git pull:*), Bash(git fetch:*), Bash(git stash:*), Bash(git log:*), Bash(git status:*), Bash(git diff:*), Bash(git tag:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(git merge:*), Bash(pnpm:*), Bash(npx:*), Bash(npm:*), Bash(node:*), Bash(uv:*), Read, Write, Edit, Glob, Grep
 ---
 
 # /build
 
 Autonomous development loop. Builds all open `[Arch]` and `vibekit`-labeled issues, runs the test suite, runs a `/simulate` cycle, polls for new issues, repeats until launch gates pass.
 
-Branch: always `develop`. Never create feature branches.
+Branch: always `develop`. For full arch issues, use a `feat/<slug>` branch → PR → merge to develop.
 
 ## Arguments
 
@@ -98,14 +98,59 @@ npx codebase brief 2>/dev/null > /tmp/cb-brief.json || true
 
 Read `CLAUDE.md` if present — follow its conventions exactly.
 
-**Commit format** (codebase git convention):
+**Branch + commit convention:**
+
+For small fixes (< 50 lines): commit directly to `develop`.
+For arch issues (significant changes): use a feature branch → PR.
+
+```bash
+# Pre-work: always sync first
+git fetch origin
+git status  # abort if dirty uncommitted changes exist
+git checkout develop && git pull origin develop
+
+# For arch issues — create a feature branch
+SLUG=$(echo "[issue title]" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-' | cut -c1-40)
+git checkout -b feat/${SLUG}
+
+# ... implement the fix ...
+
+# Stash if you need to switch context mid-work
+# git stash && git checkout develop && git stash pop
+
+# Atomic commit — one commit per issue, never batch unrelated changes
+git add [specific files changed]
+git commit -m "feat(#[N]): [short description]
+
+[1-2 sentence description of what was built]
+Closes #[N]"
+git push origin feat/${SLUG}
+
+# Raise PR — do not merge directly
+gh pr create \
+  --base develop \
+  --head feat/${SLUG} \
+  --title "feat(#[N]): [short description]" \
+  --body "## What
+[description]
+
+## Test evidence
+[test output or Playwright result]
+
+Closes #[N]"
+
+# After PR is merged, clean up
+git checkout develop && git pull origin develop
+git branch -d feat/${SLUG} 2>/dev/null || true
+```
+
+For direct `develop` commits (small fixes only):
 ```bash
 git checkout develop && git pull origin develop
 git add [specific files changed]
-git commit -m "feat: [short description]
+git commit -m "fix(#[N]): [short description]
 
-Implements #[N]
-[1-2 sentence description of what was built]"
+Closes #[N]"
 git push origin develop
 ```
 

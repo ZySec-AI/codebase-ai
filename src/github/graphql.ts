@@ -37,7 +37,7 @@ async function graphqlQuery<T>(
       args.push("-f", `${key}=${JSON.stringify(value)}`);
     }
 
-    execFile("gh", args, { cwd, timeout: 30_000 }, (err, stdout, stderr) => {
+    execFile("gh", args, { cwd, timeout: 30_000 }, (err, stdout, _stderr) => {
       if (err) {
         // Silently fail - caller should use fallback
         resolve(null);
@@ -276,9 +276,9 @@ function parsePRNode(node: Record<string, unknown>): ReturnType<typeof import(".
   let checksStatus: "pending" | "passing" | "failing" | undefined;
   if (statusCheck?.state) {
     const state = statusCheck.state.toLowerCase();
-    if (state === "success" || state === "completed") checksStatus = "passing";
-    else if (state === "failure" || state === "error") checksStatus = "failing";
-    else checksStatus = "pending";
+    if (state === "success" || state === "completed") {checksStatus = "passing";}
+    else if (state === "failure" || state === "error") {checksStatus = "failing";}
+    else {checksStatus = "pending";}
   }
 
   const mergeable = (node.mergeable as string) === "MERGEABLE";

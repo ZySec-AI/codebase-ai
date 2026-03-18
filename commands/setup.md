@@ -2,7 +2,7 @@
 description: Bootstrap a project for the /simulate → /build → /launch loop. Run once per project.
 argument-hint: [--auto] [--refresh]
 model: sonnet
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(node:*), Bash(npx:*), Bash(npm:*), Bash(brew:*), Bash(curl:*), Bash(chmod:*), Read, Write, Edit, Glob, Grep
+allowed-tools: Bash(gh:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git checkout:*), Bash(git pull:*), Bash(git fetch:*), Bash(git status:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(git remote:*), Bash(node:*), Bash(npx:*), Bash(npm:*), Bash(brew:*), Bash(curl:*), Bash(chmod:*), Read, Write, Edit, Glob, Grep
 ---
 
 # /setup
@@ -28,24 +28,22 @@ claude --version   2>/dev/null || echo "MISSING: npm install -g @anthropic-ai/cl
 gh --version       2>/dev/null || echo "MISSING: brew install gh"
 gh auth status     2>/dev/null || echo "NOT AUTHENTICATED: gh auth login"
 git remote get-url origin 2>/dev/null || echo "NO REMOTE: git remote add origin <url>"
-npx playwright --version 2>/dev/null || PLAYWRIGHT_MISSING=true
-```
-
-If Playwright missing:
-```bash
-npx playwright install chromium --with-deps
+agent-browser --version 2>/dev/null || {
+  echo "Installing agent-browser..."
+  npm install -g agent-browser && agent-browser install
+}
 ```
 
 Print status table:
 ```
 PREREQUISITE CHECK
 ══════════════════════════════════════
-Node.js:     [OK vX.X.X | MISSING]
-Claude Code: [OK vX.X.X | MISSING]
-gh CLI:      [OK vX.X.X | MISSING]
-gh auth:     [OK | NOT AUTHENTICATED]
-git remote:  [OK | MISSING]
-Playwright:  [OK | installed now]
+Node.js:       [OK vX.X.X | MISSING]
+Claude Code:   [OK vX.X.X | MISSING]
+gh CLI:        [OK vX.X.X | MISSING]
+gh auth:       [OK | NOT AUTHENTICATED]
+git remote:    [OK | MISSING]
+agent-browser: [OK | installed now]
 ══════════════════════════════════════
 ```
 
@@ -63,9 +61,12 @@ npx codebase setup --sync 2>/dev/null || npx codebase init --sync
 
 This installs:
 - `.codebase.json` manifest
-- AI tool injections (CLAUDE.md, .cursorrules, etc.)
+- `CLAUDE.md` injection
 - `post-commit` hook (auto-updates manifest)
 - `commit-msg` hook (blocks direct commits to main/master)
+- `.claude/hooks/git-guard.sh` (PreToolUse — blocks unsafe git ops in Claude)
+- `.claude/hooks/git-post.sh` (PostToolUse — PR reminder after branch push)
+- `.claude/settings.json` (wires Claude Code hooks)
 - `.gitignore` entries
 
 Print: `codebase manifest: generated`
@@ -122,7 +123,7 @@ fi
 
 Add `.vibekit/` entries to `.gitignore` (lock/log files only):
 ```bash
-grep -q "daemon.lock" .gitignore 2>/dev/null || printf "\n.vibekit/daemon.lock\n.vibekit/daemon.log\n.vibekit/build.lock\n.vibekit/_pw_*\n" >> .gitignore
+grep -q "build.lock" .gitignore 2>/dev/null || printf "\n.vibekit/build.lock\n" >> .gitignore
 ```
 
 ---
@@ -181,73 +182,7 @@ Initialized by /setup"
 
 ---
 
-## Step 7 — daemon.sh
-
-Write `.vibekit/daemon.sh` — the autonomous background worker:
-
-```bash
-cat > .vibekit/daemon.sh << 'DAEMON_EOF'
-#!/bin/bash
-# codebase autonomous daemon — polls GitHub issues every 3 minutes, runs /build --once
-set -uo pipefail
-
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && git rev-parse --show-toplevel 2>/dev/null)"
-[ -n "$PROJECT_ROOT" ] || exit 1
-cd "$PROJECT_ROOT"
-
-VIBEKIT_DIR="$PROJECT_ROOT/.vibekit"
-LOG="$VIBEKIT_DIR/daemon.log"
-LOCK="$VIBEKIT_DIR/daemon.lock"
-MAX_LOG_LINES=2000
-
-[ -f "$LOG" ] && [ "$(wc -l < "$LOG")" -gt "$MAX_LOG_LINES" ] && \
-  tail -500 "$LOG" > "${LOG}.tmp" && mv "${LOG}.tmp" "$LOG"
-
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"; }
-
-if [ -f "$LOCK" ]; then
-  LOCK_PID=$(cat "$LOCK" 2>/dev/null || echo "")
-  [ -n "$LOCK_PID" ] && kill -0 "$LOCK_PID" 2>/dev/null && log "Already running (pid $LOCK_PID)" && exit 0
-  rm -f "$LOCK"
-fi
-echo $$ > "$LOCK"
-trap 'rm -f "$LOCK"' EXIT
-
-gh auth status &>/dev/null || { log "ERROR: gh not authenticated"; exit 1; }
-
-OPEN=$(gh issue list --label "vibekit" --state open --limit 100 --json number --jq 'length' 2>/dev/null || echo "0")
-ARCH=$(gh issue list --label "arch" --state open --limit 100 --json number --jq 'length' 2>/dev/null || echo "0")
-TOTAL=$((OPEN + ARCH))
-log "Poll: vibekit=$OPEN arch=$ARCH total=$TOTAL"
-
-if [ "$TOTAL" -eq 0 ]; then
-  BUGS=$(gh issue list --label "bug" --state open --limit 10 --json number --jq 'length' 2>/dev/null || echo "1")
-  if [ "$BUGS" -eq 0 ]; then
-    log "All clear — triggering /launch"
-    claude --print "/launch" >> "$LOG" 2>&1
-    log "Launch exit: $?"
-  else
-    log "Idle — $BUGS open bugs, no vibekit/arch tickets. Label issues 'vibekit' to resume."
-  fi
-  exit 0
-fi
-
-log "Found $TOTAL issues — running /build --once"
-claude --print "/build --once" >> "$LOG" 2>&1
-log "Build exit: $?"
-
-CYCLE=$(gh issue list --label "cycle" --state open --limit 1 --json number --jq '.[0].number // empty' 2>/dev/null || true)
-[ -n "$CYCLE" ] && gh issue comment "$CYCLE" \
-  --body "## Daemon run — $(date '+%Y-%m-%d %H:%M')
-Started with $TOTAL issues. Remaining: $(gh issue list --label 'vibekit' --state open --limit 100 --json number --jq 'length' 2>/dev/null || echo '?')" 2>/dev/null || true
-DAEMON_EOF
-chmod +x .vibekit/daemon.sh
-echo "daemon.sh written"
-```
-
----
-
-## Step 8 — Summary
+## Step 7 — Summary
 
 ```
 /setup COMPLETE
@@ -257,8 +192,24 @@ GitHub labels:       13 ready
 Milestone:           v0.1 (#N)
 Highlights Index:    #N
 docs/PRODUCT.md:     [generated | updated]
-.vibekit/daemon.sh:  ready
 Branch:              develop
+Claude hooks:        git-guard + git-post active
+
+Branch convention:
+  main          protected — only /launch merges here
+  develop       integration — all work lands here
+  feat/<slug>   new features  → PR to develop
+  fix/<slug>    bug fixes     → PR to develop
+  chore/<slug>  maintenance   → PR to develop
+  hotfix/<slug> urgent fixes  → PR to develop
+  docs/<slug>   docs only     → PR to develop
+  test/<slug>   tests only    → PR to develop
+
+Commit format:
+  feat(#N): short description
+  fix(#N):  short description
+  chore:    short description
+  docs:     short description
 
 Next steps:
   1. Review docs/PRODUCT.md — fill in [INFERRED] sections

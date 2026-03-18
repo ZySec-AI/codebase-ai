@@ -20,8 +20,8 @@ export async function runScan(options: CLIOptions): Promise<void> {
 
   // Print summary per category
   for (const [category, data] of Object.entries(manifest)) {
-    if (category === "version" || category === "generated_at") continue;
-    if (typeof data !== "object" || data === null) continue;
+    if (category === "version" || category === "generated_at") {continue;}
+    if (typeof data !== "object" || data === null) {continue;}
     success(`${capitalize(category)} (${summarizeCategory(category, data as Record<string, unknown>)})`);
   }
 

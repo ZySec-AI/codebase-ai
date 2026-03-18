@@ -7,11 +7,11 @@ export const commandsDetector: Detector = {
   async detect(ctx: ScanContext) {
     // Try package.json scripts first (most common)
     const pkgCommands = await detectFromPackageJson(ctx);
-    if (Object.values(pkgCommands).some(Boolean)) return pkgCommands;
+    if (Object.values(pkgCommands).some(Boolean)) {return pkgCommands;}
 
     // Try Makefile
     const makeCommands = await detectFromMakefile(ctx);
-    if (Object.values(makeCommands).some(Boolean)) return makeCommands;
+    if (Object.values(makeCommands).some(Boolean)) {return makeCommands;}
 
     // Try Cargo/Go/Python defaults
     const langCommands = await detectLanguageDefaults(ctx);
@@ -21,7 +21,7 @@ export const commandsDetector: Detector = {
 
 async function detectFromPackageJson(ctx: ScanContext): Promise<Record<string, string | null>> {
   const content = await ctx.readFile("package.json");
-  if (!content) return emptyCommands();
+  if (!content) {return emptyCommands();}
 
   try {
     const pkg = JSON.parse(content);
@@ -29,9 +29,9 @@ async function detectFromPackageJson(ctx: ScanContext): Promise<Record<string, s
 
     // Detect package manager for prefix
     let pm = "npm run";
-    if (ctx.fileExists("pnpm-lock.yaml")) pm = "pnpm";
-    else if (ctx.fileExists("yarn.lock")) pm = "yarn";
-    else if (ctx.fileExists("bun.lockb") || ctx.fileExists("bun.lock")) pm = "bun run";
+    if (ctx.fileExists("pnpm-lock.yaml")) {pm = "pnpm";}
+    else if (ctx.fileExists("yarn.lock")) {pm = "yarn";}
+    else if (ctx.fileExists("bun.lockb") || ctx.fileExists("bun.lock")) {pm = "bun run";}
 
     const result: Record<string, string | null> = {
       dev: findScript(scripts, ["dev", "start", "serve"], pm),
@@ -44,7 +44,7 @@ async function detectFromPackageJson(ctx: ScanContext): Promise<Record<string, s
     // Detect extra useful scripts
     const extras = ["typecheck", "check", "deploy", "preview", "clean", "db:migrate", "db:seed", "generate", "codegen", "storybook"];
     for (const name of extras) {
-      if (scripts[name]) result[name] = `${pm} ${name}`;
+      if (scripts[name]) {result[name] = `${pm} ${name}`;}
     }
 
     return result;
@@ -59,19 +59,19 @@ function findScript(
   pm: string
 ): string | null {
   for (const name of names) {
-    if (scripts[name]) return `${pm} ${name}`;
+    if (scripts[name]) {return `${pm} ${name}`;}
   }
   return null;
 }
 
 async function detectFromMakefile(ctx: ScanContext): Promise<Record<string, string | null>> {
   const content = await ctx.readFile("Makefile");
-  if (!content) return emptyCommands();
+  if (!content) {return emptyCommands();}
 
   const targets = new Set<string>();
   for (const line of content.split("\n")) {
     const match = line.match(/^([a-zA-Z_-]+)\s*:/);
-    if (match) targets.add(match[1]);
+    if (match) {targets.add(match[1]);}
   }
 
   return {
@@ -120,12 +120,12 @@ async function detectLanguageDefaults(ctx: ScanContext): Promise<Record<string, 
     const hasFastapi = ctx.files.some(f => f.includes("main.py") || f.includes("app.py"));
 
     let devCmd: string | null = null;
-    if (hasDjango) devCmd = `${pm} python manage.py runserver`;
-    else if (hasFastapi) devCmd = `${pm} uvicorn main:app --reload`;
-    else if (ctx.fileExists("vite.config.ts")) devCmd = `${pm} vite`;
+    if (hasDjango) {devCmd = `${pm} python manage.py runserver`;}
+    else if (hasFastapi) {devCmd = `${pm} uvicorn main:app --reload`;}
+    else if (ctx.fileExists("vite.config.ts")) {devCmd = `${pm} vite`;}
 
     let buildCmd: string | null = null;
-    if (ctx.fileExists("pyproject.toml")) buildCmd = `${pm} build`;
+    if (ctx.fileExists("pyproject.toml")) {buildCmd = `${pm} build`;}
 
     return {
       dev: devCmd,

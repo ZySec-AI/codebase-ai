@@ -69,7 +69,7 @@ Thumbs.db
 *.sublime-workspace
 
 # Editor directories and files
-.claude/
+.claude/settings.local.json
 .cursor/
 .cursorrules
 .windsurf/

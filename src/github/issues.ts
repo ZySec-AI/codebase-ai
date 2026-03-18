@@ -7,8 +7,8 @@ import { log, success, error } from "../utils/output.js";
 function ghExec(cwd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile("gh", args, { cwd, timeout: 30_000 }, (err, stdout, stderr) => {
-      if (err) reject(new Error(stderr || err.message));
-      else resolve(stdout.trim());
+      if (err) {reject(new Error(stderr || err.message));}
+      else {resolve(stdout.trim());}
     });
   });
 }
@@ -16,7 +16,7 @@ function ghExec(cwd: string, args: string[]): Promise<string> {
 export async function createIssue(root: string, title: string, body?: string, labels?: string[]): Promise<void> {
   const issueBody = body || `## Summary\n\n${title}\n\n## Steps to Reproduce\n\n1. \n\n## Expected\n\n\n\n## Actual\n\n`;
   const args = ["issue", "create", "--title", title, "--body", issueBody];
-  if (labels?.length) args.push("--label", labels.join(","));
+  if (labels?.length) {args.push("--label", labels.join(","));}
 
   try {
     const url = await ghExec(root, args);
@@ -54,6 +54,15 @@ export async function listIssues(root: string, filter?: string): Promise<void> {
     }
   } catch (e) {
     error(`Failed to list issues: ${(e as Error).message}`);
+  }
+}
+
+export async function commentIssue(root: string, number: string, body: string): Promise<void> {
+  try {
+    await ghExec(root, ["issue", "comment", number, "--body", body]);
+    success(`Comment added to issue #${number}`);
+  } catch (e) {
+    error(`Failed to comment on issue: ${(e as Error).message}`);
   }
 }
 

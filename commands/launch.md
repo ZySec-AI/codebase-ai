@@ -2,7 +2,7 @@
 description: Gates on open bugs, runs test suite + world-class score check, generates release notes, creates GitHub release, merges develop to main.
 argument-hint: [--version X.Y.Z] [--dry-run]
 model: sonnet
-allowed-tools: Agent, Bash(gh:*), Bash(git:*), Bash(npx:*), Bash(npm:*), Bash(node:*), Read, Write, Edit, Glob, Grep
+allowed-tools: Agent, Bash(gh:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git checkout:*), Bash(git pull:*), Bash(git fetch:*), Bash(git log:*), Bash(git status:*), Bash(git diff:*), Bash(git tag:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(git merge:*), Bash(npx:*), Bash(npm:*), Bash(node:*), Read, Write, Edit, Glob, Grep
 ---
 
 # /launch
@@ -80,18 +80,13 @@ List open carry bugs — they appear in release notes as known issues.
 ### Gate 3 — Branch clean and current
 
 ```bash
+git fetch origin
 git status --short
-git fetch origin develop
 git log HEAD..origin/develop --oneline
 ```
 
-If uncommitted changes or behind remote → exit "BLOCKED".
-
-### Gate 4 — GTM docs exist
-
-Check for: `docs/SALES-PLAY.md`, `docs/PRODUCT-BROCHURE.md`, `docs/PRODUCT-DOCS.md`.
-
-If missing → exit "BLOCKED: run /pitch to generate GTM artifacts".
+If uncommitted changes → exit "BLOCKED: commit or stash all changes first."
+If behind remote → exit "BLOCKED: git pull origin develop".
 
 Print gate summary:
 ```
@@ -102,7 +97,6 @@ Gate 1b — Test suite:           [PASS | FAIL | WARNING: no tests]
 Gate 1c — World-class score:    [PASS (N/10) | FAIL (N/10 < 7.0) | WARNING]
 Gate 2  — Carry bugs:           [PASS | WARNING: N open]
 Gate 3  — Branch clean:         PASS
-Gate 4  — GTM docs:             PASS
 All blocking gates passed. Proceeding.
 ════════════════════════════════════════════════════════
 ```
@@ -121,13 +115,7 @@ LATEST=$(git tag --sort=-version:refname | head -1)
 
 ---
 
-## Phase 2 — GTM Doc Gate
-
-Check `docs/SALES-PLAY.md`, `docs/PRODUCT-BROCHURE.md`, `docs/PRODUCT-DOCS.md` exist. If missing → "BLOCKED: run /pitch first."
-
-Check freshness vs last commit on develop. Stale → warning only.
-
-### Release Notes
+## Phase 2 — Release Notes
 
 Generate `docs/RELEASE-NOTES.md`:
 - **What's New** — closed `[Arch]` issues since last tag
@@ -140,6 +128,8 @@ Generate `docs/RELEASE-NOTES.md`:
 ## Phase 3 — Create GitHub Release
 
 ```bash
+# Always sync before tagging
+git fetch origin
 git checkout develop && git pull origin develop
 git tag -a [version] -m "Release [version]"
 git push origin [version]
@@ -188,17 +178,17 @@ This updates `.codebase.json` with the new release tag so `codebase brief` refle
 ```
 /launch COMPLETE
 ════════════════════════════════════════════════════════
-Version:       [version]
-Release date:  [date]
+Version:        [version]
+Release date:   [date]
 GitHub release: [URL]
 
 Artifacts:
   docs/RELEASE-NOTES.md
 
-develop → main: merged
-Tag [version]: pushed
-Milestone:     [v0.1 closed → v0.2 created]
-.codebase.json: refreshed
+develop → main:  merged
+Tag [version]:   pushed
+Milestone:       [v0.1 closed → v0.2 created]
+.codebase.json:  refreshed
 
 [If --dry-run: DRY RUN — no release, no merge]
 ════════════════════════════════════════════════════════
@@ -210,7 +200,21 @@ Milestone:     [v0.1 closed → v0.2 created]
 
 1. **Gates 1a/1b/1c failures always block** — no exceptions
 2. **Grounded release notes** — every item traceable to a closed GitHub Issue
-3. **main is production** — merging to main is the last step
+3. **main is production** — merging to main is the last step, only via /launch
 4. **Dry-run is safe** — never touches git history or creates releases
-5. **Read before writing** — read PRODUCT.md and Highlights Index before any artifact
-6. **Honest known issues** — never omit carry bugs or open arch from release notes
+5. **Honest known issues** — never omit carry bugs or open arch from release notes
+6. **No force push ever** — use `git revert` to undo commits
+7. **No direct push to main** — only the merge step in Phase 4 touches main
+
+## Branch Convention (reference)
+
+```
+main          protected — only /launch merges here
+develop       integration branch — all work lands here
+feat/<slug>   new features        (→ PR to develop)
+fix/<slug>    bug fixes            (→ PR to develop)
+chore/<slug>  maintenance          (→ PR to develop)
+hotfix/<slug> urgent prod fixes    (→ PR to develop, then /launch fast-track)
+docs/<slug>   documentation only   (→ PR to develop)
+test/<slug>   test additions       (→ PR to develop)
+```

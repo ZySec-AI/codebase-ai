@@ -1,10 +1,8 @@
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, join } from "node:path";
 import { writeFileSync, existsSync, mkdirSync, readFileSync, chmodSync, readdirSync, copyFileSync } from "node:fs";
-import { join } from "node:path";
 import { execFile } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
 import { runScan } from "./scan.js";
-import { detectTools } from "../integrations/index.js";
 import { claudeIntegration } from "../integrations/claude.js";
 import { updateGitignore } from "../integrations/gitignore.js";
 import { installHooks } from "../integrations/githook.js";
@@ -33,40 +31,33 @@ export async function runSetup(options: CLIOptions): Promise<void> {
   // ── Step 1: Full scan ──────────────────────────────────────────
   await runScan({ ...options, sync: true });
 
-  // ── Step 2: AI tool integration ───────────────────────────────
-  heading("AI Tool Integration");
-  let tools = detectTools(root);
-  if (options.tools.length) {
-    tools = tools.filter(t => options.tools.includes(t.name));
-  }
-  if (tools.length === 0 && !options.tools.length) {
-    info("No AI tool configs detected. Creating CLAUDE.md...");
+  // ── Step 2: Claude Code integration ──────────────────────────
+  heading("Claude Code Integration");
+  if (!existsSync(join(root, "CLAUDE.md"))) {
     writeFileSync(join(root, "CLAUDE.md"), "# Project Rules\n", "utf-8");
-    tools = [claudeIntegration];
   }
-
-  if (options.dryRun) {
-    log("\nDry run - would configure:");
-    tools.forEach(t => info(t.name));
-    log("\nDone (dry run).");
-    return;
-  }
-
-  for (const tool of tools) {
-    tool.inject(root);
-    success(`${tool.name} - added .codebase.json reference`);
-  }
+  claudeIntegration.inject(root);
+  success("CLAUDE.md - added .codebase.json reference");
 
   // ── Step 3: Git hooks ─────────────────────────────────────────
   heading("Git Hooks");
   const hookInstalled = installHooks(root, false);
   if (hookInstalled) {
     success("post-commit hook (auto-updates .codebase.json)");
+    success("pre-commit hook (runs typecheck + lint before every commit)");
     installBranchHook(root);
     success("commit-msg hook (blocks direct commits to main/master)");
   } else {
     info("Not a git repository - skipping hooks");
   }
+
+  // ── Step 3b: Claude Code hooks ────────────────────────────────
+  heading("Claude Code Hooks");
+  installClaudeHooks(root);
+
+  // ── Step 3c: agent-browser ────────────────────────────────────
+  heading("Browser Automation");
+  await installAgentBrowser();
 
   // ── Step 4: Claude commands ───────────────────────────────────
   heading("Claude Commands");
@@ -84,7 +75,6 @@ export async function runSetup(options: CLIOptions): Promise<void> {
     ".vibekit/daemon.lock",
     ".vibekit/daemon.log",
     ".vibekit/build.lock",
-    ".vibekit/_pw_*",
   ]);
   success(".gitignore updated");
 
@@ -109,18 +99,10 @@ export async function runSetup(options: CLIOptions): Promise<void> {
     await ensureHighlightsIndex(root);
   }
 
-  // ── Step 8: GitHub Actions ────────────────────────────────────
-  heading("GitHub Actions");
-  if (ghAvailable) {
-    installGitHubActions(root);
-  } else {
-    info("Skipping GitHub Actions (gh not authenticated)");
-  }
-
-  // ── Step 9: docs/PRODUCT.md ───────────────────────────────────
+  // ── Step 8: docs/PRODUCT.md ───────────────────────────────────
   heading("Product Brief");
   const docsDir = join(root, "docs");
-  if (!existsSync(docsDir)) mkdirSync(docsDir, { recursive: true });
+  if (!existsSync(docsDir)) {mkdirSync(docsDir, { recursive: true });}
 
   const productPath = join(docsDir, "PRODUCT.md");
   if (!existsSync(productPath)) {
@@ -181,17 +163,175 @@ function installClaudeCommands(root: string): void {
   }
 
   const parts: string[] = [];
-  if (installed > 0) parts.push(`${installed} new`);
-  if (updated > 0) parts.push(`${updated} updated`);
-  if (skipped > 0) parts.push(`${skipped} unchanged`);
+  if (installed > 0) {parts.push(`${installed} new`);}
+  if (updated > 0) {parts.push(`${updated} updated`);}
+  if (skipped > 0) {parts.push(`${skipped} unchanged`);}
 
   if (installed > 0 || updated > 0) {
     success(`Claude commands installed → .claude/commands/ (${parts.join(", ")})`);
-    info("Available: /setup /simulate /build /launch /review /pitch /daemon");
+    info("Available: /setup /simulate /build /launch /review");
     info("Tip: commit .claude/commands/ to share these with your team");
   } else {
     info(`All ${skipped} Claude commands up to date`);
   }
+}
+
+// ─── Claude Code hooks ────────────────────────────────────────────
+
+export function installClaudeHooksForFix(root: string): void {
+  installClaudeHooks(root);
+}
+
+function installClaudeHooks(root: string): void {
+  const hooksDir = join(root, ".claude", "hooks");
+  mkdirSync(hooksDir, { recursive: true });
+
+  // ── git-guard.sh (PreToolUse) ──────────────────────────────────
+  const guardPath = join(hooksDir, "git-guard.sh");
+  const guardScript = `#!/bin/bash
+# codebase git-guard — PreToolUse hook
+# Reads Claude tool input JSON from stdin, enforces git safety rules.
+
+INPUT=$(cat)
+CMD=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('command',''))" 2>/dev/null || echo "")
+
+if [ -z "$CMD" ]; then exit 0; fi
+
+# ── Rule 1: No commits to protected branches ──────────────────
+if echo "$CMD" | grep -qE "^git commit|&& git commit| git commit"; then
+  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  if [[ "$BRANCH" == "main" || "$BRANCH" == "master" || "$BRANCH" == "prod" || "$BRANCH" == "production" ]]; then
+    echo ""
+    echo "  BLOCKED: Direct commits to '$BRANCH' are not allowed."
+    echo ""
+    echo "  Branch naming convention:"
+    echo "    feat/<slug>     new features"
+    echo "    fix/<slug>      bug fixes"
+    echo "    chore/<slug>    maintenance"
+    echo "    hotfix/<slug>   urgent prod fixes"
+    echo "    docs/<slug>     documentation"
+    echo "    test/<slug>     test additions"
+    echo ""
+    echo "  Switch to develop first:"
+    echo "    git checkout develop && git pull origin develop"
+    echo "    git checkout -b feat/<your-feature>"
+    echo ""
+    exit 2
+  fi
+fi
+
+# ── Rule 2: No direct push to protected branches ──────────────
+if echo "$CMD" | grep -qE "git push.*(origin )?(main|master|prod|production)(\s|$|\"|\')"; then
+  echo ""
+  echo "  BLOCKED: Direct push to protected branch is not allowed."
+  echo "  Use /launch to release to main."
+  echo ""
+  exit 2
+fi
+
+# ── Rule 3: No force push ever ────────────────────────────────
+if echo "$CMD" | grep -qE "git push.*(--force|-f)( |$)"; then
+  echo ""
+  echo "  BLOCKED: Force push is not allowed."
+  echo "  If you need to undo a commit, use: git revert <sha>"
+  echo ""
+  exit 2
+fi
+
+# ── Rule 4: Pull before commit if behind remote ───────────────
+if echo "$CMD" | grep -qE "^git commit|&& git commit| git commit"; then
+  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  if [ -n "$BRANCH" ] && [ "$BRANCH" != "HEAD" ]; then
+    git fetch origin "$BRANCH" --quiet 2>/dev/null || true
+    BEHIND=$(git rev-list HEAD..origin/"$BRANCH" --count 2>/dev/null || echo "0")
+    if [[ "$BEHIND" -gt 0 ]]; then
+      echo ""
+      echo "  BLOCKED: Branch '$BRANCH' is $BEHIND commit(s) behind origin/$BRANCH."
+      echo "  Pull first:  git pull origin $BRANCH"
+      echo ""
+      exit 2
+    fi
+  fi
+fi
+
+exit 0
+`;
+
+  writeFileSync(guardPath, guardScript, "utf-8");
+  chmodSync(guardPath, 0o755);
+  success(".claude/hooks/git-guard.sh (PreToolUse — blocks unsafe git ops)");
+
+  // ── git-post.sh (PostToolUse) ──────────────────────────────────
+  const postPath = join(hooksDir, "git-post.sh");
+  const postScript = `#!/bin/bash
+# codebase git-post — PostToolUse hook
+# Reads Claude tool input JSON from stdin. Reminds to raise PR after branch push.
+
+INPUT=$(cat)
+CMD=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('command',''))" 2>/dev/null || echo "")
+
+if [ -z "$CMD" ]; then exit 0; fi
+
+# ── Remind to raise PR after pushing a non-develop/main branch ──
+if echo "$CMD" | grep -qE "git push origin [a-zA-Z0-9/_-]+"; then
+  PUSHED_BRANCH=$(echo "$CMD" | grep -oE "git push origin [a-zA-Z0-9/_-]+" | awk '{print $4}')
+  if [[ -n "$PUSHED_BRANCH" ]] && \
+     [[ "$PUSHED_BRANCH" != "main" ]] && \
+     [[ "$PUSHED_BRANCH" != "master" ]] && \
+     [[ "$PUSHED_BRANCH" != "develop" ]] && \
+     [[ "$PUSHED_BRANCH" != "prod" ]]; then
+    echo ""
+    echo "  Branch '$PUSHED_BRANCH' pushed."
+    echo "  Raise a PR to develop:"
+    echo "    gh pr create --base develop --head $PUSHED_BRANCH --title 'feat: <description>' --body 'Closes #<N>'"
+    echo ""
+  fi
+fi
+
+exit 0
+`;
+
+  writeFileSync(postPath, postScript, "utf-8");
+  chmodSync(postPath, 0o755);
+  success(".claude/hooks/git-post.sh (PostToolUse — PR reminder after branch push)");
+
+  // ── .claude/settings.json ─────────────────────────────────────
+  const settingsPath = join(root, ".claude", "settings.json");
+  let settings: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try { settings = JSON.parse(readFileSync(settingsPath, "utf-8")); } catch { /* ignore */ }
+  }
+
+  const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
+
+  const guardCmd = `bash .claude/hooks/git-guard.sh`;
+  const postCmd  = `bash .claude/hooks/git-post.sh`;
+
+  // PreToolUse — add guard if not already present
+  const preHooks = (hooks["PreToolUse"] as unknown[]) ?? [];
+  const hasGuard = JSON.stringify(preHooks).includes("git-guard");
+  if (!hasGuard) {
+    preHooks.push({
+      matcher: "Bash",
+      hooks: [{ type: "command", command: guardCmd }],
+    });
+  }
+  hooks["PreToolUse"] = preHooks;
+
+  // PostToolUse — add post if not already present
+  const postHooks = (hooks["PostToolUse"] as unknown[]) ?? [];
+  const hasPost = JSON.stringify(postHooks).includes("git-post");
+  if (!hasPost) {
+    postHooks.push({
+      matcher: "Bash",
+      hooks: [{ type: "command", command: postCmd }],
+    });
+  }
+  hooks["PostToolUse"] = postHooks;
+
+  settings.hooks = hooks;
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+  success(".claude/settings.json (PreToolUse + PostToolUse hooks registered)");
 }
 
 // ─── commit-msg hook: block commits directly to main/master ─────
@@ -231,7 +371,7 @@ function appendToGitignore(root: string, lines: string[]): void {
   const p = join(root, ".gitignore");
   const existing = existsSync(p) ? readFileSync(p, "utf-8") : "";
   const toAdd = lines.filter(l => !existing.includes(l)).join("\n");
-  if (toAdd) writeFileSync(p, existing.trimEnd() + "\n" + toAdd + "\n", "utf-8");
+  if (toAdd) {writeFileSync(p, existing.trimEnd() + "\n" + toAdd + "\n", "utf-8");}
 }
 
 // ─── gh helpers ──────────────────────────────────────────────────
@@ -242,6 +382,25 @@ function execGh(root: string, args: string[]): Promise<{ ok: boolean; stdout: st
       resolve({ ok: !err, stdout: (stdout || "").trim() });
     });
   });
+}
+
+async function installAgentBrowser(): Promise<void> {
+  const installed = await new Promise<boolean>(resolve => {
+    execFile("agent-browser", ["--version"], { timeout: 5_000 }, err => resolve(!err));
+  });
+  if (installed) { info("agent-browser already installed"); return; }
+
+  log("Installing agent-browser...");
+  const ok = await new Promise<boolean>(resolve => {
+    execFile("npm", ["install", "-g", "agent-browser"], { timeout: 120_000 }, err => resolve(!err));
+  });
+  if (!ok) { warn("agent-browser install failed — run: npm install -g agent-browser"); return; }
+
+  const chrome = await new Promise<boolean>(resolve => {
+    execFile("agent-browser", ["install"], { timeout: 300_000 }, err => resolve(!err));
+  });
+  if (chrome) { success("agent-browser installed (Chrome for Testing downloaded)"); }
+  else { warn("agent-browser installed but Chrome download failed — run: agent-browser install"); }
 }
 
 async function checkClaude(): Promise<boolean> {
@@ -264,18 +423,18 @@ async function installLabels(root: string): Promise<void> {
 
   let created = 0;
   for (const label of VIBEKIT_LABELS) {
-    if (existing.has(label.name)) continue;
+    if (existing.has(label.name)) {continue;}
     const { ok } = await execGh(root, [
       "label", "create", label.name,
       "--color", label.color,
       "--description", label.description,
     ]);
-    if (ok) created++;
+    if (ok) {created++;}
   }
 
   const skipped = VIBEKIT_LABELS.length - created;
-  if (created > 0) success(`${created} GitHub labels created (${skipped} already existed)`);
-  else info(`All ${VIBEKIT_LABELS.length} labels already exist`);
+  if (created > 0) {success(`${created} GitHub labels created (${skipped} already existed)`);}
+  else {info(`All ${VIBEKIT_LABELS.length} labels already exist`);}
 }
 
 async function ensureHighlightsIndex(root: string): Promise<void> {
@@ -302,86 +461,8 @@ Tracks positive signals from /simulate cycles. Updated automatically — do not 
     "--label", "highlight",
     "--body", body,
   ]);
-  if (ok) success("Highlights Index issue created on GitHub");
-  else warn("Could not create Highlights Index issue");
-}
-
-// ─── GitHub Actions workflow ─────────────────────────────────────
-
-export function installGitHubActionsForFix(root: string): void {
-  installGitHubActions(root);
-}
-
-function installGitHubActions(root: string): void {
-  const workflowsDir = join(root, ".github", "workflows");
-  mkdirSync(workflowsDir, { recursive: true });
-
-  const workflowPath = join(workflowsDir, "codebase.yml");
-  if (existsSync(workflowPath)) {
-    info(".github/workflows/codebase.yml already exists — skipping");
-    return;
-  }
-
-  const workflow = `# Codebase autonomous build workflow
-# Runs on every push to develop + scheduled every 15 minutes
-# Replaces the local daemon — GitHub runs the build loop in the cloud
-
-name: codebase
-
-on:
-  push:
-    branches: [develop]
-  schedule:
-    - cron: '*/15 * * * *'
-  workflow_dispatch:
-    inputs:
-      command:
-        description: 'Slash command to run (default: /build --once)'
-        required: false
-        default: '/build --once'
-
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: \${{ secrets.GITHUB_TOKEN }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install codebase
-        run: npm install -g codebase
-
-      - name: Project brief
-        run: npx codebase brief
-        env:
-          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run autonomous build
-        run: |
-          CMD="\${{ github.event.inputs.command || '/build --once' }}"
-          claude --print "\$CMD"
-        env:
-          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
-          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-`;
-
-  writeFileSync(workflowPath, workflow, "utf-8");
-  success(".github/workflows/codebase.yml created");
-  info("Add ANTHROPIC_API_KEY to GitHub repo secrets to activate");
-  info("Go to: Settings → Secrets → Actions → New repository secret");
+  if (ok) {success("Highlights Index issue created on GitHub");}
+  else {warn("Could not create Highlights Index issue");}
 }
 
 // ─── PRODUCT.md skeleton from manifest ───────────────────────────

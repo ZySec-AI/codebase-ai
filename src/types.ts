@@ -244,8 +244,6 @@ export interface CLIOptions {
   port: number;
   tools: string[];
   dryRun: boolean;
-  debounce: number;
-  watch: boolean;
   since: string;
   sync: boolean;
   message: string;

@@ -8,7 +8,7 @@ export const apiDocsDetector: Detector = {
     const [openApiSpecs, graphqlSchemas, grpcProtos, postmanCollections] = await Promise.all([
       detectOpenAPI(ctx),
       detectGraphQL(ctx),
-      detectGraphQL(ctx),
+      detectGRPC(ctx),
       detectPostmanCollections(ctx),
     ]);
 
@@ -79,14 +79,14 @@ async function detectGraphQL(ctx: ScanContext): Promise<GraphQLData | null> {
     f.includes("/schema/")
   );
 
-  if (graphqlFiles.length === 0) return null;
+  if (graphqlFiles.length === 0) {return null;}
 
   const schemas: string[] = [];
   const resolvers: string[] = [];
 
   for (const file of graphqlFiles) {
     const content = await ctx.readFile(file);
-    if (!content) continue;
+    if (!content) {continue;}
 
     if (content.includes("type Query") || content.includes("type Mutation") || content.includes("type Subscription")) {
       schemas.push(file);
@@ -96,7 +96,7 @@ async function detectGraphQL(ctx: ScanContext): Promise<GraphQLData | null> {
     }
   }
 
-  if (schemas.length === 0 && resolvers.length === 0) return null;
+  if (schemas.length === 0 && resolvers.length === 0) {return null;}
 
   return {
     schema_files: schemas,
@@ -108,13 +108,13 @@ async function detectGraphQL(ctx: ScanContext): Promise<GraphQLData | null> {
 async function detectGRPC(ctx: ScanContext): Promise<GRPCData | null> {
   const protoFiles = ctx.files.filter(f => f.endsWith(".proto"));
 
-  if (protoFiles.length === 0) return null;
+  if (protoFiles.length === 0) {return null;}
 
   const services: string[] = [];
 
   for (const file of protoFiles) {
     const content = await ctx.readFile(file);
-    if (!content) continue;
+    if (!content) {continue;}
 
     if (content.includes("service ")) {
       services.push(file);
@@ -133,13 +133,13 @@ async function detectPostmanCollections(ctx: ScanContext): Promise<PostmanData |
     (f.endsWith(".json") || f.endsWith(".json.backup"))
   );
 
-  if (postmanFiles.length === 0) return null;
+  if (postmanFiles.length === 0) {return null;}
 
   const collections: Array<{ file: string; name: string | null }> = [];
 
   for (const file of postmanFiles) {
     const content = await ctx.readFile(file);
-    if (!content) continue;
+    if (!content) {continue;}
 
     try {
       const json = JSON.parse(content);
@@ -152,7 +152,7 @@ async function detectPostmanCollections(ctx: ScanContext): Promise<PostmanData |
     } catch {}
   }
 
-  if (collections.length === 0) return null;
+  if (collections.length === 0) {return null;}
 
   return {
     collections: collections,

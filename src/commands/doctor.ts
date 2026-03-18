@@ -1,9 +1,7 @@
 import { resolve, join } from "node:path";
 import { existsSync, readFileSync, statSync, readdirSync } from "node:fs";
 import type { CLIOptions, Manifest } from "../types.js";
-import { detectTools } from "../integrations/index.js";
-import { checkGhDetailed, detectGlobalTools } from "./init.js";
-import { installHooks } from "../integrations/githook.js";
+import { checkGhDetailed } from "./init.js";
 import { setQuiet, log, heading } from "../utils/output.js";
 
 const HOOK_MARKER = "# codebase-auto-update";
@@ -57,7 +55,7 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
     if (existsSync(join(root, "src"))) {
       try {
         const srcStat = statSync(join(root, "src"));
-        if (srcStat.mtimeMs > generatedAt) stale = true;
+        if (srcStat.mtimeMs > generatedAt) {stale = true;}
       } catch { /* ignore */ }
     }
 
@@ -108,41 +106,21 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
     }
   }
 
-  // ─── 6. AI tools ───────────────────────────────────────────
-  let tools = detectTools(root);
-  const globalTools = detectGlobalTools();
-  const toolNames = new Set(tools.map(t => t.name));
-  for (const gt of globalTools) {
-    if (!toolNames.has(gt.name)) {
-      tools.push(gt);
-      toolNames.add(gt.name);
-    }
-  }
+  // ─── 6. Claude Code injection ──────────────────────────────
+  const claudeInjected = checkInjection(root);
+  results.push({
+    label: "Claude Code",
+    ok: claudeInjected,
+    detail: claudeInjected ? "CLAUDE.md injected" : "CLAUDE.md injection missing — run `codebase fix`",
+  });
 
-  if (tools.length > 0) {
-    results.push({ label: "AI Tools", ok: true, detail: tools.map(t => t.name).join(", ") });
-  } else {
-    results.push({ label: "AI Tools", ok: false, detail: "None detected" });
-  }
-
-  // ─── 7 & 8. Per-tool injection + MCP ──────────────────────
-  for (const tool of tools) {
-    const injected = checkInjection(root, tool.name);
-    const mcpOk = checkMcpConfig(root, tool.name);
-
-    const parts: string[] = [];
-    if (injected) parts.push("injected");
-    else parts.push("injection missing");
-
-    if (mcpOk) parts.push("MCP configured");
-    else parts.push("MCP missing");
-
-    results.push({
-      label: `  ${tool.name}`,
-      ok: injected && mcpOk,
-      detail: parts.join(", "),
-    });
-  }
+  // ─── 7. MCP ────────────────────────────────────────────────
+  const mcpOk = checkMcpConfig(root);
+  results.push({
+    label: "MCP",
+    ok: mcpOk,
+    detail: mcpOk ? ".mcp.json configured" : ".mcp.json missing — run `codebase fix`",
+  });
 
   // ─── 9. Git hooks ─────────────────────────────────────────
   if (existsSync(join(root, ".git"))) {
@@ -157,8 +135,8 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
       results.push({ label: "Git Hooks", ok: true, detail: `post-commit + post-checkout${syncDetail}` });
     } else {
       const missing: string[] = [];
-      if (!postCommitOk) missing.push("post-commit");
-      if (!postCheckoutOk) missing.push("post-checkout");
+      if (!postCommitOk) {missing.push("post-commit");}
+      if (!postCheckoutOk) {missing.push("post-checkout");}
       results.push({ label: "Git Hooks", ok: false, detail: `${missing.join(" + ")} missing` });
     }
 
@@ -180,6 +158,24 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
     }
   }
 
+  // ─── 10e. pre-commit hook (lint + typecheck) ───────────────
+  if (existsSync(join(root, ".git"))) {
+    const preCommitOk = checkPreCommitHook(root);
+    const hasPkgScripts = (() => {
+      try {
+        const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
+        return !!(pkg.scripts?.check || pkg.scripts?.typecheck || pkg.scripts?.lint);
+      } catch { return false; }
+    })();
+    if (!hasPkgScripts) {
+      results.push({ label: "Pre-commit", ok: true, detail: "No lint/typecheck scripts — skipped" });
+    } else if (preCommitOk) {
+      results.push({ label: "Pre-commit", ok: true, detail: "Runs lint + typecheck before every commit" });
+    } else {
+      results.push({ label: "Pre-commit", ok: false, detail: "pre-commit hook missing — run `codebase fix`" });
+    }
+  }
+
   // ─── 10c. Claude commands ──────────────────────────────────
   const claudeCommandsDir = join(root, ".claude", "commands");
   if (existsSync(claudeCommandsDir)) {
@@ -189,12 +185,27 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
     results.push({ label: "Claude Commands", ok: false, detail: ".claude/commands/ missing — run `codebase setup`" });
   }
 
-  // ─── 10d. GitHub Actions ──────────────────────────────────
-  const actionsWorkflow = join(root, ".github", "workflows", "codebase.yml");
-  if (existsSync(actionsWorkflow)) {
-    results.push({ label: "GitHub Actions", ok: true, detail: ".github/workflows/codebase.yml present" });
+  // ─── 10d. Claude Code hooks ────────────────────────────────
+  const guardHook = join(root, ".claude", "hooks", "git-guard.sh");
+  const postHook  = join(root, ".claude", "hooks", "git-post.sh");
+  const settingsFile = join(root, ".claude", "settings.json");
+  const hooksInstalled = existsSync(guardHook) && existsSync(postHook);
+  const settingsOk = (() => {
+    if (!existsSync(settingsFile)) {return false;}
+    try {
+      const s = JSON.parse(readFileSync(settingsFile, "utf-8"));
+      const pre  = JSON.stringify(s.hooks?.PreToolUse  ?? "");
+      const post = JSON.stringify(s.hooks?.PostToolUse ?? "");
+      return pre.includes("git-guard") && post.includes("git-post");
+    } catch { return false; }
+  })();
+  if (hooksInstalled && settingsOk) {
+    results.push({ label: "Claude Hooks", ok: true, detail: "git-guard + git-post wired in settings.json" });
   } else {
-    results.push({ label: "GitHub Actions", ok: false, detail: "No workflow — run `codebase setup` to generate" });
+    const missing: string[] = [];
+    if (!hooksInstalled) {missing.push("hook scripts");}
+    if (!settingsOk) {missing.push("settings.json wiring");}
+    results.push({ label: "Claude Hooks", ok: false, detail: `Missing: ${missing.join(", ")} — run \`codebase setup\`` });
   }
 
   // ─── 11. Gitignore ────────────────────────────────────────
@@ -233,64 +244,21 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
   }
   log("");
 
-  if (issues.length > 0) process.exit(1);
+  if (issues.length > 0) {process.exit(1);}
 }
 
 // ─── Check helpers ──────────────────────────────────────────────
 
-function checkInjection(root: string, toolName: string): boolean {
-  const fileMap: Record<string, string> = {
-    claude: "CLAUDE.md",
-    cursor: ".cursorrules",
-    windsurf: ".windsurfrules",
-    copilot: ".github/copilot-instructions.md",
-    cline: ".clinerules",
-    aider: ".aider.conf.yml",
-    continue: ".continuerc.json",
-  };
-
-  const file = fileMap[toolName];
-  if (!file) return false;
-
-  const filePath = join(root, file);
-  if (!existsSync(filePath)) return false;
-
+function checkInjection(root: string): boolean {
+  const filePath = join(root, "CLAUDE.md");
+  if (!existsSync(filePath)) {return false;}
   const content = readFileSync(filePath, "utf-8");
-
-  // Markdown tools use HTML comment markers
-  if (toolName === "claude" || toolName === "copilot") {
-    return content.includes("<!-- codebase:start -->");
-  }
-
-  // JSON-based tools
-  if (toolName === "continue") {
-    try {
-      const config = JSON.parse(content);
-      return config.docs?.some((d: { path?: string }) => d.path === ".codebase.json") ?? false;
-    } catch { return false; }
-  }
-
-  // YAML-based tools
-  if (toolName === "aider") {
-    return content.includes(".codebase.json");
-  }
-
-  // Plaintext tools use hash comment markers
-  return content.includes("# codebase:start");
+  return content.includes("<!-- codebase:start -->");
 }
 
-function checkMcpConfig(root: string, toolName: string): boolean {
-  const mcpPaths: Record<string, string> = {
-    claude: join(root, ".mcp.json"),
-    cursor: join(root, ".cursor", "mcp.json"),
-    windsurf: join(root, ".windsurf", "mcp.json"),
-  };
-
-  const mcpPath = mcpPaths[toolName];
-  if (!mcpPath) return true; // tools without MCP are fine
-
-  if (!existsSync(mcpPath)) return false;
-
+function checkMcpConfig(root: string): boolean {
+  const mcpPath = join(root, ".mcp.json");
+  if (!existsSync(mcpPath)) {return false;}
   try {
     const config = JSON.parse(readFileSync(mcpPath, "utf-8"));
     return !!(config.mcpServers?.codebase);
@@ -301,32 +269,39 @@ function checkMcpConfig(root: string, toolName: string): boolean {
 
 function checkHook(root: string, hookName: string): boolean {
   const hookPath = join(root, ".git", "hooks", hookName);
-  if (!existsSync(hookPath)) return false;
+  if (!existsSync(hookPath)) {return false;}
   const content = readFileSync(hookPath, "utf-8");
   return content.includes(HOOK_MARKER);
 }
 
 function checkCommitMsgHook(root: string): boolean {
   const hookPath = join(root, ".git", "hooks", "commit-msg");
-  if (!existsSync(hookPath)) return false;
+  if (!existsSync(hookPath)) {return false;}
   const content = readFileSync(hookPath, "utf-8");
   return content.includes("codebase-branch-check");
 }
 
+function checkPreCommitHook(root: string): boolean {
+  const hookPath = join(root, ".git", "hooks", "pre-commit");
+  if (!existsSync(hookPath)) {return false;}
+  const content = readFileSync(hookPath, "utf-8");
+  return content.includes("codebase-pre-commit");
+}
+
 function checkHookSync(root: string): boolean {
   const hookPath = join(root, ".git", "hooks", "post-commit");
-  if (!existsSync(hookPath)) return false;
+  if (!existsSync(hookPath)) {return false;}
   const content = readFileSync(hookPath, "utf-8");
   return content.includes("--sync");
 }
 
 function formatAge(ms: number): string {
   const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds} sec ago`;
+  if (seconds < 60) {return `${seconds} sec ago`;}
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 60) {return `${minutes} min ago`;}
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hr ago`;
+  if (hours < 24) {return `${hours} hr ago`;}
   const days = Math.floor(hours / 24);
   return `${days} day${days > 1 ? "s" : ""} ago`;
 }

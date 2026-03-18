@@ -24,11 +24,11 @@ export function setVerbose(verbose: boolean): void {
 }
 
 export function log(msg: string): void {
-  if (!isQuiet) console.log(msg);
+  if (!isQuiet) {console.log(msg);}
 }
 
 export function success(msg: string): void {
-  if (!isQuiet) console.log(`  ${colors.green}[✓]${colors.reset} ${msg}`);
+  if (!isQuiet) {console.log(`  ${colors.green}[✓]${colors.reset} ${msg}`);}
 }
 
 export function error(msg: string): void {
@@ -41,19 +41,19 @@ export function errorWithSuggestion(msg: string, suggestion: string): void {
 }
 
 export function warn(msg: string): void {
-  if (!isQuiet) console.log(`  ${colors.yellow}[!]${colors.reset} ${msg}`);
+  if (!isQuiet) {console.log(`  ${colors.yellow}[!]${colors.reset} ${msg}`);}
 }
 
 export function info(msg: string): void {
-  if (!isQuiet) console.log(`  ${colors.cyan}[i]${colors.reset} ${msg}`);
+  if (!isQuiet) {console.log(`  ${colors.cyan}[i]${colors.reset} ${msg}`);}
 }
 
 export function verbose(msg: string): void {
-  if (isVerbose && !isQuiet) console.log(`  ${colors.dim}[verbose]${colors.reset} ${msg}`);
+  if (isVerbose && !isQuiet) {console.log(`  ${colors.dim}[verbose]${colors.reset} ${msg}`);}
 }
 
 export function dim(msg: string): void {
-  if (!isQuiet) console.log(`${colors.dim}${msg}${colors.reset}`);
+  if (!isQuiet) {console.log(`${colors.dim}${msg}${colors.reset}`);}
 }
 
 export function bold(msg: string): string {
@@ -61,7 +61,7 @@ export function bold(msg: string): string {
 }
 
 export function heading(msg: string): void {
-  if (!isQuiet) console.log(`\n${colors.bold}${msg}${colors.reset}`);
+  if (!isQuiet) {console.log(`\n${colors.bold}${msg}${colors.reset}`);}
 }
 
 export function link(text: string, url: string): string {
@@ -93,19 +93,19 @@ export class Progress {
   }
 
   start(): void {
-    if (isQuiet) return;
+    if (isQuiet) {return;}
     this.render();
     this.interval = setInterval(() => this.tick(), 100);
   }
 
   tick(): void {
-    if (isQuiet) return;
+    if (isQuiet) {return;}
     this.current = Math.min(this.current + 1, this.total);
     this.render();
   }
 
   increment(amount: number): void {
-    if (isQuiet) return;
+    if (isQuiet) {return;}
     this.current = Math.min(this.current + amount, this.total);
     this.render();
   }

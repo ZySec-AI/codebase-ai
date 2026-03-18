@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { scan, summarizeCategory } from "../../src/scanner/engine.js";
-import { detectors } from "../../src/detectors/index.js";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -155,7 +154,6 @@ describe("scan engine", () => {
 
   describe("GitHub sync", () => {
     it("does not call syncGitHub when sync option is false", { timeout: 30000 }, async () => {
-      const { syncGitHub } = await import("../../src/github/sync.js");
 
       const manifest = await scan(tempDir, { sync: false });
 
@@ -166,7 +164,6 @@ describe("scan engine", () => {
 
     it("includes GitHub data when sync option is true and gh CLI works", { timeout: 30000 }, async () => {
       // Mock is already set up at top of file
-      const { syncGitHub } = await import("../../src/github/sync.js");
 
       const manifest = await scan(tempDir, { sync: true });
 

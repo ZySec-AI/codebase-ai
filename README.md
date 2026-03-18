@@ -1,34 +1,33 @@
-# codebase
+# CodeBase
 
 <p align="center">
-  <img src="https://img.shields.io/npm/v/codebase" alt="npm version" />
-  <img src="https://img.shields.io/npm/dm/codebase" alt="npm downloads" />
-  <img src="https://img.shields.io/github/license/your-repo/codebase" alt="license" />
-  <a href="https://github.com/your-repo/codebase/stargazers"><img src="https://img.shields.io/github/stars/your-repo/codebase?style=social" alt="GitHub stars"></a>
+  <img src="https://img.shields.io/npm/v/codebase-ai" alt="npm version" />
+  <img src="https://img.shields.io/npm/dm/codebase-ai" alt="npm downloads" />
+  <img src="https://img.shields.io/github/license/ZySec-AI/codebase" alt="license" />
+  <a href="https://github.com/ZySec-AI/codebase/stargazers"><img src="https://img.shields.io/github/stars/ZySec-AI/codebase?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
-  <b>Your AI can now understand your project, find bugs by itself, fix them, and ship — while you sleep.</b>
+  <b>One command. Your AI understands your project, finds bugs, fixes them, and ships.</b>
 </p>
 
 ---
 
-## What is this, really?
+## The idea in plain English
 
-Most developers use AI as a fancy autocomplete. You write a prompt, AI suggests code, you paste it in. Repeat 50 times a day. You're still doing all the thinking, all the coordination, all the shipping.
+Imagine hiring an engineer who reads your entire project in seconds and works through your bug list on demand. That's what `codebase` does — it gives AI the context and the tools to work *on* your project, not just *for* you.
 
-**codebase turns AI into an autonomous engineer on your project.**
+**Without codebase:** Every time you open Claude Code, it starts from zero. You re-explain your project, paste in files, describe what's broken. You're the coordinator. Claude is the cursor.
 
-It works in three stages:
+**With codebase:** Claude reads a single compact file that captures everything about your project — your stack, your commands, your open issues. It knows where things are. It knows what needs doing. It can act.
 
-**Stage 1 — Give AI permanent memory of your project**
-One command scans your codebase and writes a compact manifest (`.codebase.json`) that captures everything: your tech stack, commands, file structure, open GitHub issues, recent decisions. Every AI tool you use reads this automatically — forever, on every session, without you doing anything.
+**Two things happen:**
 
-**Stage 2 — Give AI the ability to act**
-Seven slash commands are installed into Claude Code. These aren't just prompts — they're complete workflows that use Playwright to simulate real users, read your GitHub issues, write and test code, commit fixes, and open new issues for anything they find.
+**1 — Claude gets permanent memory of your project**
+One command scans your project and writes a small snapshot file (`.codebase.json`). Claude reads this automatically on every session via `CLAUDE.md`. You never re-explain your project again.
 
-**Stage 3 — Let it run continuously**
-A GitHub Actions workflow polls your repo every 15 minutes. When there's work to do, it runs the build loop automatically. You check GitHub in the morning and there are new commits, closed issues, and a healthier codebase. You didn't write a line.
+**2 — AI gets the ability to act**
+Seven slash commands give AI a complete workflow: simulate real users in a browser, work through your bug backlog, run tests, commit fixes, and ship releases. Not prompts — real, repeatable actions.
 
 ---
 
@@ -46,7 +45,7 @@ That's it. Here's what each one actually does:
 
 ### `/simulate` — AI becomes your user
 
-Claude opens your app in a real browser (Playwright) and acts like a real customer. It tries to sign up, log in, complete purchases, hit edge cases. When something breaks or feels wrong, it:
+Claude opens your app in a real browser (agent-browser) and acts like a real customer. It tries to sign up, log in, complete purchases, hit edge cases. When something breaks or feels wrong, it:
 
 1. Fixes the bug directly in your code
 2. Commits the fix with a proper message
@@ -70,7 +69,7 @@ Claude reads your open GitHub Issues (prioritized by label), picks the most impo
 7. Moves to the next issue
 8. Repeats until the backlog is clear or you stop it
 
-This runs in a loop. You can run `/build` once or let the GitHub Actions workflow run it continuously.
+This runs in a loop. You can run `/build` once or keep it running until the backlog is clear.
 
 ---
 
@@ -83,7 +82,7 @@ Before merging to `main`, Claude checks four quality gates:
 | **Bugs** | No open critical or high severity issues |
 | **Tests** | Your full test suite passes |
 | **UX score** | World-class score ≥ 7.0 (from `/simulate` cycles) |
-| **Docs** | GTM docs exist (warns if missing, doesn't block) |
+| **Branch** | No uncommitted changes, branch is clean |
 
 If all gates pass, it:
 - Auto-increments your version
@@ -98,28 +97,33 @@ One command. Zero manual steps.
 
 ## Quick start
 
-**Prerequisites:**
-```bash
-node --version    # needs 18+
-gh auth login     # GitHub CLI — needed for issues, releases, labels
-```
+### Level 1 — Give Claude memory of your project
 
-**Setup (run once per project):**
+Only requires Node.js 18+.
+
 ```bash
 cd your-project
-npx codebase
+npx codebase-ai
 ```
 
-This wires everything. You'll see it:
-- Scan your project and write `.codebase.json`
-- Detect and configure your AI tools (Claude, Cursor, Copilot, etc.)
-- Install git hooks so the manifest stays fresh forever
-- Create GitHub labels for the autonomous workflow
-- Generate `.github/workflows/codebase.yml` for cloud automation
+This scans your project and wires everything automatically:
+- Writes `.codebase.json` — a compact snapshot of your stack, commands, and structure
+- Injects smart instructions into `CLAUDE.md`
+- Configures the MCP server so Claude can query project context natively
+- Installs git hooks so the manifest stays fresh on every commit
+- Updates `.gitignore`
 
-**Then open Claude Code and run `/setup`** — this creates your `docs/PRODUCT.md` (the product brief every slash command reads) and sets up your first GitHub milestone.
+That's it. Every Claude session now starts with instant project context — no re-explaining, no file pasting.
 
-**Then run the loop:**
+---
+
+### Level 2 — Autonomous dev loop
+
+> **Requires:** Claude Code (`npm install -g @anthropic-ai/claude-code`) and GitHub CLI (`gh auth login`)
+
+Open Claude Code in your project and run `/setup` — this creates `docs/PRODUCT.md` and sets up your first GitHub milestone.
+
+Then run the loop:
 ```bash
 /simulate    # find and fix bugs as a real user would
 /build       # clear the issue backlog
@@ -128,40 +132,26 @@ This wires everything. You'll see it:
 
 ---
 
-## Enable the cloud loop (no daemon needed)
+## Why does Claude actually understand my project?
 
-`codebase setup` generates a GitHub Actions workflow. To activate it:
-
-1. Go to your repo on GitHub
-2. Settings → Secrets and variables → Actions
-3. Add a secret: `ANTHROPIC_API_KEY` = your Anthropic API key
-
-**That's it.** Now every push to `develop` triggers a build cycle. And every 15 minutes, GitHub checks if there's work to do and runs `/build --once` automatically. You can also trigger it manually from the Actions tab.
-
-Your project now has an always-on AI engineer. No local machine. No cron job. Just GitHub.
-
----
-
-## Why does the AI actually understand my project?
-
-Without codebase, AI starts every session knowing nothing:
+Without codebase, Claude starts every session knowing nothing:
 
 ```
-Session start → AI reads package.json → reads src/ → reads tests/ → reads configs...
+Session start → reads package.json → reads src/ → reads tests/ → reads configs...
 30 seconds + ~10,000 tokens later: "ok so you're using Next.js..."
 ```
 
 With codebase, every session starts instantly:
 
 ```
-Session start → AI reads .codebase.json (~500 tokens)
+Session start → reads .codebase.json (~500 tokens)
 "I can see: Next.js 14, Prisma, Vitest, dev server on port 3000,
  3 open critical bugs, last commit 2 hours ago, milestone v1.2 is 60% done"
 ```
 
-**~95% fewer tokens. Instant context. Every session. Every AI tool.**
+**~95% fewer tokens. Instant context. Every session.**
 
-But more importantly — the autonomous commands (`/simulate`, `/build`, `/launch`) all read the same manifest. That's why they work without human guidance. They know your stack, your commands, your open issues, your product brief. They're not guessing.
+The autonomous commands (`/simulate`, `/build`, `/launch`) all read the same manifest. That's why they work without human guidance. They know your stack, your commands, your open issues, your product brief. They're not guessing.
 
 ---
 
@@ -171,13 +161,11 @@ These live in `.claude/commands/` in your project. Commit this folder to share t
 
 | Command | Plain English |
 |---------|--------------|
-| `/setup` | First-time setup. Creates GitHub labels, your first milestone, `docs/PRODUCT.md`, and the GitHub Actions workflow. Run once per project. |
+| `/setup` | First-time setup. Creates GitHub labels, your first milestone, and `docs/PRODUCT.md`. Run once per project. |
 | `/simulate` | Opens your app in a real browser. Acts like multiple types of users. Finds bugs, UX problems, and accessibility issues. Fixes what it can, tracks the rest as GitHub Issues. |
 | `/build` | Reads your open GitHub Issues. Picks the most important one. Implements the fix. Tests it. Commits it. Closes the issue. Moves to the next. Repeats. |
-| `/launch` | Checks quality gates (bugs, tests, UX, docs). If everything passes: bumps version, tags release, merges to main, publishes GitHub Release. |
+| `/launch` | Checks quality gates (bugs, tests, UX score). If everything passes: bumps version, tags release, merges to main, publishes GitHub Release. |
 | `/review` | Deep code audit. Checks for security vulnerabilities, code quality problems, outdated/vulnerable dependencies, and accessibility issues. Everything goes to GitHub Issues. |
-| `/pitch` | Reads your project data and writes real GTM documents: a sales playbook, product brochure, and technical docs. Useful for investors, customers, and new engineers. |
-| `/daemon` | Manages the background worker. Can use GitHub Actions (recommended) or a local process. Run `/daemon install` to activate, `/daemon status` to check, `/daemon logs` to debug. |
 
 ---
 
@@ -220,7 +208,7 @@ For AI tools that support Model Context Protocol:
 codebase mcp    # start stdio MCP server
 ```
 
-Add to your Claude/Cursor config:
+Add to your Claude Code MCP config (`.mcp.json` in project root):
 
 ```json
 {
@@ -237,24 +225,6 @@ Tools available: `project_brief`, `get_codebase`, `query_codebase`, `get_next_ta
 
 ---
 
-## Supported AI tools
-
-`codebase init` auto-detects and wires all of these:
-
-| Tool | What gets updated |
-|------|------------------|
-| Claude Code | `CLAUDE.md` |
-| Cursor | `.cursorrules` |
-| Windsurf | `.windsurfrules` |
-| GitHub Copilot | `.github/copilot-instructions.md` |
-| Aider | `.aider.conf.yml` |
-| Cline | `.clinerules` |
-| Continue | `.continue/config.json` |
-| VS Code | `.vscode/settings.json` |
-| WebStorm | `.idea/` |
-| Neovim | `init.lua` |
-
----
 
 ## Diagnostics
 
@@ -263,7 +233,7 @@ codebase doctor    # shows exactly what's broken and why
 codebase fix       # auto-repairs everything doctor flags
 ```
 
-`doctor` checks: manifest freshness, AI tool injection, MCP config, git hooks, commit-msg hook, `.claude/commands/`, GitHub Actions workflow, and `.gitignore`.
+`doctor` checks: manifest freshness, AI tool injection, MCP config, git hooks, commit-msg hook, `.claude/commands/`, and `.gitignore`.
 
 ---
 
@@ -281,20 +251,18 @@ codebase status        # kanban board + milestones
 codebase query <path>  # any field, e.g. stack.languages or commands.test
 
 # Issues
-codebase issue create "title"              # create GitHub issue
-codebase issue close <n> --reason "why"   # close with reason
+codebase issue create "title"                    # create GitHub issue
+codebase issue close <n> --reason "why"          # close with reason
+codebase issue comment <n> --message "text"      # add comment (audit trail)
 
 # Maintenance
 codebase scan          # refresh .codebase.json
-codebase watch         # auto-refresh on file changes
-codebase diff          # what changed since last scan
 codebase release       # quality gates → tag → develop→main → GitHub release
 codebase doctor        # health check
 codebase fix           # auto-repair
 
 # Integrations
 codebase mcp           # start MCP server
-codebase serve         # start HTTP API (localhost:7432)
 ```
 
 ---
@@ -302,34 +270,34 @@ codebase serve         # start HTTP API (localhost:7432)
 ## FAQ
 
 **Do I need Claude Code for this to work?**
-The manifest (`.codebase.json`) and MCP server work with any AI tool — Cursor, Copilot, Aider, etc. The slash commands (`/simulate`, `/build`, `/launch`) require Claude Code specifically.
+Yes. `codebase` is built for Claude Code. The MCP server, slash commands, and autonomous loop all require Claude Code.
 
 **What does "autonomous" actually mean — will it break my code?**
 All AI commits go to `develop`. Nothing reaches `main` until you run `/launch` and quality gates pass. You're always in control of what ships. The AI runs tests before committing and opens issues rather than guessing when it's stuck.
 
 **Does it send my code to anyone?**
-No. Everything runs locally or inside your own GitHub Actions. The only external calls are to GitHub (via `gh` CLI) and to Anthropic's API (only when you run Claude commands).
+No. Everything runs locally. The only external calls are to GitHub (via `gh` CLI) and to Anthropic's API (only when you run Claude commands).
 
 **Will the git hooks slow down my commits?**
 No. The scan runs in ~200ms on most projects.
 
 **What if I don't use GitHub?**
-The manifest and AI tool wiring work without GitHub. You lose issues, PRs, releases, labels, and the GitHub Actions workflow — but the core context injection still works.
+The manifest and AI tool wiring work without GitHub. You lose issues, PRs, releases, and labels — but the core context injection still works.
 
 **My project isn't JavaScript — does it work?**
 Yes. Detectors cover Python, Go, Rust, Ruby, Java, PHP, Swift, C#, and more. The slash commands use `codebase brief` to detect your stack and adapt automatically.
 
 **Can my whole team use this?**
-Yes. Commit `.codebase.json`, `.claude/commands/`, and `.github/workflows/codebase.yml`. Every team member gets the same context, the same slash commands, and shares the same GitHub Actions loop.
+Yes. Commit `.codebase.json` and `.claude/commands/`. Every team member with Claude Code gets the same context and the same slash commands.
 
 ---
 
 ## Install
 
 ```bash
-npm install -g codebase    # global (recommended)
-npx codebase               # try without installing
-pnpm add -g codebase
+npm install -g codebase-ai    # global (recommended)
+npx codebase-ai               # try without installing
+pnpm add -g codebase-ai
 ```
 
 Zero runtime dependencies. Node.js 18+ only.

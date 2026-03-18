@@ -16,10 +16,7 @@ export function generateBrief(m: Manifest): string {
   }
   sections.push(`\nGenerated: ${m.generated_at}\n`);
 
-  // If only specific categories are present, skip the header warning
-  const hasCategories = Object.keys(m).filter(k =>
-    k !== 'version' && k !== 'generated_at' && k !== 'project'
-  ).length < Object.keys(m).length - 2;
+
 
   // ─── What is this project? ─────────────────────────────────────
   sections.push("## Technical Overview");
@@ -28,25 +25,25 @@ export function generateBrief(m: Manifest): string {
   if (m.repo?.url) {
     projectParts.push(`Repository: ${m.repo.url}`);
     projectParts.push(`Default branch: ${m.repo.default_branch || "unknown"}`);
-    if (m.repo.is_monorepo) projectParts.push(`Monorepo: yes (${m.repo.workspace_manager || "workspaces"})`);
+    if (m.repo.is_monorepo) {projectParts.push(`Monorepo: yes (${m.repo.workspace_manager || "workspaces"})`);}
   }
 
   if (m.stack) {
     const techParts: string[] = [];
-    if (m.stack.languages?.length) techParts.push(`Languages: ${m.stack.languages.join(", ")}`);
-    if (m.stack.frameworks?.length) techParts.push(`Frameworks: ${m.stack.frameworks.join(", ")}`);
-    if (m.stack.package_manager) techParts.push(`Package manager: ${m.stack.package_manager}`);
-    if (m.stack.database) techParts.push(`Database: ${m.stack.database}`);
-    if (m.stack.orm) techParts.push(`ORM: ${m.stack.orm}`);
-    if (m.stack.styling) techParts.push(`Styling: ${m.stack.styling}`);
-    if (m.stack.build_tool) techParts.push(`Build tool: ${m.stack.build_tool}`);
+    if (m.stack.languages?.length) {techParts.push(`Languages: ${m.stack.languages.join(", ")}`);}
+    if (m.stack.frameworks?.length) {techParts.push(`Frameworks: ${m.stack.frameworks.join(", ")}`);}
+    if (m.stack.package_manager) {techParts.push(`Package manager: ${m.stack.package_manager}`);}
+    if (m.stack.database) {techParts.push(`Database: ${m.stack.database}`);}
+    if (m.stack.orm) {techParts.push(`ORM: ${m.stack.orm}`);}
+    if (m.stack.styling) {techParts.push(`Styling: ${m.stack.styling}`);}
+    if (m.stack.build_tool) {techParts.push(`Build tool: ${m.stack.build_tool}`);}
     projectParts.push(techParts.join("\n"));
   }
 
   if (m.patterns) {
-    if (m.patterns.architecture) projectParts.push(`Architecture: ${m.patterns.architecture}`);
-    if (m.patterns.state_management) projectParts.push(`State management: ${m.patterns.state_management}`);
-    if (m.patterns.api_style) projectParts.push(`API style: ${m.patterns.api_style}`);
+    if (m.patterns.architecture) {projectParts.push(`Architecture: ${m.patterns.architecture}`);}
+    if (m.patterns.state_management) {projectParts.push(`State management: ${m.patterns.state_management}`);}
+    if (m.patterns.api_style) {projectParts.push(`API style: ${m.patterns.api_style}`);}
   }
 
   sections.push(projectParts.join("\n"));
@@ -110,7 +107,7 @@ export function generateBrief(m: Manifest): string {
         const labels = i.labels.length ? ` [${i.labels.join(", ")}]` : "";
         statusParts.push(`- #${i.number}: ${i.title}${labels}`);
       }
-      if (backlog.length > 5) statusParts.push(`  ... and ${backlog.length - 5} more`);
+      if (backlog.length > 5) {statusParts.push(`  ... and ${backlog.length - 5} more`);}
     }
 
     // Blockers
@@ -163,7 +160,7 @@ export function generateBrief(m: Manifest): string {
     sections.push("\n## Recent Decisions");
     for (const d of allDecisions.slice(0, 5)) {
       sections.push(`- ${d.title} (${d.source})`);
-      if (d.summary) sections.push(`  ${d.summary.slice(0, 150)}`);
+      if (d.summary) {sections.push(`  ${d.summary.slice(0, 150)}`);}
     }
   }
 

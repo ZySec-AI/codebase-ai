@@ -3,105 +3,89 @@
 ## Quick Reference
 
 ```bash
-# One-time setup (recommended first command)
-codebase init                         # full setup: scan + AI tools + hooks
+# One-time setup
+npx codebase-ai                       # full setup: scan + CLAUDE.md + hooks + MCP
 
-# Core commands
-codebase scan                         # generate/update .codebase.json
-codebase query <path>                 # query specific field
-codebase watch                        # watch files, auto-update
-
-# AI-facing commands (AI tools call these)
+# AI-facing commands (Claude calls these)
 codebase brief                        # full project briefing
 codebase next                         # what should I work on?
 codebase status                       # kanban, priorities, milestones
+codebase query <path>                 # query specific field
+
+# Issues
+codebase issue create "title"         # create GitHub issue
+codebase issue close <n> --reason "why"   # close with reason
+codebase issue comment <n> --message "text"  # add audit trail comment
+codebase issue list                   # list all issues
 
 # Maintenance
+codebase scan                         # refresh .codebase.json
+codebase release                      # gate check → tag → develop→main
 codebase doctor                       # health check
 codebase fix                          # auto-repair issues
-codebase hook uninstall               # remove git hooks
 
-# Servers
-codebase mcp                          # MCP server (stdio)
-codebase serve                        # HTTP API server
+# MCP server
+codebase mcp                          # start MCP server (stdio)
 ```
 
 ---
 
 ## Commands
 
-### `codebase init`
+### `npx codebase-ai` / `codebase init`
 
-Full one-time setup. Scans project, configures AI tools, installs hooks.
+Full one-time setup. Scans project, configures Claude Code, installs hooks.
 
 ```bash
-codebase init                         # complete setup
-codebase init --dry-run               # preview changes
+npx codebase-ai                       # complete setup
 codebase init --sync                  # include GitHub data
 ```
 
 **What it does:**
 1. Scans project (stack, commands, structure, patterns)
-2. Syncs GitHub data (issues, PRs, milestones) if `gh` CLI available
+2. Syncs GitHub data (issues, PRs, milestones) if `gh` CLI is available
 3. Writes `.codebase.json`
-4. Injects into all detected AI tool configs
-5. Installs git hooks (post-commit, post-checkout)
-6. Updates `.gitignore`
-
-**Output:** `.codebase.json` (~4KB, ~500 tokens)
+4. Injects into `CLAUDE.md`
+5. Writes `.mcp.json`
+6. Installs git hooks (pre-commit, post-commit, post-checkout, commit-msg)
+7. Installs Claude Code hooks (`.claude/hooks/`)
+8. Installs slash commands (`.claude/commands/`)
+9. Updates `.gitignore`
 
 ---
 
-### `codebase scan` / `codebase`
+### `codebase scan`
 
-Generate `.codebase.json` manifest. Running `codebase` with no arguments is the same as `codebase scan`.
+Generate `.codebase.json` manifest.
 
 ```bash
-codebase                              # scan current dir
-codebase scan /path/to/repo          # scan specific path
-codebase scan --depth 6              # directory tree depth (default: 4)
-codebase scan --categories stack,commands  # scan specific categories
-codebase scan --incremental          # only re-scan changed areas
-codebase scan --quiet                # no stdout, just write file
+codebase scan                         # scan current dir
+codebase scan --depth 6               # directory tree depth (default: 4)
+codebase scan --quiet                 # no stdout, just write file
 codebase scan --sync                  # sync GitHub data (requires gh)
-codebase scan --verbose              # show detailed progress
 ```
 
 ---
 
 ### `codebase brief` (AI-facing)
 
-Full project briefing - AI tools run this first.
+Full project briefing. Claude calls this at session start.
 
 ```bash
 codebase brief                        # everything in one call
-codebase brief | jq '.stack'         # extract specific section
 ```
 
-**Returns:**
-- Project identity
-- Tech stack
-- Commands
-- Structure
-- Current status (issues, PRs)
-- Next task to work on
-- Blockers
-- Recent decisions
+Returns: project identity, tech stack, commands, structure, current status, next task, blockers, recent decisions.
 
 ---
 
 ### `codebase next` (AI-facing)
 
-Show highest-priority task and what's currently in progress.
+Show highest-priority task.
 
 ```bash
 codebase next                         # what should I work on?
 ```
-
-**Returns:**
-- Highest-priority issue (by labels: P0 > P1 > P2)
-- Current in-progress work
-- Suggested next action
 
 ---
 
@@ -111,15 +95,7 @@ Kanban board, priorities, and milestones.
 
 ```bash
 codebase status                       # full project status
-codebase status --mine                # only your assigned items
 ```
-
-**Returns:**
-- Backlog items
-- In-progress items
-- Completed items
-- Milestone progress
-- Priority-ranked issues
 
 ---
 
@@ -129,186 +105,104 @@ Query specific field using dot-path notation.
 
 ```bash
 codebase query stack.languages            # ["typescript"]
-codebase query commands.test              # "pnpm vitest"
-codebase query commands.test --raw        # pnpm vitest (plain text)
+codebase query commands.test              # "npx vitest run"
+codebase query commands.test --raw        # npx vitest run (plain text)
 codebase query repo.is_monorepo           # false
-codebase query structure.entry_points     # ["src/index.ts"]
-codebase query dependencies.notable       # ["next", "react", "prisma"]
 
 # Pipe into other commands
-codebase query commands.test --raw | sh   # runs: pnpm vitest
-codebase query commands.dev --raw &       # runs dev server in background
+codebase query commands.test --raw | sh   # run tests directly
 ```
 
-**Common Queries:**
-- `stack.languages` - Detected languages
-- `stack.frameworks` - Detected frameworks
-- `commands.dev` - Dev server command
-- `commands.test` - Test command
-- `commands.build` - Build command
-- `repo.is_monorepo` - Is this a monorepo?
-- `structure.entry_points` - Main entry files
+**Common paths:**
+- `stack.languages`, `stack.frameworks`, `stack.database`
+- `commands.dev`, `commands.test`, `commands.build`, `commands.lint`
+- `repo.is_monorepo`, `repo.default_branch`
+- `structure.entry_points`
+- `dependencies.notable`
 
 ---
 
 ### `codebase setup`
 
-Scan + auto-configure every AI tool detected in the project.
+Re-run wiring. Safe to run multiple times.
 
 ```bash
-codebase setup                        # detect and configure all
-codebase setup --tools claude,cursor  # configure specific tools
-codebase setup --dry-run              # show what would change
-```
-
-**What it does:**
-1. Runs a full scan
-2. Detects AI tools (CLAUDE.md, .cursorrules, .windsurfrules, etc.)
-3. Adds `.codebase.json` reference to each tool's config
-4. Installs git post-commit hook
-5. Adds `.codebase.json` to `.gitignore`
-
----
-
-### `codebase watch`
-
-Watch filesystem for changes and re-scan automatically.
-
-```bash
-codebase watch                        # watch and re-scan
-codebase watch --debounce 5000        # wait 5s after last change
-codebase watch --verbose              # show what changed
+codebase setup                        # update commands, hooks, CLAUDE.md, MCP config
 ```
 
 ---
 
-### `codebase diff`
+### `codebase issue`
 
-Show what changed since last scan.
-
-```bash
-codebase diff                         # compare with current manifest
-codebase diff --since HEAD~5          # compare against 5 commits ago
-```
-
----
-
-### `codebase export`
-
-Export manifest to tool-specific formats.
+Manage GitHub issues.
 
 ```bash
-codebase export --format claude-md     # CLAUDE.md snippet
-codebase export --format cursor-rules  # .cursorrules snippet
-codebase export --format markdown      # human-readable markdown
-codebase export --format json          # JSON (with color)
-```
-
----
-
-### `codebase issue` / `codebase pr`
-
-Manage GitHub issues and pull requests.
-
-```bash
-# Issues
-codebase issue create "Fix auth bug"           # create new issue
-codebase issue close 42 --reason "Fixed"       # close with reason
-codebase issue list                          # list all issues
-codebase issue list --mine                    # list your issues
-
-# Pull Requests
-codebase pr list                             # list all PRs
-codebase pr list --mine                      # list your PRs
-```
-
----
-
-### `codebase hook`
-
-Manage git hooks for auto-updates.
-
-```bash
-codebase hook install                   # install post-commit hook
-codebase hook uninstall                 # remove git hooks
+codebase issue create "Fix auth bug"                       # create
+codebase issue close 42 --reason "Fixed in PR #43"         # close with reason
+codebase issue comment 42 --message "Refactored auth flow" # add comment
+codebase issue list                                        # list all
+codebase issue list --mine                                 # list assigned to you
 ```
 
 ---
 
 ### `codebase mcp`
 
-Start MCP (Model Context Protocol) server for native AI tool integration.
+Start MCP server for native Claude Code integration.
 
 ```bash
 codebase mcp                           # start stdio MCP server
 ```
 
-**Exposes tools:**
-- `project_brief` - Full manifest or category
-- `query_codebase` - Dot-path queries
-- `get_blockers` - Current blockers
-- `get_next_task` - Next priority task
-- `create_issue` - Create GitHub issue
-- `close_issue` - Close issue with reason
-
-**MCP Config (add to your tool's MCP settings):**
+Add to `.mcp.json`:
 ```json
 {
   "mcpServers": {
     "codebase": {
       "command": "npx",
-      "args": ["codebase", "mcp"]
+      "args": ["codebase-ai", "mcp"]
     }
   }
 }
 ```
 
+`codebase setup` writes this automatically.
+
 ---
 
-### `codebase serve`
+### `codebase release`
 
-Start HTTP API server for IDE extensions and dashboards.
+Quality gates → tag → merge `develop → main` → GitHub Release.
 
 ```bash
-codebase serve                        # localhost:7432
-codebase serve --port 8080            # custom port
-codebase serve --watch                # re-scan on manifest changes
+codebase release                      # auto-increment version and release
+codebase release v1.2.0               # explicit version
+codebase release --dry-run            # preview without tagging
 ```
 
-**Endpoints:**
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/codebase` | Full manifest |
-| `GET` | `/codebase/:category` | Single category (stack, commands, etc.) |
-| `GET` | `/codebase/query?path=stack.languages` | Query field |
-| `POST` | `/codebase/scan` | Trigger re-scan |
-| `GET` | `/health` | Health check |
+**Gates checked:**
+1. No open critical/high bugs
+2. Test suite passes
+3. World-class UX score ≥ 7.0 (if `/simulate` has been run)
+4. Branch is clean, no uncommitted changes
 
 ---
 
 ### `codebase doctor`
 
-Diagnose setup and configuration issues.
+Diagnose setup issues.
 
 ```bash
 codebase doctor                       # run health check
 ```
 
-**Checks:**
-- Manifest presence/freshness
-- Detector coverage
-- GitHub CLI status
-- AI tool injection markers
-- MCP configuration
-- Git hooks
-- `.gitignore` configuration
+Checks: manifest freshness, CLAUDE.md injection, MCP config, git hooks, Claude Code hooks, `.gitignore`.
 
 ---
 
 ### `codebase fix`
 
-Auto-repair any issues found by `doctor`.
+Auto-repair anything `doctor` flags.
 
 ```bash
 codebase fix                          # auto-repair all issues
@@ -320,102 +214,55 @@ codebase fix                          # auto-repair all issues
 
 | Option | Description |
 |--------|-------------|
-| `--help, -h` | Show help (main or command-specific) |
+| `--help, -h` | Show help |
 | `--version, -v` | Show version |
-| `--verbose` | Show detailed progress output |
-| `--quiet, -q` | Minimal output |
+| `--verbose` | Detailed output |
+| `--quiet` | Minimal output |
 | `--path <dir>` | Target directory (default: current) |
-| `--dry-run` | Preview changes without applying |
+| `--dry-run` | Preview without applying |
+| `--sync` | Include GitHub data |
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CODEBASE_PORT` | `7432` | MCP server port |
+| `CODEBASE_DEPTH` | `4` | Directory tree depth |
+| `CODEBASE_QUIET` | `false` | Suppress stdout |
 
 ---
 
 ## Language-Specific Examples
 
-### JavaScript/TypeScript
+### JavaScript / TypeScript
 
 ```bash
-codebase scan                        # Detects package.json, tsconfig.json
-codebase query commands.test --raw | sh  # Runs: npm test
+codebase scan                        # detects package.json, tsconfig.json
+codebase query commands.test --raw | sh  # runs: npm test / npx vitest run
 ```
 
 ### Python
 
 ```bash
-# Poetry
-codebase scan                        # Detects pyproject.toml, poetry.lock
-codebase query commands.test --raw | sh  # Runs: poetry run pytest
-
-# pipenv
-codebase scan                        # Detects Pipfile, Pipfile.lock
-codebase query commands.dev --raw | sh  # Runs: pipenv run python
-
-# UV (new)
-codebase scan                        # Detects uv.lock
-codebase query commands.test --raw | sh  # Runs: uv run pytest
+codebase scan                        # detects pyproject.toml, poetry.lock, uv.lock
+codebase query commands.test --raw | sh  # runs: poetry run pytest / uv run pytest
 ```
 
 ### Rust
 
 ```bash
-codebase scan                        # Detects Cargo.toml, Cargo.lock
-codebase query commands.test --raw | sh  # Runs: cargo test
-codebase query commands.lint --raw | sh  # Runs: cargo clippy
+codebase scan                        # detects Cargo.toml
+codebase query commands.test --raw | sh  # runs: cargo test
 ```
 
 ### Go
 
 ```bash
-codebase scan                        # Detects go.mod, go.sum
-codebase query commands.dev --raw | sh  # Runs: go run main.go
-codebase query commands.test --raw | sh  # Runs: go test ./...
+codebase scan                        # detects go.mod
+codebase query commands.test --raw | sh  # runs: go test ./...
 ```
-
-### Java (Maven)
-
-```bash
-codebase scan                        # Detects pom.xml
-codebase query commands.test --raw | sh  # Runs: mvn test
-```
-
-### Ruby
-
-```bash
-codebase scan                        # Detects Gemfile, Gemfile.lock
-codebase query commands.test --raw | sh  # Runs: bundle exec rspec
-```
-
-### C# (.NET)
-
-```bash
-codebase scan                        # Detects .csproj
-codebase query commands.test --raw | sh  # Runs: dotnet test
-```
-
----
-
-## Configuration
-
-### `.codebaserc` (optional)
-
-Override defaults for specific projects.
-
-```json
-{
-  "ignore": ["node_modules", "dist", ".git", "vendor"],
-  "depth": 4,
-  "categories": ["repo", "structure", "stack", "commands", "dependencies", "config", "git", "quality", "patterns"],
-  "output": ".codebase.json"
-}
-```
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CODEBASE_OUTPUT` | `.codebase.json` | Output file path |
-| `CODEBASE_PORT` | `7432` | API server port |
-| `CODEBASE_DEPTH` | `4` | Directory tree depth |
-| `CODEBASE_QUIET` | `false` | Suppress stdout |
 
 ---
 
@@ -424,13 +271,4 @@ Override defaults for specific projects.
 | Code | Meaning |
 |------|---------|
 | `0` | Success |
-| `1` | Error (see error message for details) |
-
----
-
-## Getting Help
-
-- **Command help:** `codebase <command> --help`
-- **Main help:** `codebase --help`
-- **Issues:** https://github.com/your-repo/codebase/issues
-- **Docs:** https://github.com/your-repo/codebase/wiki
+| `1` | Error (see stderr for details) |

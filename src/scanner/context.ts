@@ -1,4 +1,4 @@
-import { readdir, readFile as fsReadFile, stat } from "node:fs/promises";
+import { readdir, readFile as fsReadFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { execFile } from "node:child_process";
@@ -39,7 +39,7 @@ export async function createScanContext(
 
     fileExists(path: string): boolean {
       // Fast O(1) check against walked files first
-      if (fileSet.has(path)) return true;
+      if (fileSet.has(path)) {return true;}
       // Fallback: actual filesystem check (for files in ignored dirs or outside walk depth)
       return existsSync(join(root, path));
     },
@@ -65,7 +65,7 @@ async function walkDirectory(
   maxDepth: number,
   currentDepth = 0
 ): Promise<string[]> {
-  if (currentDepth > maxDepth) return [];
+  if (currentDepth > maxDepth) {return [];}
 
   const results: string[] = [];
 
@@ -73,11 +73,11 @@ async function walkDirectory(
     const entries = await readdir(dir, { withFileTypes: true });
 
     for (const entry of entries) {
-      if (ignore.has(entry.name)) continue;
+      if (ignore.has(entry.name)) {continue;}
       if (entry.isDirectory() && entry.name.startsWith(".")) {
         // Allow .github, .husky, .circleci — skip other hidden dirs
         const allowedDotDirs = new Set([".github", ".husky", ".circleci"]);
-        if (!allowedDotDirs.has(entry.name)) continue;
+        if (!allowedDotDirs.has(entry.name)) {continue;}
       }
 
       const fullPath = join(dir, entry.name);

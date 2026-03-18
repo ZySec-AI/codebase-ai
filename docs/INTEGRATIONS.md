@@ -1,158 +1,99 @@
 # Integrations
 
-How `codebase` connects to each AI coding tool. There are three integration levels, from simplest to most powerful.
+`codebase` is built for **Claude Code**. There are two integration levels.
 
-## Level 1: File Reference (works today, any tool)
+## Level 1: File Reference — CLAUDE.md
 
-The tool's config file tells the AI to read `.codebase.json` first. `codebase setup` does this automatically.
+`codebase setup` automatically injects a context block into `CLAUDE.md`:
 
-### Claude Code
-
-Appends to `CLAUDE.md`:
 ```markdown
+<!-- codebase:start -->
 ## Project Context
-Read .codebase.json for project structure, tech stack, and available commands before exploring the codebase.
+
+Read `.codebase.json` for project structure, tech stack, commands, and open issues
+before exploring the codebase.
+<!-- codebase:end -->
 ```
 
-### Cursor
-
-Appends to `.cursorrules`:
-```
-Read .codebase.json for project structure, tech stack, and available commands before exploring the codebase.
-```
-
-### Windsurf
-
-Appends to `.windsurfrules`:
-```
-Read .codebase.json for project structure, tech stack, and available commands before exploring the codebase.
-```
-
-### GitHub Copilot
-
-Appends to `.github/copilot-instructions.md`:
-```markdown
-Read .codebase.json for project structure, tech stack, and available commands before exploring the codebase.
-```
-
-### Aider
-
-Appends to `.aider.conf.yml`:
-```yaml
-read: [".codebase.json"]
-```
-
-### Cline
-
-Appends to `.clinerules`:
-```
-Read .codebase.json for project structure, tech stack, and available commands before exploring the codebase.
-```
-
-### Continue
-
-Adds to `.continuerc.json`:
-```json
-{
-  "docs": [{ "path": ".codebase.json", "name": "Project Context" }]
-}
-```
+This block is maintained automatically. Running `codebase setup` again updates it if it's stale.
 
 ## Level 2: MCP Server (native tool access)
 
-The AI tool calls `codebase` directly as a tool. No file reading, no prompt engineering.
+Claude Code calls `codebase` directly as a tool via stdio JSON-RPC. No file reading needed.
 
 ```bash
-codebase mcp    # starts MCP server over stdio
+codebase mcp    # starts MCP server
 ```
 
-**Add to any MCP-compatible tool:**
+**Add to `.mcp.json` in your project root:**
 
 ```json
 {
   "mcpServers": {
     "codebase": {
       "command": "npx",
-      "args": ["codebase", "mcp"]
+      "args": ["codebase-ai", "mcp"]
     }
   }
 }
 ```
 
+`codebase setup` writes this file automatically.
+
 **Tools exposed:**
 
-### `get_codebase`
+| Tool | What it does |
+|------|-------------|
+| `project_brief` | Full project briefing — stack, commands, structure, issues |
+| `get_codebase` | Full manifest or single category |
+| `query_codebase` | Dot-path field query (e.g. `commands.test`) |
+| `get_next_task` | Highest-priority open issue |
+| `get_blockers` | Current blockers |
+| `create_issue` | Create a GitHub issue |
+| `close_issue` | Close a GitHub issue with reason |
+| `rescan_project` | Trigger manifest refresh |
+| `list_commands` | List available slash commands |
 
-Returns the full manifest or a specific category.
+## Claude Code Hooks
 
-```
-Input:  { "category": "stack" }        // optional
-Output: { "languages": ["typescript"], "frameworks": ["next.js@14.1"], ... }
-```
+`codebase setup` installs two hook scripts into `.claude/hooks/` that enforce safe git practices at the tool-call level:
 
-### `query_codebase`
+**`git-guard.sh` (PreToolUse on Bash)**
+- Blocks `git commit` on `main`, `master`, or `prod`
+- Blocks `git push --force`
+- Blocks `git push origin main/master/prod`
+- Blocks commit if local branch is behind remote (forces pull first)
 
-Returns a specific field by dot-path.
+**`git-post.sh` (PostToolUse on Bash)**
+- After pushing a feature branch, prints a PR creation reminder
 
-```
-Input:  { "path": "commands.test" }
-Output: "pnpm vitest"
-```
+These are wired into `.claude/settings.json` automatically.
 
-**Supported MCP clients:**
-- Claude Code
-- Cursor
-- Windsurf
-- Continue
-- Cline
-- Any tool implementing the MCP spec
+## Slash Commands
 
-## Level 3: HTTP API (any client)
+`codebase setup` installs five slash commands into `.claude/commands/`:
 
-For IDE extensions, dashboards, CI tools, or anything that speaks HTTP.
+| Command | What it does |
+|---------|-------------|
+| `/setup` | Bootstrap project — labels, milestone, PRODUCT.md |
+| `/simulate` | AI customer journeys (agent-browser) + UX audit |
+| `/build` | Autonomous loop — implement issues until backlog is clear |
+| `/launch` | Gate check → tag → release → merge to main |
+| `/review` | Security, quality, deps, accessibility audit |
 
-```bash
-codebase serve --port 7432
-```
-
-```bash
-curl localhost:7432/codebase                     # full manifest
-curl localhost:7432/codebase/stack               # just stack
-curl localhost:7432/codebase/query?path=commands.test  # specific field
-curl -X POST localhost:7432/codebase/scan        # trigger re-scan
-```
-
-CORS enabled by default for local browser-based tools.
+Commit `.claude/commands/` to share these with your whole team.
 
 ## Auto-Detection
 
-`codebase setup` detects tools by checking for their config files:
+`codebase setup` detects Claude Code by checking for `CLAUDE.md` in the project root. If it doesn't exist yet, it creates one.
 
-| Tool | Detection |
-|------|-----------|
-| Claude Code | `CLAUDE.md` exists |
-| Cursor | `.cursorrules` exists |
-| Windsurf | `.windsurfrules` exists |
-| Copilot | `.github/copilot-instructions.md` exists |
-| Aider | `.aider.conf.yml` exists |
-| Cline | `.clinerules` exists |
-| Continue | `.continuerc.json` exists |
+## Git Hooks
 
-If no AI tool configs exist yet, `codebase setup` creates a `CLAUDE.md` as a sensible default (since it's the most widely adopted format).
+Three git hooks are installed into `.git/hooks/`:
 
-## Custom Integrations
-
-Build your own integration by reading `.codebase.json` or calling the API:
-
-```javascript
-// Read from file
-const manifest = JSON.parse(fs.readFileSync('.codebase.json', 'utf8'));
-console.log(manifest.stack.frameworks); // ["next.js@14.1"]
-
-// Read from API
-const res = await fetch('http://localhost:7432/codebase/stack');
-const stack = await res.json();
-
-// Read from MCP
-// Your MCP client calls get_codebase({ category: "stack" })
-```
+| Hook | What it does |
+|------|-------------|
+| `pre-commit` | Runs lint + typecheck before every commit |
+| `post-commit` | Runs `codebase scan --quiet` to keep manifest fresh |
+| `post-checkout` | Runs `codebase scan --quiet` on branch switch |
+| `commit-msg` | Blocks direct commits to `main`/`master` |

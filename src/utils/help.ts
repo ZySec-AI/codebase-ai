@@ -45,14 +45,12 @@ const HELP: Record<string, CommandHelp> = {
   },
 
   setup: {
-    description: "Auto-wire .codebase.json into AI tool configs",
+    description: "Wire .codebase.json into Claude Code and install slash commands",
     usage: "codebase setup [options]",
     examples: [
-      { command: "codebase setup", description: "Auto-detect and configure all AI tools" },
-      { command: "codebase setup --tools claude,cursor", description: "Configure specific tools only" },
+      { command: "codebase setup", description: "Configure Claude Code, git hooks, and slash commands" },
     ],
     options: [
-      { flag: "--tools <list>", description: "Comma-separated tool names" },
       { flag: "--dry-run", description: "Preview changes" },
     ],
   },
@@ -102,74 +100,20 @@ const HELP: Record<string, CommandHelp> = {
     ],
   },
 
-  watch: {
-    description: "Watch files and re-scan on changes",
-    usage: "codebase watch [options]",
-    examples: [
-      { command: "codebase watch", description: "Watch and auto-update" },
-      { command: "codebase watch --debounce 5000", description: "Wait 5s after changes" },
-    ],
-    options: [
-      { flag: "--debounce <ms>", description: "Debounce time in ms (default: 2000)" },
-    ],
-  },
-
-  diff: {
-    description: "Show changes since last scan",
-    usage: "codebase diff [options]",
-    examples: [
-      { command: "codebase diff", description: "Compare with current manifest" },
-      { command: "codebase diff --since HEAD~5", description: "Compare against 5 commits ago" },
-    ],
-    options: [
-      { flag: "--since <ref>", description: "Git reference to compare against" },
-    ],
-  },
-
-  export: {
-    description: "Export manifest to tool-specific formats",
-    usage: "codebase export --format <format>",
-    examples: [
-      { command: "codebase export --format markdown", description: "Export as Markdown" },
-      { command: "codebase export --format claude-md > CLAUDE.md", description: "Export CLAUDE.md snippet" },
-      { command: "codebase export --format cursor-rules > .cursorrules", description: "Export .cursorrules snippet" },
-    ],
-    options: [
-      { flag: "--format <fmt>", description: "Format: markdown, claude-md, cursor-rules, json" },
-    ],
-  },
-
   issue: {
     description: "Manage GitHub issues",
     usage: "codebase issue <subcommand> [args]",
     examples: [
       { command: "codebase issue create \"Fix auth bug\"", description: "Create new issue" },
       { command: "codebase issue close 42 --reason \"Fixed in PR #123\"", description: "Close with reason" },
+      { command: "codebase issue comment 42 --message \"Fixed by refactoring auth flow\"", description: "Add comment" },
       { command: "codebase issue list", description: "List all issues" },
       { command: "codebase issue list --mine", description: "List your issues" },
     ],
     options: [
-      { flag: "--message <text>", description: "Issue body (for create)" },
+      { flag: "--message <text>", description: "Issue body (for create) or comment text" },
       { flag: "-m <text>", description: "Shorthand for --message" },
       { flag: "--reason <text>", description: "Close reason" },
-    ],
-  },
-
-  pr: {
-    description: "Manage GitHub pull requests",
-    usage: "codebase pr <subcommand> [args]",
-    examples: [
-      { command: "codebase pr list", description: "List all PRs" },
-      { command: "codebase pr list --mine", description: "List your PRs" },
-    ],
-  },
-
-  hook: {
-    description: "Manage git hooks for auto-updates",
-    usage: "codebase hook <subcommand>",
-    examples: [
-      { command: "codebase hook install", description: "Install post-commit hook" },
-      { command: "codebase hook uninstall", description: "Remove git hooks" },
     ],
   },
 
@@ -179,22 +123,6 @@ const HELP: Record<string, CommandHelp> = {
     examples: [
       { command: "codebase mcp", description: "Start stdio MCP server" },
     ],
-    seeAlso: ["serve"],
-  },
-
-  serve: {
-    description: "Start HTTP API server",
-    usage: "codebase serve [options]",
-    examples: [
-      { command: "codebase serve", description: "Start on localhost:7432" },
-      { command: "codebase serve --port 8080", description: "Start on custom port" },
-      { command: "codebase serve --watch", description: "Auto-reload on manifest changes" },
-    ],
-    options: [
-      { flag: "--port <n>", description: "HTTP port (default: 7432)" },
-      { flag: "--watch", description: "Watch for file changes" },
-    ],
-    seeAlso: ["mcp"],
   },
 
   doctor: {
@@ -222,7 +150,6 @@ const HELP: Record<string, CommandHelp> = {
       { command: "codebase release", description: "Auto-increment version and release" },
       { command: "codebase release v1.2.0", description: "Release with explicit version" },
       { command: "codebase release --dry-run", description: "Preview release without tagging" },
-      { command: "codebase release generate", description: "Generate release notes only (legacy)" },
     ],
     options: [
       { flag: "--dry-run", description: "Preview release notes without creating tag or merge" },
@@ -254,17 +181,13 @@ ${bold("AUTONOMOUS LOOP")}
   ${command("/build")}                     Autonomous loop — build → test → simulate → repeat
   ${command("/launch")}                    Gate check → tag → release → merge to main
   ${command("/review")}                    Security, quality, deps, accessibility audit
-  ${command("/pitch")}                     GTM docs, dev docs, investor deck
-  ${command("/daemon")}                    Background worker — ships automatically
 
 ${bold("HUMAN COMMANDS")}
   ${command("codebase init")}              Full setup (scan + AI tools + hooks)
   ${command("codebase scan")}              Generate/update .codebase.json
   ${command("codebase setup")}             Wire AI tools + install slash commands
   ${command("codebase release")}           Gate check → tag → develop→main
-  ${command("codebase watch")}             Auto-update on file changes
   ${command("codebase doctor")}            Health check & diagnostics
-  ${command("codebase serve")}             Start HTTP API server
 
 ${bold("OPTIONS")}
   ${code("--help, -h")}                    Show this help or command-specific help

@@ -212,7 +212,7 @@ function parsePyprojectToml(content: string): { direct: string[]; dev: string[] 
     dev.push(...extractTomlKeys(poetryDevMatch[1]));
   }
 
-  if (direct.length === 0 && dev.length === 0) return null;
+  if (direct.length === 0 && dev.length === 0) {return null;}
   return { direct, dev };
 }
 
@@ -222,7 +222,7 @@ function extractQuotedNames(block: string): string[] {
   for (const m of matches) {
     const raw = m[1] || m[2];
     const name = raw.split(/[>=<!;\[]/)[0].trim().toLowerCase();
-    if (name) names.push(name);
+    if (name) {names.push(name);}
   }
   return names;
 }
@@ -231,9 +231,9 @@ function extractTomlKeys(block: string): string[] {
   const names: string[] = [];
   for (const line of block.split("\n")) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
+    if (!trimmed || trimmed.startsWith("#")) {continue;}
     const match = trimmed.match(/^([a-zA-Z0-9_-]+)\s*=/);
-    if (match) names.push(match[1].toLowerCase());
+    if (match) {names.push(match[1].toLowerCase());}
   }
   return names;
 }
@@ -242,9 +242,9 @@ function parseRequirementsTxt(content: string): string[] {
   const names: string[] = [];
   for (const line of content.split("\n")) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("-")) continue;
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("-")) {continue;}
     const name = trimmed.split(/[>=<!;\[]/)[0].trim().toLowerCase();
-    if (name) names.push(name);
+    if (name) {names.push(name);}
   }
   return names;
 }
@@ -274,9 +274,9 @@ function parseGoMod(content: string): string[] {
   for (const m of blockMatches) {
     for (const line of m[1].split("\n")) {
       const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("//")) continue;
+      if (!trimmed || trimmed.startsWith("//")) {continue;}
       const parts = trimmed.split(/\s+/);
-      if (parts[0]) names.push(parts[0]);
+      if (parts[0]) {names.push(parts[0]);}
     }
   }
 
@@ -291,7 +291,7 @@ function parseGoMod(content: string): string[] {
 
 async function detectRubyDeps(ctx: ScanContext): Promise<{ direct_count: number; dev_count: number; notable: string[] }> {
   const gemfile = await ctx.readFile("Gemfile");
-  if (!gemfile) return { direct_count: 0, dev_count: 0, notable: [] };
+  if (!gemfile) {return { direct_count: 0, dev_count: 0, notable: [] };}
 
   const deps: string[] = [];
   const notable: string[] = [];
@@ -300,7 +300,7 @@ async function detectRubyDeps(ctx: ScanContext): Promise<{ direct_count: number;
     const match = line.match(/gem\s+["']([^"']+)["']/);
     if (match) {
       deps.push(match[1]);
-      if (NOTABLE_PACKAGES.has(match[1])) notable.push(match[1]);
+      if (NOTABLE_PACKAGES.has(match[1])) {notable.push(match[1]);}
     }
   }
 
@@ -313,7 +313,7 @@ async function detectRubyDeps(ctx: ScanContext): Promise<{ direct_count: number;
 
 async function detectPhpDeps(ctx: ScanContext): Promise<{ direct_count: number; dev_count: number; notable: string[] }> {
   const composer = await ctx.readFile("composer.json");
-  if (!composer) return { direct_count: 0, dev_count: 0, notable: [] };
+  if (!composer) {return { direct_count: 0, dev_count: 0, notable: [] };}
 
   try {
     const pkg = JSON.parse(composer);
@@ -341,7 +341,7 @@ async function detectJavaDeps(ctx: ScanContext): Promise<{ direct_count: number;
   const gradleKts = await ctx.readFile("build.gradle.kts");
   const content = (pom || "") + "\n" + (gradle || "") + "\n" + (gradleKts || "");
 
-  if (!content.trim()) return { direct_count: 0, dev_count: 0, notable: [] };
+  if (!content.trim()) {return { direct_count: 0, dev_count: 0, notable: [] };}
 
   const deps: string[] = [];
   const notable: string[] = [];
@@ -350,7 +350,7 @@ async function detectJavaDeps(ctx: ScanContext): Promise<{ direct_count: number;
   let match;
   while ((match = artifactIdRegex.exec(content)) !== null) {
     deps.push(match[1]);
-    if (NOTABLE_PACKAGES.has(match[1])) notable.push(match[1]);
+    if (NOTABLE_PACKAGES.has(match[1])) {notable.push(match[1]);}
   }
 
   const gradleDepsRegex = /(?:implementation|compile|api)\s+['"]([^:'"]+)/g;
@@ -358,7 +358,7 @@ async function detectJavaDeps(ctx: ScanContext): Promise<{ direct_count: number;
     const dep = match[1].split(":").pop();
     if (dep) {
       deps.push(dep);
-      if (NOTABLE_PACKAGES.has(dep)) notable.push(dep);
+      if (NOTABLE_PACKAGES.has(dep)) {notable.push(dep);}
     }
   }
 
@@ -371,7 +371,7 @@ async function detectJavaDeps(ctx: ScanContext): Promise<{ direct_count: number;
 
 async function detectCSharpDeps(ctx: ScanContext): Promise<{ direct_count: number; dev_count: number; notable: string[] }> {
   const csprojFiles = ctx.files.filter(f => f.endsWith(".csproj"));
-  if (csprojFiles.length === 0) return { direct_count: 0, dev_count: 0, notable: [] };
+  if (csprojFiles.length === 0) {return { direct_count: 0, dev_count: 0, notable: [] };}
 
   const deps: string[] = [];
   const notable: string[] = [];
@@ -383,7 +383,7 @@ async function detectCSharpDeps(ctx: ScanContext): Promise<{ direct_count: numbe
     while ((match = packageRegex.exec(content)) !== null) {
       deps.push(match[1]);
       const name = match[1].split(".")[0].toLowerCase();
-      if (NOTABLE_PACKAGES.has(name)) notable.push(match[1]);
+      if (NOTABLE_PACKAGES.has(name)) {notable.push(match[1]);}
     }
   }
 
@@ -396,35 +396,35 @@ async function detectCSharpDeps(ctx: ScanContext): Promise<{ direct_count: numbe
 
 function detectLockFile(ctx: ScanContext): string | null {
   // JavaScript/TypeScript
-  if (ctx.fileExists("pnpm-lock.yaml")) return "pnpm-lock.yaml";
-  if (ctx.fileExists("yarn.lock")) return "yarn.lock";
-  if (ctx.fileExists("package-lock.json")) return "package-lock.json";
-  if (ctx.fileExists("bun.lockb") || ctx.fileExists("bun.lock")) return "bun.lock";
+  if (ctx.fileExists("pnpm-lock.yaml")) {return "pnpm-lock.yaml";}
+  if (ctx.fileExists("yarn.lock")) {return "yarn.lock";}
+  if (ctx.fileExists("package-lock.json")) {return "package-lock.json";}
+  if (ctx.fileExists("bun.lockb") || ctx.fileExists("bun.lock")) {return "bun.lock";}
   // Rust
-  if (ctx.fileExists("Cargo.lock")) return "Cargo.lock";
+  if (ctx.fileExists("Cargo.lock")) {return "Cargo.lock";}
   // Python
-  if (ctx.fileExists("poetry.lock")) return "poetry.lock";
-  if (ctx.fileExists("Pipfile.lock")) return "Pipfile.lock";
-  if (ctx.fileExists("uv.lock")) return "uv.lock";
+  if (ctx.fileExists("poetry.lock")) {return "poetry.lock";}
+  if (ctx.fileExists("Pipfile.lock")) {return "Pipfile.lock";}
+  if (ctx.fileExists("uv.lock")) {return "uv.lock";}
   // Go
-  if (ctx.fileExists("go.sum")) return "go.sum";
+  if (ctx.fileExists("go.sum")) {return "go.sum";}
   // Ruby
-  if (ctx.fileExists("Gemfile.lock")) return "Gemfile.lock";
+  if (ctx.fileExists("Gemfile.lock")) {return "Gemfile.lock";}
   // PHP
-  if (ctx.fileExists("composer.lock")) return "composer.lock";
+  if (ctx.fileExists("composer.lock")) {return "composer.lock";}
   // Java
-  if (ctx.fileExists(".mvn/jvm.config")) return "maven";
+  if (ctx.fileExists(".mvn/jvm.config")) {return "maven";}
   // Kotlin/Gradle
-  if (ctx.fileExists(".gradle")) return "gradle";
+  if (ctx.fileExists(".gradle")) {return "gradle";}
   // Swift
-  if (ctx.fileExists("Package.resolved")) return "swift";
+  if (ctx.fileExists("Package.resolved")) {return "swift";}
   // Dart/Flutter
-  if (ctx.fileExists("pubspec.lock")) return "pubspec.lock";
+  if (ctx.fileExists("pubspec.lock")) {return "pubspec.lock";}
   // Elixir
-  if (ctx.fileExists("mix.lock")) return "mix.lock";
+  if (ctx.fileExists("mix.lock")) {return "mix.lock";}
   // Scala
-  if (ctx.fileExists("project/target/resolution-cache")) return "sbt";
+  if (ctx.fileExists("project/target/resolution-cache")) {return "sbt";}
   // NuGet (.NET)
-  if (ctx.fileExists("packages.lock.json")) return "nuget";
+  if (ctx.fileExists("packages.lock.json")) {return "nuget";}
   return null;
 }

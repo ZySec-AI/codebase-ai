@@ -2,7 +2,7 @@ import { resolve, join } from "node:path";
 import { readFile } from "node:fs/promises";
 import type { CLIOptions, Manifest } from "../types.js";
 import { generateBrief } from "../mcp/brief.js";
-import { error } from "../utils/output.js";
+import { error, warn } from "../utils/output.js";
 
 /**
  * `codebase brief` — outputs a complete project briefing for AI consumption.
@@ -28,6 +28,11 @@ export async function runBrief(options: CLIOptions): Promise<void> {
   } catch {
     error("No .codebase.json found (or it's corrupted). Run `npx codebase` first.");
     process.exit(1);
+  }
+
+  // Warn if GitHub data is absent
+  if (!options.quiet && !manifest.status && !manifest.roadmap) {
+    warn("GitHub data unavailable (gh not authenticated or --sync not used). Issues, PRs and milestones not included.");
   }
 
   // Filter by categories if specified

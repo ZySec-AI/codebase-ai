@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadCache, saveCache, isCacheValid } from "../../src/scanner/cache.js";
@@ -55,7 +55,7 @@ describe("scanner cache", () => {
     const cache = loadCache(root)!;
 
     // Modify tracked file — change mtime
-    const future = new Date(Date.now() + 5000);
+    const _future = new Date(Date.now() + 5000);
     writeFileSync(join(root, "package.json"), '{"name":"changed"}');
 
     expect(isCacheValid(root, cache, 100)).toBe(false);

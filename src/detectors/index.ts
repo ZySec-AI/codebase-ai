@@ -9,6 +9,7 @@ import { configDetector } from "./config.js";
 import { gitDetector } from "./git.js";
 import { qualityDetector } from "./quality.js";
 import { patternsDetector } from "./patterns.js";
+import { apiDocsDetector } from "./api-docs.js";
 
 export const detectors: Detector[] = [
   projectDetector,
@@ -21,4 +22,5 @@ export const detectors: Detector[] = [
   gitDetector,
   qualityDetector,
   patternsDetector,
+  apiDocsDetector,
 ];

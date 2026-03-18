@@ -1,31 +1,33 @@
-import js from "@eslint/js";
+import tseslint from "typescript-eslint";
 
-export default [
+export default tseslint.config(
   {
-    ignores: [
-      "dist/**",
-      "node_modules/**",
-      "coverage/**",
-      "*.config.js",
-      "pnpm-lock.yaml",
-      "**/*.ts",  // Ignore TypeScript files - we use tsc for checking
-    ],
+    ignores: ["dist/**", "node_modules/**", "coverage/**"],
   },
-  js.configs.recommended,
+  ...tseslint.configs.recommended,
   {
-    files: ["**/*.js"],
+    files: ["src/**/*.ts", "tests/**/*.ts"],
     languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: "module",
       globals: {
         process: "readonly",
         Buffer: "readonly",
         console: "readonly",
+        __VERSION__: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
       },
     },
     rules: {
-      "no-unused-vars": "off",  // Disabled - TypeScript catches this
       "no-console": "off",
+      "no-duplicate-imports": "error",
+      "no-var": "error",
+      "prefer-const": "error",
+      "eqeqeq": ["error", "always"],
+      "curly": ["error", "all"],
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-explicit-any": "warn",
     },
-  },
-];
+  }
+);

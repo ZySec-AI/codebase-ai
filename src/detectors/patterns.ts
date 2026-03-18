@@ -96,75 +96,75 @@ export const patternsDetector: Detector = {
 
 function detectArchitecture(ctx: ScanContext): string | null {
   // Next.js App Router
-  if (ctx.files.some(f => f.match(/^(src\/)?app\/layout\.(tsx?|jsx?)$/))) return "app-router";
+  if (ctx.files.some(f => f.match(/^(src\/)?app\/layout\.(tsx?|jsx?)$/))) {return "app-router";}
 
   // Next.js Pages Router
-  if (ctx.files.some(f => f.match(/^(src\/)?pages\/_app\./))) return "pages-router";
+  if (ctx.files.some(f => f.match(/^(src\/)?pages\/_app\./))) {return "pages-router";}
 
   // MVC
   if (
     ctx.files.some(f => f.includes("/controllers/")) &&
     ctx.files.some(f => f.includes("/models/"))
-  ) return "mvc";
+  ) {return "mvc";}
 
   // Feature-sliced
-  if (ctx.files.some(f => f.startsWith("src/features/"))) return "feature-sliced";
+  if (ctx.files.some(f => f.startsWith("src/features/"))) {return "feature-sliced";}
 
   // Modular (src/modules/)
-  if (ctx.files.some(f => f.startsWith("src/modules/"))) return "modular";
+  if (ctx.files.some(f => f.startsWith("src/modules/"))) {return "modular";}
 
   // Layered (services + repositories)
   if (
     ctx.files.some(f => f.includes("/services/")) &&
     ctx.files.some(f => f.includes("/repositories/"))
-  ) return "layered";
+  ) {return "layered";}
 
   // File-based routing (SvelteKit, Remix)
-  if (ctx.files.some(f => f.startsWith("src/routes/"))) return "file-based-routing";
+  if (ctx.files.some(f => f.startsWith("src/routes/"))) {return "file-based-routing";}
 
   // CLI / command-based (src/commands/ or cmd/)
-  if (ctx.files.some(f => f.startsWith("src/commands/") || f.startsWith("cmd/"))) return "command-based";
+  if (ctx.files.some(f => f.startsWith("src/commands/") || f.startsWith("cmd/"))) {return "command-based";}
 
   // Plugin / detector architecture
-  if (ctx.files.some(f => f.startsWith("src/detectors/") || f.startsWith("src/plugins/"))) return "plugin-based";
+  if (ctx.files.some(f => f.startsWith("src/detectors/") || f.startsWith("src/plugins/"))) {return "plugin-based";}
 
   // Hexagonal / clean architecture
   if (
     ctx.files.some(f => f.includes("/domain/")) &&
     ctx.files.some(f => f.includes("/infra/") || f.includes("/infrastructure/"))
-  ) return "hexagonal";
+  ) {return "hexagonal";}
 
   // Monolith with clear layers
   if (
     ctx.files.some(f => f.includes("/services/")) &&
     ctx.files.some(f => f.includes("/handlers/") || f.includes("/controllers/"))
-  ) return "layered";
+  ) {return "layered";}
 
   // Package-per-feature (Go-style)
-  if (ctx.files.some(f => f.match(/^internal\/.+\/.+/))) return "package-per-feature";
+  if (ctx.files.some(f => f.match(/^internal\/.+\/.+/))) {return "package-per-feature";}
 
   return null;
 }
 
 async function detectStateManagement(ctx: ScanContext): Promise<string | null> {
   const content = await ctx.readFile("package.json");
-  if (!content) return null;
+  if (!content) {return null;}
 
   try {
     const pkg = JSON.parse(content);
     const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
 
     const stateLibs: string[] = [];
-    if (allDeps["zustand"]) stateLibs.push("zustand");
-    if (allDeps["@reduxjs/toolkit"] || allDeps["redux"]) stateLibs.push("redux");
-    if (allDeps["mobx"]) stateLibs.push("mobx");
-    if (allDeps["jotai"]) stateLibs.push("jotai");
-    if (allDeps["recoil"]) stateLibs.push("recoil");
-    if (allDeps["pinia"]) stateLibs.push("pinia");
-    if (allDeps["vuex"]) stateLibs.push("vuex");
-    if (allDeps["@tanstack/react-query"]) stateLibs.push("react-query");
-    if (allDeps["@tanstack/vue-query"]) stateLibs.push("vue-query");
-    if (allDeps["swr"]) stateLibs.push("swr");
+    if (allDeps["zustand"]) {stateLibs.push("zustand");}
+    if (allDeps["@reduxjs/toolkit"] || allDeps["redux"]) {stateLibs.push("redux");}
+    if (allDeps["mobx"]) {stateLibs.push("mobx");}
+    if (allDeps["jotai"]) {stateLibs.push("jotai");}
+    if (allDeps["recoil"]) {stateLibs.push("recoil");}
+    if (allDeps["pinia"]) {stateLibs.push("pinia");}
+    if (allDeps["vuex"]) {stateLibs.push("vuex");}
+    if (allDeps["@tanstack/react-query"]) {stateLibs.push("react-query");}
+    if (allDeps["@tanstack/vue-query"]) {stateLibs.push("vue-query");}
+    if (allDeps["swr"]) {stateLibs.push("swr");}
 
     return stateLibs.length > 0 ? stateLibs.join(" + ") : null;
   } catch {
@@ -181,20 +181,20 @@ async function detectApiStyle(ctx: ScanContext): Promise<string | null> {
       const pkg = JSON.parse(content);
       const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
 
-      if (allDeps["@trpc/server"] || allDeps["@trpc/client"]) styles.push("trpc");
-      if (allDeps["graphql"] || allDeps["@apollo/server"]) styles.push("graphql");
+      if (allDeps["@trpc/server"] || allDeps["@trpc/client"]) {styles.push("trpc");}
+      if (allDeps["graphql"] || allDeps["@apollo/server"]) {styles.push("graphql");}
     } catch {}
   }
 
   // Check for protobuf files (gRPC)
-  if (ctx.glob("**/*.proto").length > 0) styles.push("grpc");
+  if (ctx.glob("**/*.proto").length > 0) {styles.push("grpc");}
 
   // Check for REST patterns
-  if (ctx.files.some(f => f.match(/\/api\/.*route\.(ts|js)$/))) styles.push("route-handlers");
-  if (ctx.files.some(f => f.includes("/routes/") || f.includes("/controllers/"))) styles.push("rest");
+  if (ctx.files.some(f => f.match(/\/api\/.*route\.(ts|js)$/))) {styles.push("route-handlers");}
+  if (ctx.files.some(f => f.includes("/routes/") || f.includes("/controllers/"))) {styles.push("rest");}
 
   // Check for server actions (Next.js)
-  if (ctx.files.some(f => f.match(/\/actions?\.(ts|js)$/))) styles.push("server-actions");
+  if (ctx.files.some(f => f.match(/\/actions?\.(ts|js)$/))) {styles.push("server-actions");}
 
   return styles.length > 0 ? styles.join(" + ") : null;
 }
@@ -206,7 +206,7 @@ function detectKeyModules(ctx: ScanContext): Record<string, string> {
   const srcDirs = new Set<string>();
   for (const file of ctx.files) {
     const match = file.match(/^src\/([^/]+)\//);
-    if (match) srcDirs.add(match[1]);
+    if (match) {srcDirs.add(match[1]);}
   }
 
   for (const dir of srcDirs) {

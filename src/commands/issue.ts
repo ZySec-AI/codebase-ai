@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import type { CLIOptions } from "../types.js";
-import { createIssue, closeIssue, listIssues, mapIssueToFiles } from "../github/issues.js";
+import { createIssue, closeIssue, commentIssue, listIssues, mapIssueToFiles } from "../github/issues.js";
 import { error } from "../utils/output.js";
 
 export async function runIssue(options: CLIOptions): Promise<void> {
@@ -25,6 +25,16 @@ export async function runIssue(options: CLIOptions): Promise<void> {
       await closeIssue(root, number, options.reason || undefined);
       break;
     }
+    case "comment": {
+      const number = options.positionals[0];
+      const body = options.message;
+      if (!number || !body) {
+        error("Usage: codebase issue comment <number> --message \"text\"");
+        process.exit(1);
+      }
+      await commentIssue(root, number, body);
+      break;
+    }
     case "list": {
       const filter = options.positionals[0]; // "mine" from --mine flag
       await listIssues(root, filter);
@@ -41,7 +51,7 @@ export async function runIssue(options: CLIOptions): Promise<void> {
       break;
     }
     default:
-      error("Usage: codebase issue create|close|list|map");
+      error("Usage: codebase issue create|close|comment|list|map");
       process.exit(1);
   }
 }

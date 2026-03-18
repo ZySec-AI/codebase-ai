@@ -3,8 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import type { CLIOptions } from "../types.js";
 import { scan } from "../scanner/engine.js";
-import { detectTools } from "../integrations/index.js";
-import { checkGhDetailed, detectGlobalTools, autoConfigureMcp } from "./init.js";
+import { checkGhDetailed, autoConfigureMcp } from "./init.js";
 import { installHooks } from "../integrations/githook.js";
 import { updateGitignore } from "../integrations/gitignore.js";
 import { setQuiet, log, heading, info } from "../utils/output.js";
@@ -68,7 +67,7 @@ export async function runFix(options: CLIOptions): Promise<void> {
       if (existsSync(join(root, "src"))) {
         const { statSync } = await import("node:fs");
         const srcStat = statSync(join(root, "src"));
-        if (srcStat.mtimeMs > generatedAt) needsScan = true;
+        if (srcStat.mtimeMs > generatedAt) {needsScan = true;}
       }
     } catch {
       needsScan = true;
@@ -88,26 +87,16 @@ export async function runFix(options: CLIOptions): Promise<void> {
     fixCount++;
   }
 
-  // ─── 3. Re-inject into tools with missing injection ────────
-  let tools = detectTools(root);
-  const globalTools = detectGlobalTools();
-  const toolNames = new Set(tools.map(t => t.name));
-  for (const gt of globalTools) {
-    if (!toolNames.has(gt.name)) {
-      tools.push(gt);
-      toolNames.add(gt.name);
-    }
+  // ─── 3. Re-inject CLAUDE.md if missing ────────────────────
+  const { claudeIntegration } = await import("../integrations/claude.js");
+  if (!checkInjection(root)) {
+    claudeIntegration.inject(root);
+    fixed("Re-injected Claude Code instructions into CLAUDE.md");
+    fixCount++;
   }
 
-  for (const tool of tools) {
-    if (!checkInjection(root, tool.name)) {
-      tool.inject(root);
-      fixed(`Re-injected ${tool.name} instructions`);
-      fixCount++;
-    }
-  }
-
-  // ─── 4. Fix missing MCP configs ───────────────────────────
+  // ─── 4. Fix missing MCP config ────────────────────────────
+  const toolNames = new Set(["claude"]);
   const mcpConfigured = autoConfigureMcp(root, toolNames);
   for (const entry of mcpConfigured) {
     fixed(`Added MCP entry to ${entry}`);
@@ -119,14 +108,16 @@ export async function runFix(options: CLIOptions): Promise<void> {
     const postCommitOk = checkHook(root, "post-commit");
     const postCheckoutOk = checkHook(root, "post-checkout");
     const hookHasSync = checkHookSync(root);
-    const needsReinstall = !postCommitOk || !postCheckoutOk || (ghAvailable && !hookHasSync);
+    const preCommitOk = checkPreCommitHook(root);
+    const needsReinstall = !postCommitOk || !postCheckoutOk || (ghAvailable && !hookHasSync) || !preCommitOk;
 
     if (needsReinstall) {
       installHooks(root, ghAvailable);
       const fixes: string[] = [];
-      if (!postCommitOk) fixes.push("post-commit");
-      if (!postCheckoutOk) fixes.push("post-checkout");
-      if (ghAvailable && !hookHasSync) fixes.push("--sync flag");
+      if (!postCommitOk) {fixes.push("post-commit");}
+      if (!postCheckoutOk) {fixes.push("post-checkout");}
+      if (ghAvailable && !hookHasSync) {fixes.push("--sync flag");}
+      if (!preCommitOk) {fixes.push("pre-commit");}
       fixed(`Installed ${fixes.join(" + ")} hook${fixes.length > 1 ? "s" : ""}`);
       fixCount++;
     }
@@ -141,21 +132,33 @@ export async function runFix(options: CLIOptions): Promise<void> {
     fixCount++;
   }
 
-  // ─── 7. GitHub Actions workflow ───────────────────────────
-  const actionsWorkflow = join(root, ".github", "workflows", "codebase.yml");
-  if (!existsSync(actionsWorkflow) && ghAvailable) {
-    const { installGitHubActionsForFix } = await import("./setup.js");
-    installGitHubActionsForFix(root);
-    fixed("Created .github/workflows/codebase.yml");
-    fixCount++;
-  }
-
-  // ─── 8. Claude commands ───────────────────────────────────
+  // ─── 7. Claude commands ───────────────────────────────────
   const claudeCommandsDir = join(root, ".claude", "commands");
   if (!existsSync(claudeCommandsDir)) {
     const { installClaudeCommandsForFix } = await import("./setup.js");
     installClaudeCommandsForFix(root);
     fixed("Installed Claude commands → .claude/commands/");
+    fixCount++;
+  }
+
+  // ─── 8. Claude Code hooks ─────────────────────────────────
+  const guardHook    = join(root, ".claude", "hooks", "git-guard.sh");
+  const postHook     = join(root, ".claude", "hooks", "git-post.sh");
+  const settingsFile = join(root, ".claude", "settings.json");
+  const hooksOk = existsSync(guardHook) && existsSync(postHook);
+  const settingsOk = (() => {
+    if (!existsSync(settingsFile)) {return false;}
+    try {
+      const s = JSON.parse(readFileSync(settingsFile, "utf-8"));
+      const pre  = JSON.stringify(s.hooks?.PreToolUse  ?? "");
+      const post = JSON.stringify(s.hooks?.PostToolUse ?? "");
+      return pre.includes("git-guard") && post.includes("git-post");
+    } catch { return false; }
+  })();
+  if (!hooksOk || !settingsOk) {
+    const { installClaudeHooksForFix } = await import("./setup.js");
+    installClaudeHooksForFix(root);
+    fixed("Installed Claude Code hooks → .claude/hooks/ + settings.json");
     fixCount++;
   }
 
@@ -171,50 +174,30 @@ export async function runFix(options: CLIOptions): Promise<void> {
 
 // ─── Check helpers (duplicated from doctor for independence) ──
 
-function checkInjection(root: string, toolName: string): boolean {
-  const fileMap: Record<string, string> = {
-    claude: "CLAUDE.md",
-    cursor: ".cursorrules",
-    windsurf: ".windsurfrules",
-    copilot: ".github/copilot-instructions.md",
-    cline: ".clinerules",
-    aider: ".aider.conf.yml",
-    continue: ".continuerc.json",
-  };
-
-  const file = fileMap[toolName];
-  if (!file) return false;
-
-  const filePath = join(root, file);
-  if (!existsSync(filePath)) return false;
-
+function checkInjection(root: string): boolean {
+  const filePath = join(root, "CLAUDE.md");
+  if (!existsSync(filePath)) {return false;}
   const content = readFileSync(filePath, "utf-8");
-
-  if (toolName === "claude" || toolName === "copilot") {
-    return content.includes("<!-- codebase:start -->");
-  }
-  if (toolName === "continue") {
-    try {
-      const config = JSON.parse(content);
-      return config.docs?.some((d: { path?: string }) => d.path === ".codebase.json") ?? false;
-    } catch { return false; }
-  }
-  if (toolName === "aider") {
-    return content.includes(".codebase.json");
-  }
-  return content.includes("# codebase:start");
+  return content.includes("<!-- codebase:start -->");
 }
 
 function checkHook(root: string, hookName: string): boolean {
   const hookPath = join(root, ".git", "hooks", hookName);
-  if (!existsSync(hookPath)) return false;
+  if (!existsSync(hookPath)) {return false;}
   const content = readFileSync(hookPath, "utf-8");
   return content.includes(HOOK_MARKER);
 }
 
 function checkHookSync(root: string): boolean {
   const hookPath = join(root, ".git", "hooks", "post-commit");
-  if (!existsSync(hookPath)) return false;
+  if (!existsSync(hookPath)) {return false;}
   const content = readFileSync(hookPath, "utf-8");
   return content.includes("--sync");
+}
+
+function checkPreCommitHook(root: string): boolean {
+  const hookPath = join(root, ".git", "hooks", "pre-commit");
+  if (!existsSync(hookPath)) {return false;}
+  const content = readFileSync(hookPath, "utf-8");
+  return content.includes("codebase-pre-commit");
 }

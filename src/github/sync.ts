@@ -16,7 +16,7 @@ interface GitHubData {
 export async function syncGitHub(root: string): Promise<GitHubData | null> {
   // Check if `gh` CLI is available
   const ghAvailable = await ghExec(root, ["--version"]);
-  if (!ghAvailable) return null;
+  if (!ghAvailable) {return null;}
 
   // Check if repo has a GitHub remote — if not, github_available should be false
   const remoteUrl = await shellExec(root, "git remote get-url origin 2>/dev/null");
@@ -134,7 +134,7 @@ async function fetchIssues(root: string): Promise<IssueData[]> {
     "issue", "list", "--limit", "50", "--state", "all",
     "--json", "number,title,state,labels,assignees,milestone,createdAt,updatedAt",
   ]);
-  if (!output) return [];
+  if (!output) {return [];}
 
   try {
     const raw = JSON.parse(output) as Array<Record<string, unknown>>;
@@ -168,7 +168,7 @@ async function fetchPullRequests(root: string): Promise<PullRequestData[]> {
     "pr", "list", "--limit", "30", "--state", "all",
     "--json", "number,title,state,author,headRefName,labels,reviewRequests,createdAt,updatedAt",
   ]);
-  if (!output) return [];
+  if (!output) {return [];}
 
   try {
     const raw = JSON.parse(output) as Array<Record<string, unknown>>;
@@ -203,7 +203,7 @@ async function fetchMilestones(root: string): Promise<MilestoneData[]> {
     "api", "repos/{owner}/{repo}/milestones",
     "--jq", ".[] | {title,description,due_on,open_issues,closed_issues}",
   ]);
-  if (!output) return [];
+  if (!output) {return [];}
 
   try {
     const lines = output.split("\n").filter(Boolean);
@@ -236,7 +236,7 @@ async function fetchDecisionPRs(root: string): Promise<DecisionEntry[]> {
     "pr", "list", "--limit", "20", "--state", "merged",
     "--json", "number,title,body,mergedAt,url",
   ]);
-  if (!output) return [];
+  if (!output) {return [];}
 
   try {
     const raw = JSON.parse(output) as Array<Record<string, unknown>>;
@@ -290,7 +290,7 @@ function findADRFiles(root: string): DecisionEntry[] {
 
   for (const dir of adrDirs) {
     const fullPath = join(root, dir);
-    if (!existsSync(fullPath)) continue;
+    if (!existsSync(fullPath)) {continue;}
     try {
       const files = readdirSync(fullPath)
         .filter(f => f.endsWith(".md"))
@@ -347,14 +347,14 @@ function buildPriorities(issues: IssueData[]): IssueData[] {
   const priorityOrder = (i: IssueData): number => {
     for (const label of i.labels) {
       const l = label.toLowerCase();
-      if (l.includes("p0") || l.includes("critical") || l.includes("urgent")) return 0;
-      if (l === "vibekit") return 1;           // queued for autonomous build — top of queue
-      if (l.includes("p1") || l.includes("high")) return 1;
-      if (l.includes("p2") || l.includes("medium")) return 2;
-      if (l === "arch") return 2;             // architectural issues — high value
-      if (l.includes("p3") || l.includes("low")) return 3;
-      if (l.includes("bug")) return 1;
-      if (l.includes("feature")) return 2;
+      if (l.includes("p0") || l.includes("critical") || l.includes("urgent")) {return 0;}
+      if (l === "vibekit") {return 1;}           // queued for autonomous build — top of queue
+      if (l.includes("p1") || l.includes("high")) {return 1;}
+      if (l.includes("p2") || l.includes("medium")) {return 2;}
+      if (l === "arch") {return 2;}             // architectural issues — high value
+      if (l.includes("p3") || l.includes("low")) {return 3;}
+      if (l.includes("bug")) {return 1;}
+      if (l.includes("feature")) {return 2;}
     }
     return 4;
   };

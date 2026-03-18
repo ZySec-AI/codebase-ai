@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { installHooks, installHook, uninstallHook } from "../../src/integrations/githook.js";
-import { writeFileSync, readFileSync, existsSync, rmSync, mkdirSync, chmodSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, rmSync, mkdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -68,7 +68,7 @@ describe("githook integration", () => {
 
       const hookPath = join(tempDir, ".git", "hooks", "post-commit");
       // On Unix-like systems, check the file is executable
-      const stats = require("node:fs").statSync(hookPath);
+      const stats = statSync(hookPath);
       // Note: mode checks vary by platform, just verify file exists and has content
       expect(stats.isFile()).toBe(true);
     });

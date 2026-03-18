@@ -1,8 +1,13 @@
 {
-  "name": "codebase",
+  "name": "codebase-ai",
   "version": "0.1.0",
   "description": "One command. Every AI tool understands your project instantly.",
   "type": "module",
+  "homepage": "https://github.com/ZySec-AI/codebase",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZySec-AI/codebase.git"
+  },
   "bin": {
     "codebase": "./dist/index.js"
   },
@@ -12,10 +17,14 @@
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src tests || true",
-    "lint:fix": "eslint src tests --fix || true",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "format": "prettier --write src tests",
+    "format:check": "prettier --check src tests",
+    "check": "tsc --noEmit && eslint src tests && prettier --check src tests",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run check && npm run build"
   },
   "engines": {
     "node": ">=18"
@@ -31,8 +40,6 @@
     "manifest",
     "mcp",
     "claude",
-    "cursor",
-    "copilot",
     "developer-tools"
   ],
   "license": "MIT",
@@ -40,8 +47,10 @@
     "@eslint/js": "^9.18.0",
     "@types/node": "^22.10.0",
     "eslint": "^9.18.0",
+    "prettier": "^3.8.1",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
+    "typescript-eslint": "^8.57.1",
     "vitest": "^1.6.0"
   }
 }

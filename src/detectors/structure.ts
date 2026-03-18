@@ -37,7 +37,7 @@ export const structureDetector: Detector = {
   },
 };
 
-function buildTree(files: string[], maxDepth: number): Record<string, string[]> {
+function buildTree(files: string[], _maxDepth: number): Record<string, string[]> {
   const tree: Record<string, Set<string>> = {};
   const topLevelFiles: string[] = [];
 
@@ -51,18 +51,18 @@ function buildTree(files: string[], maxDepth: number): Record<string, string[]> 
       continue;
     }
 
-    if (parts.length < 2) continue;
+    if (parts.length < 2) {continue;}
 
     const topDir = parts[0] + "/";
 
     // Add second-level entries (files or dirs)
     if (parts.length === 2 && !file.endsWith("/")) {
       // File directly in top-level dir
-      if (!tree[topDir]) tree[topDir] = new Set();
+      if (!tree[topDir]) {tree[topDir] = new Set();}
       tree[topDir].add(parts[1]);
     } else if (parts.length >= 3) {
       // Subdirectory
-      if (!tree[topDir]) tree[topDir] = new Set();
+      if (!tree[topDir]) {tree[topDir] = new Set();}
       tree[topDir].add(parts[1] + "/");
     }
   }

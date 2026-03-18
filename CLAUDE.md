@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`codebase` is a zero-dependency CLI tool that scans projects and generates a structured manifest (`.codebase.json`) so AI coding assistants can understand project context without expensive token-consuming discovery. It auto-wires into 7 AI tools (Claude, Cursor, Windsurf, Copilot, Aider, Cline, Continue).
+`codebase` gives AI tools permanent memory of any software project. One command scans a project and writes a compact snapshot (`.codebase.json`) — stack, commands, structure, open issues, recent decisions. AI tools read this instead of exploring files, saving ~95% of tokens and enabling fully autonomous workflows. Auto-wires into 7 AI tools (Claude, Cursor, Windsurf, Copilot, Aider, Cline, Continue) and exposes an MCP server so Claude can query project context, manage GitHub issues, and drive the `/simulate → /build → /launch` loop without human guidance.
 
 ## Build & Development Commands
 
@@ -34,9 +34,9 @@ Commands are registered in `src/index.ts` as a `Record<string, handler>` map and
 
 ### Detectors (`src/detectors/`)
 
-10 parallel detectors implement the `Detector` interface (`src/types.ts`). Each receives a `ScanContext` (filesystem abstraction from `src/scanner/context.ts`) and returns a slice of the manifest. The scanner engine (`src/scanner/engine.ts`) runs all detectors via `Promise.all()` and merges results.
+11 parallel detectors implement the `Detector` interface (`src/types.ts`). Each receives a `ScanContext` (filesystem abstraction from `src/scanner/context.ts`) and returns a slice of the manifest. The scanner engine (`src/scanner/engine.ts`) runs all detectors via `Promise.all()` and merges results.
 
-Detectors: `project`, `repo`, `structure`, `stack`, `commands`, `dependencies`, `config`, `git`, `quality`, `patterns`
+Registered detectors: `project`, `repo`, `structure`, `stack`, `commands`, `dependencies`, `config`, `git`, `quality`, `patterns`, `api-docs`
 
 ### Integrations (`src/integrations/`)
 
@@ -62,6 +62,12 @@ CLI arg parser (`args.ts`), console output formatting with colors (`output.ts`),
 - **Manifest under 10KB.** Must stay small enough for a single AI context read.
 - Detectors are self-contained and run in parallel — no cross-detector dependencies.
 - File walking uses recursive traversal with depth limit (default 10), ignoring common dirs (node_modules, .git, dist, etc.).
+
+### Browser Automation
+
+`/simulate` uses [agent-browser](https://github.com/vercel-labs/agent-browser) for headless browser automation. Installed automatically by `codebase setup`.
+
+Commands: `open <url>`, `snapshot -i` (accessibility tree → `@e1`/`@e2` refs), `click @e1`, `fill @e2 "text"`, `screenshot`, `auth save/login <profile>`, `state save/load <name>`.
 
 ### Doctor & Fix (`src/commands/doctor.ts`, `src/commands/fix.ts`)
 

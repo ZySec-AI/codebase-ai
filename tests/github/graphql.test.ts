@@ -301,9 +301,9 @@ describe("GitHub GraphQL Integration", () => {
     it("should respect include options", async () => {
       const { execFile } = await import("node:child_process");
 
-      let callCount = 0;
+      let _callCount = 0;
       vi.mocked(execFile).mockImplementation((cmd, args, options, callback) => {
-        callCount++;
+        _callCount++;
         const response = {
           data: {
             repository: {

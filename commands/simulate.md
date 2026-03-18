@@ -1,15 +1,15 @@
 ---
-description: Customer journeys (Playwright) + UX audit (9 dimensions, 3 iterations). Fixes all bugs inline. Outputs GitHub Issues. Uses codebase context.
+description: Customer journeys (agent-browser) + UX audit (9 dimensions, 3 iterations). Fixes all bugs inline. Outputs GitHub Issues. Uses codebase context.
 argument-hint: [country] [industry] [--count N] [--iterations N] [--cx-only] [--journey-only]
 model: sonnet
-allowed-tools: Agent, Bash(gh:*), Bash(pnpm:*), Bash(npx:*), Bash(npm:*), Bash(git:*), Bash(node:*), Bash(curl:*), Bash(uv:*), Read, Write, Edit, Glob, Grep
+allowed-tools: Agent, Bash(gh:*), Bash(pnpm:*), Bash(npx:*), Bash(npm:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git checkout:*), Bash(git pull:*), Bash(git fetch:*), Bash(git stash:*), Bash(git log:*), Bash(git status:*), Bash(git diff:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(node:*), Bash(curl:*), Bash(uv:*), Read, Write, Edit, Glob, Grep
 ---
 
 # /simulate
 
-Simulate real customers via Playwright, perform a deep UX audit, fix everything fixable inline, and track all output in GitHub Issues. Powered by `codebase` project intelligence.
+Simulate real customers via agent-browser, perform a deep UX audit, fix everything fixable inline, and track all output in GitHub Issues. Powered by `codebase` project intelligence.
 
-Runs indefinitely (Ctrl+C to stop). Branch: always `develop`. PRs merged with `--delete-branch`.
+Runs indefinitely (Ctrl+C to stop). Branch: always `develop`. All inline fixes go directly to `develop` as atomic commits (one commit per fix).
 
 ---
 
@@ -112,7 +112,7 @@ PREFLIGHT — CYCLE [N]
 
 Follow the complete `/vb-simulate` workflow:
 
-- **Phase 1** — Customer Journeys (Playwright, profile generation, triage, inline fixes)
+- **Phase 1** — Customer Journeys (agent-browser, profile generation, triage, inline fixes)
 - **Phase 2** — UX Audit (9 dimensions, 3 iterations, page inventory, IA audit, fixes)
 - **Phase 3** — Performance Audit (Core Web Vitals via CDP)
 - **Phase 4** — Dedup
@@ -133,15 +133,29 @@ npx codebase issue create "[title]" --message "[body summary]" 2>/dev/null || tr
 ```
 This keeps the codebase manifest's issue list in sync.
 
-**Commit format** (enforced by codebase git hooks):
+**Pre-work sync (run once at the start of each cycle):**
 ```bash
+git fetch origin
+git status  # if dirty, stash first: git stash
 git checkout develop && git pull origin develop
-git add [specific files]
+```
+
+**Commit convention — one atomic commit per fix, never batch:**
+```bash
+git add [specific files only — never git add .]
 git commit -m "fix([severity]): [short description]
 
 Simulation cycle [N] — [role] at [company]
-Page: [route]"
+Page: [route]
+Closes #[issue-N if exists]"
 git push origin develop
+```
+
+**If working files are dirty before checkout:**
+```bash
+git stash
+git checkout develop && git pull origin develop
+git stash pop
 ```
 
 **After each full cycle** run a fresh scan:
@@ -149,6 +163,15 @@ git push origin develop
 npx codebase scan-only --quiet --sync
 ```
 
-All Playwright scripts go in `.vibekit/_pw_*.mjs`, are executed with `node`, and deleted after reading output. One browser process at a time. No parallel tabs.
+Use agent-browser for all browser automation. One sequential browser session per journey — no parallel tabs. Example session:
+```bash
+agent-browser open http://localhost:[port]
+agent-browser snapshot -i              # get @e1, @e2 refs from accessibility tree
+agent-browser click @e1
+agent-browser fill @e2 "value"
+agent-browser screenshot               # capture evidence
+```
+
+Auth persistence: `agent-browser auth save <role>` after login, `agent-browser auth login <role>` to restore. State: `agent-browser state save/load <name>` between pages.
 
 All other behavior follows the `/vb-simulate` specification exactly.

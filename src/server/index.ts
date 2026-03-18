@@ -19,7 +19,7 @@ export function startServer(root: string, port: number): void {
       const route = await handleRoute(req.url || "/", req.method || "GET", root);
       res.writeHead(route.status);
       res.end(JSON.stringify(route.body, null, 2));
-    } catch (err) {
+    } catch {
       res.writeHead(500);
       res.end(JSON.stringify({ error: "Internal server error" }));
     }

@@ -82,13 +82,13 @@ export const configDetector: Detector = {
 
 async function detectFeatureFlags(ctx: ScanContext): Promise<string | null> {
   const content = await ctx.readFile("package.json");
-  if (!content) return null;
+  if (!content) {return null;}
 
   try {
     const pkg = JSON.parse(content);
     const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
     for (const [dep, name] of Object.entries(FEATURE_FLAG_MARKERS)) {
-      if (allDeps[dep]) return name;
+      if (allDeps[dep]) {return name;}
     }
   } catch {}
 
@@ -133,7 +133,7 @@ function parseEnvFile(content: string, envVars: Record<string, { description?: s
     const trimmed = line.trim();
 
     // Skip empty lines
-    if (!trimmed) continue;
+    if (!trimmed) {continue;}
 
     // Capture comments as descriptions
     if (trimmed.startsWith("#")) {

@@ -114,7 +114,7 @@ const TOOL_DEFINITIONS = [
   // ─── Commands ──────────────────────────────────────────────────
   {
     name: "list_commands",
-    description: "List installed Claude Code slash commands in this project. Returns names and descriptions of available /setup, /simulate, /build, /launch, /review, /pitch, /daemon commands.",
+    description: "List installed Claude Code slash commands in this project. Returns names and descriptions of available /setup, /simulate, /build, /launch, /review commands.",
     inputSchema: {
       type: "object" as const,
       properties: {},
@@ -141,7 +141,7 @@ export async function startMcpServer(root: string): Promise<void> {
   const rl = createInterface({ input: process.stdin, terminal: false });
 
   for await (const line of rl) {
-    if (!line.trim()) continue;
+    if (!line.trim()) {continue;}
 
     let request: JsonRpcRequest;
     try {
@@ -152,7 +152,7 @@ export async function startMcpServer(root: string): Promise<void> {
     }
 
     const response = await handleRequest(request, root);
-    if (response) writeResponse(response);
+    if (response) {writeResponse(response);}
   }
 }
 
@@ -371,8 +371,8 @@ function getBlockers(manifest: Manifest): string {
 function ghExecArgs(cwd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile("gh", args, { cwd, timeout: 30_000 }, (err, stdout, stderr) => {
-      if (err) reject(new Error(stderr || err.message));
-      else resolve(stdout.trim());
+      if (err) {reject(new Error(stderr || err.message));}
+      else {resolve(stdout.trim());}
     });
   });
 }
@@ -383,7 +383,7 @@ async function ghCreateIssue(root: string, args: Record<string, unknown>): Promi
   const labels = args.labels as string[] | undefined;
 
   const ghArgs = ["issue", "create", "--title", title, "--body", body];
-  if (labels?.length) ghArgs.push("--label", labels.join(","));
+  if (labels?.length) {ghArgs.push("--label", labels.join(","));}
 
   const url = await ghExecArgs(root, ghArgs);
   return `Issue created: ${url}`;

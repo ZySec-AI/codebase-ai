@@ -5,7 +5,7 @@ import {
   removeMarkdown,
   removePlaintext,
 } from "../../src/integrations/shared.js";
-import { writeFileSync, readFileSync, unlinkSync, mkdirSync, rmSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 

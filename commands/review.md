@@ -2,14 +2,14 @@
 description: Code review (security, quality, deps health, UI/accessibility) + test generation. Outputs GitHub Issues. Uses codebase context.
 argument-hint: [--security] [--quality] [--deps] [--ui] [--test] [--pr N] [--fix]
 model: sonnet
-allowed-tools: Agent, Bash(gh:*), Bash(git:*), Bash(npx:*), Bash(npm:*), Bash(node:*), Bash(pnpm:*), Bash(uv:*), Bash(pip:*), Read, Write, Edit, Glob, Grep
+allowed-tools: Agent, Bash(gh:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git checkout:*), Bash(git pull:*), Bash(git fetch:*), Bash(git stash:*), Bash(git log:*), Bash(git status:*), Bash(git diff:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(npx:*), Bash(npm:*), Bash(node:*), Bash(pnpm:*), Bash(uv:*), Bash(pip:*), Read, Write, Edit, Glob, Grep
 ---
 
 # /review
 
 Security, quality, dependency health, accessibility review + test generation. Every finding becomes a GitHub Issue. Powered by `codebase` project intelligence.
 
-Branch: always `develop`.
+Branch: `develop` for read-only review. For `--fix`: use a `fix/<slug>` branch → PR → merge to develop.
 
 ## Arguments
 
@@ -96,15 +96,41 @@ npx codebase issue create "[title]" --message "[body summary]" 2>/dev/null || tr
 npx codebase scan-only --incremental --quiet --sync
 ```
 
-**Commit format** (if `--fix`):
+**Pre-work sync:**
 ```bash
+git fetch origin
+git status  # abort if dirty
 git checkout develop && git pull origin develop
-git add [specific files]
-git commit -m "fix(review): [dimension] — [short description]
-
-/review --fix | Severity: [sev] | Dimension: [dim]"
-git push origin develop
 ```
+
+**Commit convention (if `--fix`):**
+
+For each finding, use an isolated branch:
+```bash
+SLUG=$(echo "[finding title]" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-' | cut -c1-40)
+git checkout -b fix/${SLUG}
+
+git add [specific files only]
+git commit -m "fix([dim]): [short description]
+
+/review --fix | Severity: [sev] | Dimension: [dim]
+Closes #[N]"
+git push origin fix/${SLUG}
+
+gh pr create \
+  --base develop \
+  --head fix/${SLUG} \
+  --title "fix(#[N]): [short description]" \
+  --body "## Finding
+[description]
+
+## Fix
+[what was changed]
+
+Severity: [sev] | Closes #[N]"
+```
+
+After PR merge: `git checkout develop && git pull origin develop && git branch -d fix/${SLUG}`
 
 Print scope banner:
 ```

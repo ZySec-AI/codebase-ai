@@ -53,7 +53,7 @@ describe("E2E: Init Workflow", () => {
     execSync(`echo '${claudeMd}' > CLAUDE.md`, { cwd: tempDir, stdio: "pipe" });
 
     // Run init
-    const output = execSync(`node ${cliPath} init`, {
+    const _output = execSync(`node ${cliPath} init`, {
       cwd: tempDir,
       stdio: "pipe",
       encoding: "utf-8",
@@ -102,29 +102,6 @@ describe("E2E: Init Workflow", () => {
     expect(claudeContent).toContain("codebase:end");
   });
 
-  it("should inject into .cursorrules if present", () => {
-    // Create project with .cursorrules
-    const cursorRulesDir = join(tempDir, "cursor-test");
-    execSync(`mkdir -p ${cursorRulesDir}`, { stdio: "pipe" });
-
-    execSync(`npm init -y`, { cwd: cursorRulesDir, stdio: "pipe" });
-    execSync(`git init`, { cwd: cursorRulesDir, stdio: "pipe" });
-    execSync(`git config user.email "test@example.com"`, { cwd: cursorRulesDir, stdio: "pipe" });
-    execSync(`git config user.name "Test User"`, { cwd: cursorRulesDir, stdio: "pipe" });
-    execSync(`git add .`, { cwd: cursorRulesDir, stdio: "pipe" });
-    execSync(`git commit -m "Initial commit"`, { cwd: cursorRulesDir, stdio: "pipe" });
-
-    const cursorRules = "# Cursor Rules\n\nBe helpful.";
-    execSync(`echo '${cursorRules}' > .cursorrules`, { cwd: cursorRulesDir, stdio: "pipe" });
-
-    // Run init
-    execSync(`node ${cliPath} init`, { cwd: cursorRulesDir, stdio: "pipe" });
-
-    // Verify .cursorrules was updated with codebase markers
-    const cursorContent = readFileSync(join(cursorRulesDir, ".cursorrules"), "utf-8");
-    expect(cursorContent).toContain("codebase:start");
-    expect(cursorContent).toContain("codebase:end");
-  });
 
   it("should handle --dry-run flag", () => {
     // Create a fresh directory for this test
@@ -207,7 +184,7 @@ describe("E2E: Init Workflow", () => {
     // Should not throw, but create minimal manifest
     try {
       execSync(`node ${cliPath} init`, { cwd: emptyDir, stdio: "pipe" });
-    } catch (error) {
+    } catch {
       // Error is acceptable, but shouldn't crash
     }
 
