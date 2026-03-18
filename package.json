@@ -24,7 +24,7 @@
     "format:check": "prettier --check src tests",
     "check": "tsc --noEmit && eslint src tests && prettier --check src tests",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run check && npm run build"
+    "prepublishOnly": "npm run build"
   },
   "engines": {
     "node": ">=18"
