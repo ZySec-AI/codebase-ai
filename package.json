@@ -21,7 +21,8 @@
     "node": ">=18"
   },
   "files": [
-    "dist"
+    "dist",
+    "commands"
   ],
   "keywords": [
     "codebase",
