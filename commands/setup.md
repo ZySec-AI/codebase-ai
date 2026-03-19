@@ -171,10 +171,65 @@ Mark genuinely unknown sections with `[INFERRED: ...]`.
 
 **Never hardcode example industries, roles, or countries** — infer from codebase or ask the user.
 
-Commit:
+---
+
+## Step 7 — CLAUDE.md
+
+Write (or update) `CLAUDE.md` for this specific project. Read `.codebase.json` and the codebase structure to produce a file that is genuinely useful to an AI starting a fresh session on this project.
+
+**If `CLAUDE.md` already exists:** read it first. Preserve any existing sections. Only update the `<!-- codebase:start -->...<!-- codebase:end -->` block and add missing sections without removing human-authored content.
+
+**If `CLAUDE.md` does not exist:** generate it from scratch.
+
+The file must include these sections, tailored to the actual project:
+
+### Project Overview
+One paragraph describing what the project does, who it's for, and its current state (alpha/beta/production).
+
+### Build & Development Commands
+Exact commands from `.codebase.json` → `commands.*`. Include build, dev, test, lint, typecheck.
+
+### Architecture
+How the codebase is structured — key directories, entry points, data flow. Infer from `structure`, `patterns`, and file scanning. Be specific, not generic.
+
+### Key Conventions
+Language/framework conventions detected. Coding patterns observed. Things an AI must know to not break the codebase (e.g. "zero runtime dependencies", "no cross-module state", "all DB calls go through /lib/db").
+
+### Current Status
+From `.codebase.json` → `status`: open issues count, any blockers, active milestone. One short paragraph.
+
+### Vibekit Workflow
+Always include this verbatim at the end (before the codebase injection block):
+
+```markdown
+## Vibekit Workflow
+
+```
+/simulate → /build → /launch
+```
+
+- `/simulate` — Playwright customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
+- `/build` — Implements architectural issues autonomously. Runs until all `arch`+`vibekit` issues are closed.
+- `/launch` — Gates on open bugs, generates GTM artifacts, creates GitHub release, merges to main.
+
+### Browser Automation (agent-browser)
+
+Commands: `open <url>`, `snapshot -i` (→ `@e1`/`@e2` refs), `click @e1`, `fill @e2 "text"`, `screenshot`, `auth save/login <profile>`, `state save/load <name>`.
+```
+
+After writing CLAUDE.md, re-run the codebase injection to ensure the context block is up to date:
+
+```bash
+npx codebase init --quiet 2>/dev/null || true
+```
+
+---
+
+## Step 8 — Commit
+
 ```bash
 git checkout develop 2>/dev/null || git checkout -b develop
-git add docs/PRODUCT.md .vibekit/ .gitignore 2>/dev/null || true
+git add docs/PRODUCT.md CLAUDE.md .vibekit/ .gitignore 2>/dev/null || true
 git diff --cached --quiet || git commit -m "chore: bootstrap codebase + vibekit setup
 
 Initialized by /setup"
@@ -182,7 +237,7 @@ Initialized by /setup"
 
 ---
 
-## Step 7 — Summary
+## Step 9 — Summary
 
 ```
 /setup COMPLETE
@@ -192,6 +247,7 @@ GitHub labels:       13 ready
 Milestone:           v0.1 (#N)
 Highlights Index:    #N
 docs/PRODUCT.md:     [generated | updated]
+CLAUDE.md:           [generated | updated]
 Branch:              develop
 Claude hooks:        git-guard + git-post active
 

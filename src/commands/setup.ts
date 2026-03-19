@@ -79,7 +79,13 @@ export async function runSetup(options: CLIOptions): Promise<void> {
 
   // ── Step 5: Gitignore ─────────────────────────────────────────
   updateGitignore(root);
-  appendToGitignore(root, [".vibekit/daemon.lock", ".vibekit/daemon.log", ".vibekit/build.lock"]);
+  appendToGitignore(root, [
+    ".vibekit/daemon.lock",
+    ".vibekit/daemon.log",
+    ".vibekit/build.lock",
+    ".vibekit/milestone.env",
+    ".mcp.json",
+  ]);
   success(".gitignore updated");
 
   // ── Step 6: .vibekit/ dir ─────────────────────────────────────

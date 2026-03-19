@@ -35,6 +35,17 @@ Returns: project identity, tech stack, commands, structure, current status, next
 - **Check \`next\` before starting work** — don't duplicate in-progress tasks
 - **Create issues for bugs/TODOs you find** — keep the project brain alive
 - **Close issues when you fix them** — with a reason so the team knows why
+
+### Vibekit Workflow
+\`\`\`
+/simulate → /build → /launch
+\`\`\`
+- \`/simulate\` — Playwright customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
+- \`/build\` — Implements architectural issues autonomously. Runs until all \`arch\`+\`vibekit\` issues are closed.
+- \`/launch\` — Gates on open bugs, generates GTM artifacts, creates GitHub release, merges to main.
+
+### Browser Automation (agent-browser)
+Commands: \`open <url>\`, \`snapshot -i\` (→ \`@e1\`/\`@e2\` refs), \`click @e1\`, \`fill @e2 "text"\`, \`screenshot\`, \`auth save/login <profile>\`, \`state save/load <name>\`.
 ${END_MARKER}`;
 
 const INJECT_BLOCK_PLAIN = `
@@ -130,6 +141,17 @@ Returns: project identity, tech stack, commands, structure, current status, next
 - **Check \`next\` before starting work** — don't duplicate in-progress tasks
 - **Create issues for bugs/TODOs you find** — keep the project brain alive
 - **Close issues when you fix them** — with a reason so the team knows why
+
+### Vibekit Workflow
+\`\`\`
+/simulate → /build → /launch
+\`\`\`
+- \`/simulate\` — Playwright customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
+- \`/build\` — Implements architectural issues autonomously. Runs until all \`arch\`+\`vibekit\` issues are closed.
+- \`/launch\` — Gates on open bugs, generates GTM artifacts, creates GitHub release, merges to main.
+
+### Browser Automation (agent-browser)
+Commands: \`open <url>\`, \`snapshot -i\` (→ \`@e1\`/\`@e2\` refs), \`click @e1\`, \`fill @e2 "text"\`, \`screenshot\`, \`auth save/login <profile>\`, \`state save/load <name>\`.
 ${END_MARKER}`;
 }
 

@@ -98,3 +98,4 @@ coverage/
 # yarn.lock
 # pnpm-lock.yaml
 .vibekit/
+.mcp.json
