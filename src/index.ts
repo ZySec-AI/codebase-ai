@@ -1,5 +1,6 @@
 import { parseArgs, showCommandHelp } from "./utils/args.js";
 import { setQuiet, setVerbose } from "./utils/output.js";
+import { checkForUpdate } from "./utils/update-check.js";
 import { runScan } from "./commands/scan.js";
 import { runSetup } from "./commands/setup.js";
 import { runInit } from "./commands/init.js";
@@ -43,6 +44,9 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
   // Keep "scan-only" for hooks that just want manifest refresh
   "scan-only": runScan,
 };
+
+// Non-blocking update check — runs in background, shows prompt if outdated
+checkForUpdate().catch(() => {});
 
 const handler = commands[options.command];
 if (!handler) {
