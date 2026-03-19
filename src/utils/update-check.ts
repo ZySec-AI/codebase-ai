@@ -34,8 +34,8 @@ function isNewer(latest: string, current: string): boolean {
   const parse = (v: string) => v.replace(/^v/, "").split(".").map(Number);
   const [lMaj, lMin, lPatch] = parse(latest);
   const [cMaj, cMin, cPatch] = parse(current);
-  if (lMaj !== cMaj) return lMaj > cMaj;
-  if (lMin !== cMin) return lMin > cMin;
+  if (lMaj !== cMaj) { return lMaj > cMaj; }
+  if (lMin !== cMin) { return lMin > cMin; }
   return lPatch > cPatch;
 }
 
@@ -89,7 +89,8 @@ function detectInstallCommand(): string {
   try {
     // If installed via npm global, npm root -g will contain the package
     const npmGlobal = execSync("npm root -g 2>/dev/null", { encoding: "utf8" }).trim();
-    if (npmGlobal && readFileSync(`${npmGlobal}/${NPM_PACKAGE}/package.json`, "utf8")) {
+    const found = npmGlobal && readFileSync(`${npmGlobal}/${NPM_PACKAGE}/package.json`, "utf8");
+    if (found) {
       return `npm install -g ${NPM_PACKAGE}@latest`;
     }
   } catch { /* fall through */ }
@@ -97,7 +98,8 @@ function detectInstallCommand(): string {
   try {
     execSync("pnpm --version 2>/dev/null", { encoding: "utf8" });
     const pnpmGlobal = execSync("pnpm root -g 2>/dev/null", { encoding: "utf8" }).trim();
-    if (pnpmGlobal && readFileSync(`${pnpmGlobal}/${NPM_PACKAGE}/package.json`, "utf8")) {
+    const found = pnpmGlobal && readFileSync(`${pnpmGlobal}/${NPM_PACKAGE}/package.json`, "utf8");
+    if (found) {
       return `pnpm add -g ${NPM_PACKAGE}@latest`;
     }
   } catch { /* fall through */ }
@@ -122,12 +124,12 @@ function readKey(): Promise<string> {
     const stdin = process.stdin;
     const wasTTY = stdin.isTTY;
 
-    if (wasTTY) stdin.setRawMode(true);
+    if (wasTTY) { stdin.setRawMode(true); }
     stdin.resume();
     stdin.setEncoding("utf8");
 
     const onData = (key: string) => {
-      if (wasTTY) stdin.setRawMode(false);
+      if (wasTTY) { stdin.setRawMode(false); }
       stdin.pause();
       stdin.removeListener("data", onData);
       resolve(key);
@@ -137,7 +139,7 @@ function readKey(): Promise<string> {
 
     // Timeout after 10s — treat as skip
     setTimeout(() => {
-      if (wasTTY) stdin.setRawMode(false);
+      if (wasTTY) { stdin.setRawMode(false); }
       stdin.pause();
       stdin.removeListener("data", onData);
       resolve("n");
@@ -147,8 +149,8 @@ function readKey(): Promise<string> {
 
 export async function checkForUpdate(): Promise<void> {
   // Skip in CI, piped output, or explicitly disabled
-  if (process.env.CI || process.env.NO_UPDATE_CHECK) return;
-  if (!process.stdout.isTTY || !process.stdin.isTTY) return;
+  if (process.env.CI || process.env.NO_UPDATE_CHECK) { return; }
+  if (!process.stdout.isTTY || !process.stdin.isTTY) { return; }
 
   const current = getCurrentVersion();
 
@@ -166,7 +168,7 @@ export async function checkForUpdate(): Promise<void> {
     }
   }
 
-  if (!isNewer(latest, current)) return;
+  if (!isNewer(latest, current)) { return; }
 
   const installCmd = detectInstallCommand();
 
@@ -185,7 +187,7 @@ export async function checkForUpdate(): Promise<void> {
 
   console.log(accepted ? "Updating…" : "Skipped.\n");
 
-  if (!accepted) return;
+  if (!accepted) { return; }
 
   console.log(`\n  ${c.dim}$ ${installCmd}${c.reset}\n`);
   const ok = runUpgrade(installCmd);
