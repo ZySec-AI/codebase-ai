@@ -147,50 +147,67 @@ function installClaudeCommands(root: string): void {
     return;
   }
 
-  const destDir = join(root, ".claude", "commands");
-  mkdirSync(destDir, { recursive: true });
-
   const files = readdirSync(commandsSource).filter((f) => f.endsWith(".md"));
-  let installed = 0;
-  let updated = 0;
-  let skipped = 0;
 
-  for (const file of files) {
-    const src = join(commandsSource, file);
-    const dest = join(destDir, file);
-    if (existsSync(dest)) {
-      // Update if source content differs (package upgrade)
-      const srcContent = readFileSync(src, "utf-8");
-      const destContent = readFileSync(dest, "utf-8");
-      if (srcContent !== destContent) {
-        copyFileSync(src, dest);
-        updated++;
+  // Install to both project-local (.claude/commands/) and user-global (~/.claude/commands/)
+  const destinations: Array<{ dir: string; label: string }> = [
+    { dir: join(root, ".claude", "commands"), label: ".claude/commands/" },
+    { dir: join(process.env["HOME"] ?? "~", ".claude", "commands"), label: "~/.claude/commands/" },
+  ];
+
+  let totalInstalled = 0;
+  let totalUpdated = 0;
+
+  for (const { dir, label } of destinations) {
+    mkdirSync(dir, { recursive: true });
+
+    let installed = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const file of files) {
+      const src = join(commandsSource, file);
+      const dest = join(dir, file);
+      if (existsSync(dest)) {
+        // Update if source content differs (package upgrade)
+        const srcContent = readFileSync(src, "utf-8");
+        const destContent = readFileSync(dest, "utf-8");
+        if (srcContent !== destContent) {
+          copyFileSync(src, dest);
+          updated++;
+        } else {
+          skipped++;
+        }
       } else {
-        skipped++;
+        copyFileSync(src, dest);
+        installed++;
       }
-    } else {
-      copyFileSync(src, dest);
-      installed++;
     }
+
+    const parts: string[] = [];
+    if (installed > 0) {
+      parts.push(`${installed} new`);
+    }
+    if (updated > 0) {
+      parts.push(`${updated} updated`);
+    }
+    if (skipped > 0) {
+      parts.push(`${skipped} unchanged`);
+    }
+
+    if (installed > 0 || updated > 0) {
+      success(`Claude commands → ${label} (${parts.join(", ")})`);
+    } else {
+      info(`Claude commands up to date → ${label}`);
+    }
+
+    totalInstalled += installed;
+    totalUpdated += updated;
   }
 
-  const parts: string[] = [];
-  if (installed > 0) {
-    parts.push(`${installed} new`);
-  }
-  if (updated > 0) {
-    parts.push(`${updated} updated`);
-  }
-  if (skipped > 0) {
-    parts.push(`${skipped} unchanged`);
-  }
-
-  if (installed > 0 || updated > 0) {
-    success(`Claude commands installed → .claude/commands/ (${parts.join(", ")})`);
+  if (totalInstalled > 0 || totalUpdated > 0) {
     info("Available: /setup /simulate /build /launch /review");
     info("Tip: commit .claude/commands/ to share these with your team");
-  } else {
-    info(`All ${skipped} Claude commands up to date`);
   }
 }
 
@@ -435,6 +452,16 @@ async function installAgentBrowser(): Promise<void> {
     success("agent-browser installed (Chrome for Testing downloaded)");
   } else {
     warn("agent-browser installed but Chrome download failed — run: agent-browser install");
+  }
+
+  // Post-install validation
+  const valid = await new Promise<boolean>((resolve) => {
+    execFile("agent-browser", ["--version"], { timeout: 5_000 }, (err) => resolve(!err));
+  });
+  if (!valid) {
+    warn(
+      "agent-browser validation failed — it may not be on PATH. Try: npm install -g agent-browser"
+    );
   }
 }
 

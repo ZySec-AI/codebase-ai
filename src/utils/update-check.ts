@@ -34,8 +34,12 @@ function isNewer(latest: string, current: string): boolean {
   const parse = (v: string) => v.replace(/^v/, "").split(".").map(Number);
   const [lMaj, lMin, lPatch] = parse(latest);
   const [cMaj, cMin, cPatch] = parse(current);
-  if (lMaj !== cMaj) { return lMaj > cMaj; }
-  if (lMin !== cMin) { return lMin > cMin; }
+  if (lMaj !== cMaj) {
+    return lMaj > cMaj;
+  }
+  if (lMin !== cMin) {
+    return lMin > cMin;
+  }
   return lPatch > cPatch;
 }
 
@@ -93,7 +97,9 @@ function detectInstallCommand(): string {
     if (found) {
       return `npm install -g ${NPM_PACKAGE}@latest`;
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   try {
     execSync("pnpm --version 2>/dev/null", { encoding: "utf8" });
@@ -102,12 +108,16 @@ function detectInstallCommand(): string {
     if (found) {
       return `pnpm add -g ${NPM_PACKAGE}@latest`;
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   try {
     execSync("yarn --version 2>/dev/null", { encoding: "utf8" });
     return `yarn global add ${NPM_PACKAGE}@latest`;
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   return `npm install -g ${NPM_PACKAGE}@latest`;
 }
@@ -124,12 +134,16 @@ function readKey(): Promise<string> {
     const stdin = process.stdin;
     const wasTTY = stdin.isTTY;
 
-    if (wasTTY) { stdin.setRawMode(true); }
+    if (wasTTY) {
+      stdin.setRawMode(true);
+    }
     stdin.resume();
     stdin.setEncoding("utf8");
 
     const onData = (key: string) => {
-      if (wasTTY) { stdin.setRawMode(false); }
+      if (wasTTY) {
+        stdin.setRawMode(false);
+      }
       stdin.pause();
       stdin.removeListener("data", onData);
       resolve(key);
@@ -139,7 +153,9 @@ function readKey(): Promise<string> {
 
     // Timeout after 10s — treat as skip
     setTimeout(() => {
-      if (wasTTY) { stdin.setRawMode(false); }
+      if (wasTTY) {
+        stdin.setRawMode(false);
+      }
       stdin.pause();
       stdin.removeListener("data", onData);
       resolve("n");
@@ -149,8 +165,12 @@ function readKey(): Promise<string> {
 
 export async function checkForUpdate(): Promise<void> {
   // Skip in CI, piped output, or explicitly disabled
-  if (process.env.CI || process.env.NO_UPDATE_CHECK) { return; }
-  if (!process.stdout.isTTY || !process.stdin.isTTY) { return; }
+  if (process.env.CI || process.env.NO_UPDATE_CHECK) {
+    return;
+  }
+  if (!process.stdout.isTTY || !process.stdin.isTTY) {
+    return;
+  }
 
   const current = getCurrentVersion();
 
@@ -168,7 +188,9 @@ export async function checkForUpdate(): Promise<void> {
     }
   }
 
-  if (!isNewer(latest, current)) { return; }
+  if (!isNewer(latest, current)) {
+    return;
+  }
 
   const installCmd = detectInstallCommand();
 
@@ -178,7 +200,9 @@ export async function checkForUpdate(): Promise<void> {
     `  ${c.yellow}│${c.reset}  ${c.bold}Update available${c.reset}  ` +
       `${c.dim}${current}${c.reset} ${c.yellow}→${c.reset} ${c.bold}${c.cyan}${latest}${c.reset}`
   );
-  console.log(`  ${c.yellow}│${c.reset}  Press ${c.bold}Y${c.reset} to update now, any other key to skip`);
+  console.log(
+    `  ${c.yellow}│${c.reset}  Press ${c.bold}Y${c.reset} to update now, any other key to skip`
+  );
   console.log(`  ${c.yellow}└─────────────────────────────────────────────────┘${c.reset}`);
   process.stdout.write(`\n  > `);
 
@@ -187,15 +211,21 @@ export async function checkForUpdate(): Promise<void> {
 
   console.log(accepted ? "Updating…" : "Skipped.\n");
 
-  if (!accepted) { return; }
+  if (!accepted) {
+    return;
+  }
 
   console.log(`\n  ${c.dim}$ ${installCmd}${c.reset}\n`);
   const ok = runUpgrade(installCmd);
 
   if (ok) {
-    console.log(`\n  ${c.green}✓${c.reset} ${c.bold}Updated to ${latest}!${c.reset} Restart codebase to use the new version.\n`);
+    console.log(
+      `\n  ${c.green}✓${c.reset} ${c.bold}Updated to ${latest}!${c.reset} Restart codebase to use the new version.\n`
+    );
   } else {
-    console.log(`\n  ${c.yellow}!${c.reset} Update failed. Run manually: ${c.bold}${installCmd}${c.reset}\n`);
+    console.log(
+      `\n  ${c.yellow}!${c.reset} Update failed. Run manually: ${c.bold}${installCmd}${c.reset}\n`
+    );
   }
 
   // Exit so the old binary doesn't continue running after upgrade
