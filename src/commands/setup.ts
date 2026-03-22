@@ -211,7 +211,7 @@ function installClaudeCommands(root: string): void {
   }
 
   if (totalInstalled > 0 || totalUpdated > 0) {
-    info("Available: /setup /simulate /build /launch /review");
+    info("Available: /setup /simulate /build /launch /review /vibeloop");
     info("Tip: commit .claude/commands/ to share these with your team");
   }
 }
