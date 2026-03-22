@@ -44,7 +44,7 @@ Registered detectors: `project`, `repo`, `structure`, `stack`, `commands`, `depe
 
 ### MCP Server (`src/mcp/`)
 
-JSON-RPC 2.0 over stdio. Exposes 10 tools including `project_brief`, `query_codebase`, `create_issue`. Entry: `src/mcp/server.ts`.
+JSON-RPC 2.0 over stdio. Exposes 16 tools including `project_brief`, `get_next_task`, `create_issue`, `update_issue`, `get_issue`, `get_pr`, `list_skills`, `refresh_status`. Entry: `src/mcp/server.ts`.
 
 ### GitHub Integration (`src/github/`)
 
@@ -78,7 +78,7 @@ Commands: `open <url>`, `snapshot -i` (accessibility tree → `@e1`/`@e2` refs),
 1. Create `src/commands/your-command.ts` exporting `async function runYourCommand(options: CLIOptions): Promise<void>`
 2. Import and register in `src/index.ts` commands map
 3. Add the command name to the `COMMANDS` set in `src/utils/args.ts`
-4. Add help text in the `printHelp()` function in `src/utils/args.ts`
+4. Add help text in `src/utils/help.ts` (both `HELP` record and `printMainHelp`)
 
 ## Adding a Detector
 

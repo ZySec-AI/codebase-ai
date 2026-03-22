@@ -88,7 +88,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "get_blockers",
     description:
-      "Get all current blockers — issues labeled as blocked, PRs waiting for review, and dependency issues. Shows what's preventing progress.",
+      "Get all current blockers — issues labeled as blocked, PRs waiting for review, PRs with failing CI checks, PRs with merge conflicts, and uncommitted changes. Shows what's preventing progress.",
     inputSchema: {
       type: "object" as const,
       properties: {},
@@ -158,7 +158,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "list_commands",
     description:
-      "List installed Claude Code slash commands in this project. Returns names and descriptions of available /setup, /simulate, /build, /launch, /review commands.",
+      "List installed Claude Code slash commands in this project. Returns names of available commands (e.g. /setup, /simulate, /build, /launch, /review).",
     inputSchema: {
       type: "object" as const,
       properties: {},

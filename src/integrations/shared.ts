@@ -52,6 +52,9 @@ Returns: project identity, tech stack, commands, structure, current status, next
 - \`/build\` — Implements architectural issues autonomously. Runs until all \`arch\`+\`vibekit\` issues are closed.
 - \`/launch\` — Gates on open bugs, generates GTM artifacts, creates GitHub release, merges to main.
 
+### MCP Tools (for IDE/agent integrations)
+If using MCP instead of CLI: call \`project_brief\` (not \`npx codebase brief\`), \`get_next_task\`, \`refresh_status\`, \`list_skills\`. Full tool list via \`list_commands\` and \`list_skills\`.
+
 ### Browser Automation (agent-browser)
 Commands: \`open <url>\`, \`snapshot -i\` (→ \`@e1\`/\`@e2\` refs), \`click @e1\`, \`fill @e2 "text"\`, \`screenshot\`, \`auth save/login <profile>\`, \`state save/load <name>\`.
 ${END_MARKER}`;
@@ -84,6 +87,9 @@ ${HASH_START_MARKER}
 #   - Create issues for bugs/TODOs — keep the project brain alive
 #   - Close issues when fixed — with a reason
 #   - If any command fails, run doctor then fix — self-heal before asking for help
+#
+# MCP TOOLS (for IDE/agent integrations):
+#   If using MCP: call project_brief, get_next_task, refresh_status, list_skills
 ${HASH_END_MARKER}`;
 
 interface ManifestSummary {
@@ -172,6 +178,9 @@ Returns: project identity, tech stack, commands, structure, current status, next
 - \`/build\` — Implements architectural issues autonomously. Runs until all \`arch\`+\`vibekit\` issues are closed.
 - \`/launch\` — Gates on open bugs, generates GTM artifacts, creates GitHub release, merges to main.
 
+### MCP Tools (for IDE/agent integrations)
+If using MCP instead of CLI: call \`project_brief\` (not \`npx codebase brief\`), \`get_next_task\`, \`refresh_status\`, \`list_skills\`. Full tool list via \`list_commands\` and \`list_skills\`.
+
 ### Browser Automation (agent-browser)
 Commands: \`open <url>\`, \`snapshot -i\` (→ \`@e1\`/\`@e2\` refs), \`click @e1\`, \`fill @e2 "text"\`, \`screenshot\`, \`auth save/login <profile>\`, \`state save/load <name>\`.
 ${END_MARKER}`;
@@ -221,6 +230,9 @@ ${cmdSection}#
 #   - Create issues for bugs/TODOs — keep the project brain alive
 #   - Close issues when fixed — with a reason
 #   - If any command fails, run doctor then fix — self-heal before asking for help
+#
+# MCP TOOLS (for IDE/agent integrations):
+#   If using MCP: call project_brief, get_next_task, refresh_status, list_skills
 ${HASH_END_MARKER}`;
 }
 

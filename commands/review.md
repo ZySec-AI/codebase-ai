@@ -2,7 +2,7 @@
 description: Code review (security, quality, deps health, UI/accessibility) + test generation. Outputs GitHub Issues. Uses codebase context.
 argument-hint: [--security] [--quality] [--deps] [--ui] [--test] [--pr N] [--fix]
 model: sonnet
-allowed-tools: Agent, Bash(gh:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git checkout:*), Bash(git pull:*), Bash(git fetch:*), Bash(git stash:*), Bash(git log:*), Bash(git status:*), Bash(git diff:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(npx:*), Bash(npm:*), Bash(node:*), Bash(pnpm:*), Bash(uv:*), Bash(pip:*), Read, Write, Edit, Glob, Grep
+allowed-tools: Agent, Bash(gh:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git checkout:*), Bash(git pull:*), Bash(git fetch:*), Bash(git stash:*), Bash(git log:*), Bash(git status:*), Bash(git diff:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(npx:*), Bash(npm:*), Bash(node:*), Bash(python:*), Bash(python3:*), Bash(pnpm:*), Bash(uv:*), Bash(pip:*), Read, Write, Edit, Glob, Grep
 ---
 
 # /review
