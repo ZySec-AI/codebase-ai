@@ -127,6 +127,33 @@ const TOOL_DEFINITIONS = [
     },
   },
 
+  {
+    name: "update_issue",
+    description:
+      "Update a GitHub issue — add/remove labels, set assignee. Use this to advance issues through the pipeline (e.g., add 'status:in-progress', remove 'status:backlog').",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        number: { type: "number" as const, description: "Issue number" },
+        add_labels: {
+          type: "array" as const,
+          items: { type: "string" as const },
+          description: "Labels to add",
+        },
+        remove_labels: {
+          type: "array" as const,
+          items: { type: "string" as const },
+          description: "Labels to remove",
+        },
+        assignee: {
+          type: "string" as const,
+          description: "GitHub username to assign (or empty string to unassign)",
+        },
+      },
+      required: ["number"],
+    },
+  },
+
   // ─── Commands ──────────────────────────────────────────────────
   {
     name: "list_commands",
@@ -209,7 +236,11 @@ const TOOL_DEFINITIONS = [
       properties: {
         sync: {
           type: "boolean" as const,
-          description: "Also refresh GitHub data (issues, PRs, milestones). Default: false.",
+          description: "Also refresh GitHub data (issues, PRs, milestones). Default: true.",
+        },
+        incremental: {
+          type: "boolean" as const,
+          description: "Only re-scan changed areas (faster). Default: false.",
         },
       },
     },
@@ -355,6 +386,14 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
         });
       }
 
+      case "update_issue": {
+        const result = await ghUpdateIssue(root, args);
+        await invalidateManifest(root);
+        return respond(req.id, {
+          content: [{ type: "text", text: result }],
+        });
+      }
+
       case "list_commands": {
         const projectCommandsDir = join(root, ".claude", "commands");
         const globalCommandsDir = join(homedir(), ".claude", "commands");
@@ -391,27 +430,30 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
       }
 
       case "list_skills": {
-        const skillsDir = join(homedir(), ".claude", "skills");
+        const globalSkillsDir = join(homedir(), ".claude", "skills");
+        const projectSkillsDir = join(root, ".claude", "skills");
 
-        if (!existsSync(skillsDir)) {
-          return respond(req.id, {
-            content: [
-              {
-                type: "text",
-                text: "No skills directory found (~/.claude/skills/). Run: codebase setup",
-              },
-            ],
-          });
+        const seenFiles = new Set<string>();
+        const skillFiles: Array<{ file: string; dir: string }> = [];
+
+        // Project-local takes precedence — add first, then global (skip duplicates)
+        for (const dir of [projectSkillsDir, globalSkillsDir]) {
+          if (existsSync(dir)) {
+            for (const f of readdirSync(dir)) {
+              if (f.endsWith(".skill") && !seenFiles.has(f)) {
+                seenFiles.add(f);
+                skillFiles.push({ file: f, dir });
+              }
+            }
+          }
         }
-
-        const skillFiles = readdirSync(skillsDir).filter((f) => f.endsWith(".skill"));
 
         if (skillFiles.length === 0) {
           return respond(req.id, {
             content: [
               {
                 type: "text",
-                text: "No skills installed in ~/.claude/skills/. Run: codebase setup",
+                text: "No skills installed in ~/.claude/skills/ or <project>/.claude/skills/. Run: codebase setup",
               },
             ],
           });
@@ -421,9 +463,9 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
 
         await Promise.all(
           skillFiles.map(
-            (file) =>
+            ({ file, dir }) =>
               new Promise<void>((resolveSkill) => {
-                const filePath = join(skillsDir, file);
+                const filePath = join(dir, file);
                 execFile(
                   "unzip",
                   ["-p", filePath, "*/SKILL.md"],
@@ -527,8 +569,12 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
       }
 
       case "rescan_project": {
-        const syncGh = args.sync === true;
-        const manifest = await scan(root, { quiet: true, sync: syncGh });
+        const syncGh = args.sync !== false;
+        const manifest = await scan(root, {
+          quiet: true,
+          sync: syncGh,
+          incremental: args.incremental === true,
+        });
         const manifestPath = join(root, ".codebase.json");
         const tmpPath = manifestPath + ".tmp";
         // Atomic write: write to temp file first, then rename to avoid torn reads
@@ -553,8 +599,10 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
           manifest.status = ghData.status;
           manifest.roadmap = ghData.roadmap;
           manifest.decisions = ghData.decisions;
+          const merged = manifest;
+          merged.generated_at = new Date().toISOString();
           const tmpPath = manifestPath + ".tmp";
-          await writeFile(tmpPath, JSON.stringify(manifest, null, 2), "utf-8");
+          await writeFile(tmpPath, JSON.stringify(merged, null, 2), "utf-8");
           await rename(tmpPath, manifestPath);
         }
         return respond(req.id, {
@@ -675,11 +723,24 @@ function getBlockers(manifest: Manifest): Record<string, unknown> {
   );
 
   const waitingReview = (manifest.status?.pull_requests || []).filter(
-    (pr) => pr.state === "open" && pr.reviewers.length > 0
+    (pr) => pr.state === "open" && pr.reviewers.length > 0 && pr.review_decision !== "approved"
+  );
+
+  const failingChecks = (manifest.status?.pull_requests || []).filter(
+    (pr) => pr.state === "open" && pr.checks_status === "failing"
+  );
+
+  const withConflicts = (manifest.status?.pull_requests || []).filter(
+    (pr) => pr.state === "open" && pr.merge_conflicts === true
   );
 
   const uncommittedChanges = manifest.git?.uncommitted_changes ?? false;
-  const hasBlockers = blocked.length > 0 || waitingReview.length > 0 || uncommittedChanges;
+  const hasBlockers =
+    blocked.length > 0 ||
+    waitingReview.length > 0 ||
+    failingChecks.length > 0 ||
+    withConflicts.length > 0 ||
+    uncommittedChanges;
 
   const summaryParts: string[] = [];
   if (!hasBlockers) {
@@ -690,6 +751,12 @@ function getBlockers(manifest: Manifest): Record<string, unknown> {
     }
     if (waitingReview.length) {
       summaryParts.push(`${waitingReview.length} PR(s) awaiting review`);
+    }
+    if (failingChecks.length) {
+      summaryParts.push(`${failingChecks.length} PR(s) with failing checks`);
+    }
+    if (withConflicts.length) {
+      summaryParts.push(`${withConflicts.length} PR(s) with merge conflicts`);
     }
     if (uncommittedChanges) {
       summaryParts.push("uncommitted changes in working directory");
@@ -709,6 +776,16 @@ function getBlockers(manifest: Manifest): Record<string, unknown> {
       number: pr.number,
       title: pr.title,
       reviewers: pr.reviewers,
+      url: pr.url,
+    })),
+    prs_failing_checks: failingChecks.map((pr) => ({
+      number: pr.number,
+      title: pr.title,
+      url: pr.url,
+    })),
+    prs_with_conflicts: withConflicts.map((pr) => ({
+      number: pr.number,
+      title: pr.title,
       url: pr.url,
     })),
     uncommitted_changes: uncommittedChanges,
@@ -753,6 +830,51 @@ async function ghCloseIssue(root: string, args: Record<string, unknown>): Promis
   }
   await ghExecArgs(root, ["issue", "close", String(number)]);
   return `Issue #${number} closed.`;
+}
+
+async function ghUpdateIssue(root: string, args: Record<string, unknown>): Promise<string> {
+  const number = args.number as number;
+  const addLabels = args.add_labels as string[] | undefined;
+  const removeLabels = args.remove_labels as string[] | undefined;
+  const assignee = args.assignee as string | undefined;
+
+  const updates: string[] = [];
+
+  if (addLabels?.length) {
+    await ghExecArgs(root, ["issue", "edit", String(number), "--add-label", addLabels.join(",")]);
+    updates.push(`added labels: ${addLabels.join(", ")}`);
+  }
+
+  if (removeLabels?.length) {
+    await ghExecArgs(root, [
+      "issue",
+      "edit",
+      String(number),
+      "--remove-label",
+      removeLabels.join(","),
+    ]);
+    updates.push(`removed labels: ${removeLabels.join(", ")}`);
+  }
+
+  if (assignee !== undefined) {
+    if (assignee === "") {
+      // Fetch current assignees so we know who to remove
+      const raw = await ghExecArgs(root, ["issue", "view", String(number), "--json", "assignees"]);
+      const { assignees } = JSON.parse(raw) as { assignees: Array<{ login: string }> };
+      for (const a of assignees) {
+        await ghExecArgs(root, ["issue", "edit", String(number), "--remove-assignee", a.login]);
+      }
+      updates.push("unassigned all assignees");
+    } else {
+      await ghExecArgs(root, ["issue", "edit", String(number), "--add-assignee", assignee]);
+      updates.push(`assigned to @${assignee}`);
+    }
+  }
+
+  if (updates.length === 0) {
+    return `Issue #${number}: no changes requested.`;
+  }
+  return `Issue #${number} updated: ${updates.join("; ")}.`;
 }
 
 async function invalidateManifest(root: string): Promise<void> {

@@ -2,7 +2,7 @@ import type { CLIOptions } from "../types.js";
 import { printMainHelp, printCommandHelp } from "./help.js";
 
 const DEFAULTS: CLIOptions = {
-  command: "scan",
+  command: "init",
   subcommand: "",
   positionals: [],
   path: process.cwd(),

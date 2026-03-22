@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { existsSync, readdirSync } from "node:fs";
 import { execFile } from "node:child_process";
 import type { CLIOptions } from "../types.js";
@@ -39,25 +39,34 @@ function parseYamlFrontmatter(content: string): Record<string, string> {
   return result;
 }
 
-export async function runSkills(_options: CLIOptions): Promise<void> {
-  const skillsDir = join(process.env["HOME"] ?? "~", ".claude", "skills");
+export async function runSkills(options: CLIOptions): Promise<void> {
+  const globalSkillsDir = join(process.env["HOME"] ?? "~", ".claude", "skills");
+  const projectSkillsDir = join(resolve(options.path ?? "."), ".claude", "skills");
 
-  if (!existsSync(skillsDir)) {
-    log("No skills installed. Run: codebase setup");
-    return;
+  const seenFiles = new Set<string>();
+  const entries: Array<{ file: string; dir: string }> = [];
+
+  // Project-local takes precedence — add first, then global (skip duplicates)
+  for (const dir of [projectSkillsDir, globalSkillsDir]) {
+    if (existsSync(dir)) {
+      for (const f of readdirSync(dir)) {
+        if (f.endsWith(".skill") && !seenFiles.has(f)) {
+          seenFiles.add(f);
+          entries.push({ file: f, dir });
+        }
+      }
+    }
   }
 
-  const files = readdirSync(skillsDir).filter((f) => f.endsWith(".skill"));
-
-  if (files.length === 0) {
+  if (entries.length === 0) {
     log("No skills installed. Run: codebase setup");
     return;
   }
 
   const rows: Array<{ name: string; description: string; file: string }> = [];
 
-  for (const file of files) {
-    const skillPath = join(skillsDir, file);
+  for (const { file, dir } of entries) {
+    const skillPath = join(dir, file);
     let name = file.replace(/\.skill$/, "");
     let description = "";
 

@@ -30,11 +30,19 @@ Returns: project identity, tech stack, commands, structure, current status, next
 | \`npx codebase issue create "title"\` | Track a bug, feature, or TODO |
 | \`npx codebase issue close <n> --reason "why"\` | Close an issue after fixing it |
 
+### Maintenance
+| Command | What it does |
+|---|---|
+| \`codebase doctor\` | Health check — diagnose broken setup |
+| \`codebase fix\` | Auto-repair issues found by doctor |
+| \`codebase skills\` | List installed skills and their capabilities |
+
 ### Rules
 - **Never explore the codebase to discover stack/commands/structure** — it's already in \`brief\`
 - **Check \`next\` before starting work** — don't duplicate in-progress tasks
 - **Create issues for bugs/TODOs you find** — keep the project brain alive
 - **Close issues when you fix them** — with a reason so the team knows why
+- **If any command fails, run \`codebase doctor\` then \`codebase fix\`** — self-heal before asking for help
 
 ### Vibekit Workflow
 \`\`\`
@@ -65,11 +73,17 @@ ${HASH_START_MARKER}
 #   npx codebase issue create "title"            → Track bugs/features/TODOs
 #   npx codebase issue close <n> --reason "why"  → Close after fixing
 #
+# MAINTENANCE:
+#   codebase doctor   → Health check — diagnose broken setup
+#   codebase fix      → Auto-repair issues found by doctor
+#   codebase skills   → List installed skills and their capabilities
+#
 # RULES:
 #   - Never explore codebase to discover stack/commands — it's in brief
 #   - Check next before starting work — don't duplicate in-progress tasks
 #   - Create issues for bugs/TODOs — keep the project brain alive
 #   - Close issues when fixed — with a reason
+#   - If any command fails, run doctor then fix — self-heal before asking for help
 ${HASH_END_MARKER}`;
 
 interface ManifestSummary {
@@ -136,11 +150,19 @@ Returns: project identity, tech stack, commands, structure, current status, next
 | \`npx codebase issue create "title"\` | Track a bug, feature, or TODO |
 | \`npx codebase issue close <n> --reason "why"\` | Close an issue after fixing it |
 
+### Maintenance
+| Command | What it does |
+|---|---|
+| \`codebase doctor\` | Health check — diagnose broken setup |
+| \`codebase fix\` | Auto-repair issues found by doctor |
+| \`codebase skills\` | List installed skills and their capabilities |
+
 ### Rules
 - **Never explore the codebase to discover stack/commands/structure** — it's already in \`brief\`
 - **Check \`next\` before starting work** — don't duplicate in-progress tasks
 - **Create issues for bugs/TODOs you find** — keep the project brain alive
 - **Close issues when you fix them** — with a reason so the team knows why
+- **If any command fails, run \`codebase doctor\` then \`codebase fix\`** — self-heal before asking for help
 
 ### Vibekit Workflow
 \`\`\`
@@ -188,11 +210,17 @@ ${cmdSection}#
 #   npx codebase issue create "title"            → Track bugs/features/TODOs
 #   npx codebase issue close <n> --reason "why"  → Close after fixing
 #
+# MAINTENANCE:
+#   codebase doctor   → Health check — diagnose broken setup
+#   codebase fix      → Auto-repair issues found by doctor
+#   codebase skills   → List installed skills and their capabilities
+#
 # RULES:
 #   - Never explore codebase to discover stack/commands — it's in brief
 #   - Check next before starting work — don't duplicate in-progress tasks
 #   - Create issues for bugs/TODOs — keep the project brain alive
 #   - Close issues when fixed — with a reason
+#   - If any command fails, run doctor then fix — self-heal before asking for help
 ${HASH_END_MARKER}`;
 }
 

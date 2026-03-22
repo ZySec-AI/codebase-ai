@@ -29,8 +29,8 @@ if (options.helpCommand && options.command) {
 }
 
 const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
-  // "scan" is now "init" by default — does EVERYTHING in one shot
-  scan: runInit,
+  // "scan" updates .codebase.json only — lightweight, no AI tool injection
+  scan: runScan,
   init: runInit,
   // AI-facing commands — these are the interface
   brief: runBrief,

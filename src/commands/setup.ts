@@ -129,7 +129,8 @@ export async function runSetup(options: CLIOptions): Promise<void> {
   }
 
   log("\nDone! Your project is wired for AI + autonomous loop.");
-  log("\n  1. Review docs/PRODUCT.md and fill in any [INFERRED] sections");
+  log("\n  0. codebase brief    — load project context (AI agents: call this first)");
+  log("  1. Review docs/PRODUCT.md and fill in any [INFERRED] sections");
   log("  2. /simulate   — AI customer journeys find & fix bugs");
   log("  3. /build      — implement architectural issues autonomously");
   log("  4. /launch     — gate check, release, merge to main");

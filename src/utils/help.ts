@@ -10,7 +10,8 @@ interface CommandHelp {
 
 const HELP: Record<string, CommandHelp> = {
   scan: {
-    description: "Scan project and generate .codebase.json manifest",
+    description:
+      "Scan project and update .codebase.json manifest (lightweight — no AI tool injection)",
     usage: "codebase scan [path] [options]",
     examples: [
       { command: "codebase scan", description: "Scan current directory" },
@@ -196,7 +197,7 @@ ${bold("AUTONOMOUS LOOP")}
 
 ${bold("HUMAN COMMANDS")}
   ${command("codebase init")}              Full setup (scan + AI tools + hooks)
-  ${command("codebase scan")}              Generate/update .codebase.json
+  ${command("codebase scan")}              Update .codebase.json only (lightweight)
   ${command("codebase setup")}             Wire AI tools + install slash commands
   ${command("codebase release")}           Gate check → tag → develop→main
   ${command("codebase doctor")}            Health check & diagnostics

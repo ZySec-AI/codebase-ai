@@ -313,11 +313,11 @@ function parsePRNode(node: Record<string, unknown>): ReturnType<typeof import(".
     deletions: (node.deletions as number) || 0,
     comments_count: comments?.totalCount || 0,
     review_decision:
-      (node.review_decision as string)?.toLowerCase() === "approved"
+      (node.reviewDecision as string)?.toLowerCase() === "approved"
         ? "approved"
-        : (node.review_decision as string)?.toLowerCase() === "changes_requested"
+        : (node.reviewDecision as string)?.toLowerCase() === "changes_requested"
           ? "changes_requested"
-          : (node.review_decision as string)?.toLowerCase() === "review_required"
+          : (node.reviewDecision as string)?.toLowerCase() === "review_required"
             ? "review_required"
             : null,
   };

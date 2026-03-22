@@ -175,11 +175,15 @@ FRAMEWORKS=$(node -e "try{const b=require('/tmp/cb-brief.json');console.log((b.s
 
 ### Execution
 
-When a matching skill is detected, invoke it directly via the Skill tool:
-- The skill handles its own analysis, confidence scoring, and auto-removal
-- Findings with confidence <80% are reported as GitHub Issues (labeled `review,quality,dead-code`)
-- Findings with confidence >=80% are auto-removed if `--fix` is active, otherwise reported as issues
-- After the skill completes, include its KPI summary (files removed, lines eliminated, functions cleaned) in the Phase 8 summary
+When a matching skill is detected:
+1. Call `list_skills` via MCP (or `codebase skills` via bash) to confirm the skill is installed
+2. Read the skill's SKILL.md to understand its workflow (the skill file is at `~/.claude/skills/<name>.skill`)
+3. Follow the workflow defined in SKILL.md using the tools available in the /review context (Agent, Bash, Read, Write, Edit, Glob, Grep)
+4. For Python skills: run the analysis scripts via `Bash(python:*)`
+5. For Node.js skills: run the analysis scripts via `Bash(node:*)`
+6. Findings with confidence <80% are reported as GitHub Issues (labeled `review,quality,dead-code`)
+7. Findings with confidence >=80% are auto-removed if `--fix` is active, otherwise reported as issues
+8. After the skill completes, include its KPI summary (files removed, lines eliminated, functions cleaned) in the Phase 8 summary
 
 ### If skill is not installed
 
