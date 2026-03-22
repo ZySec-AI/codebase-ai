@@ -97,6 +97,14 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
       const missing = expectedCategories.filter((c) => !presentCategories.includes(c));
       results.push({ label: "Detectors", ok: false, detail: `Missing: ${missing.join(", ")}` });
     }
+
+    // ─── 3b. Detector warnings ───────────────────────────────
+    const warnings = (manifest as unknown as Record<string, unknown>)._warnings;
+    if (Array.isArray(warnings) && warnings.length > 0) {
+      for (const w of warnings) {
+        results.push({ label: "Detector Warning", ok: false, detail: `(non-fatal) ${w}` });
+      }
+    }
   }
 
   // ─── 4. GitHub CLI ──────────────────────────────────────────

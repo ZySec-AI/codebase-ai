@@ -19,57 +19,57 @@ describe("scanner cache", () => {
     expect(loadCache(root)).toBeNull();
   });
 
-  it("saves and loads cache round-trip", () => {
+  it("saves and loads cache round-trip", async () => {
     const manifest = { version: "1.0", generated_at: "2024-01-01T00:00:00Z" };
-    saveCache(root, 42, manifest);
+    await saveCache(root, 42, manifest);
     const cache = loadCache(root);
     expect(cache).not.toBeNull();
     expect(cache!.file_count).toBe(42);
     expect(cache!.manifest).toEqual(manifest);
   });
 
-  it("cache is valid when file count and mtimes unchanged", () => {
+  it("cache is valid when file count and mtimes unchanged", async () => {
     // Create a tracked file
     writeFileSync(join(root, "package.json"), "{}");
 
     const manifest = { version: "1.0", generated_at: "2024-01-01T00:00:00Z" };
-    saveCache(root, 100, manifest);
+    await saveCache(root, 100, manifest);
     const cache = loadCache(root)!;
 
-    expect(isCacheValid(root, cache, 100)).toBe(true);
+    expect(await isCacheValid(root, cache, 100)).toBe(true);
   });
 
-  it("cache is invalid when file count changes", () => {
+  it("cache is invalid when file count changes", async () => {
     const manifest = { version: "1.0", generated_at: "2024-01-01T00:00:00Z" };
-    saveCache(root, 100, manifest);
+    await saveCache(root, 100, manifest);
     const cache = loadCache(root)!;
 
-    expect(isCacheValid(root, cache, 105)).toBe(false);
+    expect(await isCacheValid(root, cache, 105)).toBe(false);
   });
 
-  it("cache is invalid when tracked file is modified", () => {
+  it("cache is invalid when tracked file is modified", async () => {
     writeFileSync(join(root, "package.json"), "{}");
 
     const manifest = { version: "1.0", generated_at: "2024-01-01T00:00:00Z" };
-    saveCache(root, 100, manifest);
+    await saveCache(root, 100, manifest);
     const cache = loadCache(root)!;
 
     // Modify tracked file — change mtime
     const _future = new Date(Date.now() + 5000);
     writeFileSync(join(root, "package.json"), '{"name":"changed"}');
 
-    expect(isCacheValid(root, cache, 100)).toBe(false);
+    expect(await isCacheValid(root, cache, 100)).toBe(false);
   });
 
-  it("cache is invalid when a new tracked file appears", () => {
+  it("cache is invalid when a new tracked file appears", async () => {
     const manifest = { version: "1.0", generated_at: "2024-01-01T00:00:00Z" };
-    saveCache(root, 100, manifest);
+    await saveCache(root, 100, manifest);
     const cache = loadCache(root)!;
 
     // Add a new tracked file that didn't exist before
     writeFileSync(join(root, "Cargo.toml"), "[package]");
 
-    expect(isCacheValid(root, cache, 100)).toBe(false);
+    expect(await isCacheValid(root, cache, 100)).toBe(false);
   });
 
   it("returns null for corrupted cache", () => {

@@ -1,9 +1,10 @@
 import { readFileSync, writeFileSync, statSync } from "node:fs";
+import { execFile } from "node:child_process";
 import { join } from "node:path";
 import type { Manifest } from "../types.js";
 
 const CACHE_FILE = ".codebase.cache.json";
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 
 const TRACKED_FILES = [
   "package.json",
@@ -27,9 +28,22 @@ const TRACKED_FILES = [
 interface CacheData {
   cache_version: number;
   timestamp: string;
+  git_sha: string | null;
   file_count: number;
   file_mtimes: Record<string, number>;
   manifest: Manifest;
+}
+
+async function getGitSha(root: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    execFile("git", ["rev-parse", "HEAD"], { cwd: root, timeout: 5_000 }, (err, stdout) => {
+      if (err) {
+        resolve(null);
+        return;
+      }
+      resolve(stdout.trim());
+    });
+  });
 }
 
 export function loadCache(root: string): CacheData | null {
@@ -45,10 +59,15 @@ export function loadCache(root: string): CacheData | null {
   }
 }
 
-export function saveCache(root: string, fileCount: number, manifest: Manifest): void {
+export async function saveCache(
+  root: string,
+  fileCount: number,
+  manifest: Manifest
+): Promise<void> {
   const data: CacheData = {
     cache_version: CACHE_VERSION,
     timestamp: new Date().toISOString(),
+    git_sha: await getGitSha(root),
     file_count: fileCount,
     file_mtimes: snapshotMtimes(root),
     manifest,
@@ -60,13 +79,22 @@ export function saveCache(root: string, fileCount: number, manifest: Manifest): 
   }
 }
 
-export function isCacheValid(root: string, cache: CacheData, currentFileCount: number): boolean {
-  // File count changed → something was added or deleted
+export async function isCacheValid(
+  root: string,
+  cache: CacheData,
+  currentFileCount: number
+): Promise<boolean> {
+  // Primary key: if we have git SHAs, use them — zero false positives
+  const currentSha = await getGitSha(root);
+  if (currentSha && cache.git_sha) {
+    return currentSha === cache.git_sha;
+  }
+
+  // Fallback for non-git repos: file count + mtime check
   if (cache.file_count !== currentFileCount) {
     return false;
   }
 
-  // Check tracked file mtimes
   const currentMtimes = snapshotMtimes(root);
   for (const file of Object.keys({ ...cache.file_mtimes, ...currentMtimes })) {
     if ((cache.file_mtimes[file] ?? 0) !== (currentMtimes[file] ?? 0)) {

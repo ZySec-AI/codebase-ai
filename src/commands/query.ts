@@ -31,7 +31,7 @@ export async function runQuery(options: CLIOptions): Promise<void> {
     process.exit(1);
   }
 
-  if (options.raw) {
+  if (options.force) {
     if (typeof value === "string") {
       process.stdout.write(value + "\n");
     } else if (Array.isArray(value)) {

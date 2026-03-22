@@ -99,7 +99,7 @@ export async function runFix(options: CLIOptions): Promise<void> {
 
   // ─── 4. Fix missing MCP config ────────────────────────────
   const toolNames = new Set(["claude"]);
-  const mcpConfigured = autoConfigureMcp(root, toolNames);
+  const mcpConfigured = await autoConfigureMcp(root, toolNames);
   for (const entry of mcpConfigured) {
     fixed(`Added MCP entry to ${entry}`);
     fixCount++;

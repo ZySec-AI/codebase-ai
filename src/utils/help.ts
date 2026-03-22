@@ -95,10 +95,10 @@ const HELP: Record<string, CommandHelp> = {
     usage: "codebase query <path> [options]",
     examples: [
       { command: "codebase query stack.languages", description: 'Get: ["typescript"]' },
-      { command: "codebase query commands.test --raw | sh", description: "Run test command" },
+      { command: "codebase query commands.test --force | sh", description: "Run test command" },
       { command: "codebase query dependencies.notable", description: "List notable packages" },
     ],
-    options: [{ flag: "--raw", description: "Plain text output (no JSON)" }],
+    options: [{ flag: "--force", description: "Plain text output (no JSON)" }],
   },
 
   issue: {
@@ -200,7 +200,7 @@ ${bold("EXAMPLES")}
   ${command("npx codebase")}                              # One-time setup
   ${command("codebase brief")}                            # Project overview
   ${command("codebase next")}                             # Next task
-  ${command("codebase query commands.test --raw | sh")}   # Run tests
+  ${command("codebase query commands.test --force | sh")}   # Run tests
   ${command('codebase issue create "Fix bug"')}        # Track work
 
 ${bold("GLOBAL OPTIONS")}

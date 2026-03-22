@@ -14,6 +14,7 @@ import type {
   ProjectBoardData,
 } from "../types.js";
 import { fetchGitHubGraphQLData, checkGraphQLSupport } from "./graphql.js";
+import { safe, MAX_TITLE_LEN, MAX_LABEL_LEN, MAX_LOGIN_LEN } from "../utils/safe.js";
 
 interface GitHubData {
   status: StatusData;
@@ -29,7 +30,7 @@ export async function syncGitHub(root: string): Promise<GitHubData | null> {
   }
 
   // Check if repo has a GitHub remote — if not, github_available should be false
-  const remoteUrl = await shellExec(root, "git remote get-url origin 2>/dev/null");
+  const remoteUrl = await shellExec(root, "git", ["remote", "get-url", "origin"]);
   const hasGitHubRemote =
     !!remoteUrl && (remoteUrl.includes("github.com") || remoteUrl.includes("github."));
 
@@ -48,6 +49,12 @@ export async function syncGitHub(root: string): Promise<GitHubData | null> {
     };
   }
 
+  // Check GitHub API rate limit before making requests
+  const rateLimitOk = await checkRateLimit(root);
+  if (!rateLimitOk) {
+    return null;
+  }
+
   // Try GraphQL first, fall back to REST API
   const hasGraphQL = await checkGraphQLSupport(root);
   let issues: IssueData[] = [];
@@ -55,6 +62,8 @@ export async function syncGitHub(root: string): Promise<GitHubData | null> {
   let milestones: MilestoneData[] = [];
   let releases: ReleaseData[] = [];
   let projectBoards: ProjectBoardData[] = [];
+  // Track whether GraphQL succeeded so we don't double-fetch on empty repos
+  let graphqlSucceeded = false;
 
   if (hasGraphQL) {
     try {
@@ -72,19 +81,16 @@ export async function syncGitHub(root: string): Promise<GitHubData | null> {
       milestones = (graphqlData.milestones || []) as unknown as MilestoneData[];
       releases = (graphqlData.releases || []) as ReleaseData[];
       projectBoards = (graphqlData.project_boards || []) as ProjectBoardData[];
+      graphqlSucceeded = true;
     } catch {
       // GraphQL failed, fall back to REST
     }
   }
 
-  // Fallback to REST API if GraphQL didn't return data
-  if (issues.length === 0) {
+  // Fallback to REST API only if GraphQL itself failed (not just returned empty data)
+  if (!graphqlSucceeded) {
     issues = await fetchIssues(root);
-  }
-  if (prs.length === 0) {
     prs = await fetchPullRequests(root);
-  }
-  if (milestones.length === 0) {
     milestones = await fetchMilestones(root);
   }
 
@@ -126,12 +132,28 @@ function ghExec(cwd: string, args: string[]): Promise<string> {
   });
 }
 
-function shellExec(cwd: string, cmd: string): Promise<string> {
+function shellExec(cwd: string, cmd: string, args: string[]): Promise<string> {
   return new Promise((resolve) => {
-    execFile("sh", ["-c", cmd], { cwd, timeout: 10_000 }, (err, stdout) => {
+    execFile(cmd, args, { cwd, timeout: 10_000 }, (err, stdout) => {
       resolve(err ? "" : stdout.trim());
     });
   });
+}
+
+async function checkRateLimit(root: string): Promise<boolean> {
+  try {
+    const output = await ghExec(root, ["api", "rate_limit"]);
+    if (!output) {
+      return true;
+    } // Can't check — proceed optimistically
+    const data = JSON.parse(output) as {
+      resources?: { core?: { remaining?: number } };
+    };
+    const remaining = data.resources?.core?.remaining ?? 100;
+    return remaining > 10; // Require at least 10 requests remaining
+  } catch {
+    return true; // Can't check — proceed optimistically
+  }
 }
 
 // ─── Issues ──────────────────────────────────────────────────────
@@ -166,11 +188,11 @@ export function parseIssue(raw: Record<string, unknown>): IssueData {
 
   return {
     number: raw.number as number,
-    title: raw.title as string,
+    title: safe(raw.title as string, MAX_TITLE_LEN),
     state: (raw.state as string)?.toLowerCase() === "open" ? "open" : "closed",
-    labels: labels.map((l) => l.name),
-    assignee: assignees[0]?.login || null,
-    milestone: milestone?.title || null,
+    labels: labels.map((l) => safe(l.name, MAX_LABEL_LEN)).filter(Boolean),
+    assignee: safe(assignees[0]?.login, MAX_LOGIN_LEN) || null,
+    milestone: safe(milestone?.title, MAX_TITLE_LEN) || null,
     created_at: raw.createdAt as string,
     updated_at: raw.updatedAt as string,
   };
@@ -201,6 +223,8 @@ async function fetchPullRequests(root: string): Promise<PullRequestData[]> {
   }
 }
 
+const MAX_BRANCH_LEN = 200;
+
 export function parsePR(raw: Record<string, unknown>): PullRequestData {
   const labels = (raw.labels as Array<{ name: string }>) || [];
   const reviewRequests = (raw.reviewRequests as Array<{ login?: string; name?: string }>) || [];
@@ -208,12 +232,12 @@ export function parsePR(raw: Record<string, unknown>): PullRequestData {
 
   return {
     number: raw.number as number,
-    title: raw.title as string,
+    title: safe(raw.title as string, MAX_TITLE_LEN),
     state: ((raw.state as string) || "open").toLowerCase() as "open" | "closed" | "merged",
-    author: author?.login || "unknown",
-    branch: (raw.headRefName as string) || "",
-    labels: labels.map((l) => l.name),
-    reviewers: reviewRequests.map((r) => r.login || r.name || "").filter(Boolean),
+    author: safe(author?.login, MAX_LOGIN_LEN) || "unknown",
+    branch: safe(raw.headRefName as string, MAX_BRANCH_LEN),
+    labels: labels.map((l) => safe(l.name, MAX_LABEL_LEN)).filter(Boolean),
+    reviewers: reviewRequests.map((r) => safe(r.login || r.name, MAX_LOGIN_LEN)).filter(Boolean),
     created_at: raw.createdAt as string,
     updated_at: raw.updatedAt as string,
   };
@@ -288,7 +312,7 @@ async function fetchDecisionPRs(root: string): Promise<DecisionEntry[]> {
         );
       })
       .map((pr) => ({
-        title: pr.title as string,
+        title: safe(pr.title as string, MAX_TITLE_LEN),
         summary: extractDecisionSummary((pr.body as string) || ""),
         date: pr.mergedAt as string,
         source: `PR #${pr.number}`,
@@ -366,13 +390,10 @@ function buildKanban(issues: IssueData[]): KanbanView {
   const open = issues.filter((i) => i.state === "open");
   const closed = issues.filter((i) => i.state === "closed");
 
-  // In-progress: assigned or has "in progress" label
-  const inProgress = open.filter(
-    (i) =>
-      i.assignee ||
-      i.labels.some(
-        (l) => l.toLowerCase().includes("progress") || l.toLowerCase().includes("doing")
-      )
+  // In-progress: ONLY issues with an explicit in-progress label (not assignee)
+  const IN_PROGRESS_LABELS = ["in-progress", "in progress", "doing", "wip"];
+  const inProgress = open.filter((i) =>
+    i.labels.some((l) => IN_PROGRESS_LABELS.includes(l.toLowerCase()))
   );
 
   // Backlog: open but not in-progress
@@ -385,40 +406,38 @@ function buildKanban(issues: IssueData[]): KanbanView {
   };
 }
 
-function buildPriorities(issues: IssueData[]): IssueData[] {
-  const open = issues.filter((i) => i.state === "open");
-
-  // Sort by priority labels
+/**
+ * Canonical issue priority ranking — single source of truth used everywhere.
+ * Lower number = higher priority.
+ * Precedence: P0/critical/urgent > vibekit > P1/high/bug > P2/medium > arch > P3/low > feature > unlabeled
+ */
+export function rankIssues(issues: IssueData[]): IssueData[] {
   const priorityOrder = (i: IssueData): number => {
+    let best = 5;
     for (const label of i.labels) {
       const l = label.toLowerCase();
       if (l.includes("p0") || l.includes("critical") || l.includes("urgent")) {
-        return 0;
-      }
-      if (l === "vibekit") {
-        return 1;
-      } // queued for autonomous build — top of queue
-      if (l.includes("p1") || l.includes("high")) {
-        return 1;
-      }
-      if (l.includes("p2") || l.includes("medium")) {
-        return 2;
-      }
-      if (l === "arch") {
-        return 2;
-      } // architectural issues — high value
-      if (l.includes("p3") || l.includes("low")) {
-        return 3;
-      }
-      if (l.includes("bug")) {
-        return 1;
-      }
-      if (l.includes("feature")) {
-        return 2;
+        best = Math.min(best, 0);
+      } else if (l === "vibekit") {
+        best = Math.min(best, 1); // queued for autonomous build
+      } else if (l.includes("p1") || l.includes("high") || l.includes("bug")) {
+        best = Math.min(best, 1);
+      } else if (l.includes("p2") || l.includes("medium")) {
+        best = Math.min(best, 2);
+      } else if (l === "arch") {
+        best = Math.min(best, 2); // architectural issues — high value
+      } else if (l.includes("p3") || l.includes("low")) {
+        best = Math.min(best, 3);
+      } else if (l.includes("feature")) {
+        best = Math.min(best, 4);
       }
     }
-    return 4;
+    return best;
   };
 
-  return [...open].sort((a, b) => priorityOrder(a) - priorityOrder(b));
+  return [...issues].sort((a, b) => priorityOrder(a) - priorityOrder(b));
+}
+
+function buildPriorities(issues: IssueData[]): IssueData[] {
+  return rankIssues(issues.filter((i) => i.state === "open"));
 }

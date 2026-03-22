@@ -25,9 +25,10 @@ export function createMockContext(options: MockContextOptions = {}): ScanContext
       const regex = new RegExp("^" + pattern.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*") + "$");
       return files.filter((f) => regex.test(f));
     },
-    async exec(cmd: string): Promise<string> {
+    async exec(cmd: string, args: string[]): Promise<string> {
+      const full = [cmd, ...args].join(" ");
       for (const [key, value] of Object.entries(execResults)) {
-        if (cmd.includes(key)) {
+        if (full.includes(key)) {
           return value;
         }
       }

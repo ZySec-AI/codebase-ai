@@ -63,7 +63,7 @@ async function detectProjectName(ctx: ScanContext): Promise<string> {
   }
 
   // Fallback: directory name from git remote
-  const remote = await ctx.exec("git remote get-url origin 2>/dev/null");
+  const remote = await ctx.exec("git", ["remote", "get-url", "origin"]);
   if (remote) {
     const name = remote.replace(/.*[:/]/, "").replace(/\.git$/, "");
     return name;

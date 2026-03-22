@@ -11,7 +11,7 @@ const DEFAULTS: CLIOptions = {
   categories: [],
   incremental: false,
   quiet: false,
-  raw: false,
+  force: false,
   verbose: false,
   port: 7432,
   tools: [],
@@ -79,8 +79,13 @@ export function parseArgs(argv: string[]): CLIOptions {
         opts.quiet = true;
         continue;
       }
+      if (key === "force") {
+        opts.force = true;
+        continue;
+      }
       if (key === "raw") {
-        opts.raw = true;
+        console.error("Warning: --raw is deprecated, use --force instead");
+        opts.force = true;
         continue;
       }
       if (key === "verbose" || key === "V") {

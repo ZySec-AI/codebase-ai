@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import { warn } from "../utils/output.js";
+import { safe, MAX_TITLE_LEN, MAX_LABEL_LEN, MAX_LOGIN_LEN } from "../utils/safe.js";
 
 /**
  * GraphQL client for GitHub API using gh CLI
@@ -233,11 +235,11 @@ function parseIssueNode(node: Record<string, unknown>): ReturnType<
 
   return {
     number: node.number as number,
-    title: node.title as string,
+    title: safe(node.title as string, MAX_TITLE_LEN),
     state: (node.state as string)?.toLowerCase() === "open" ? "open" : "closed",
     url: (node.url as string) || undefined,
-    labels: labels.map((l) => l.name),
-    assignee: assignees[0]?.login || null,
+    labels: labels.map((l) => safe(l.name, MAX_LABEL_LEN)).filter(Boolean),
+    assignee: safe(assignees[0]?.login, MAX_LOGIN_LEN) || null,
     milestone: milestone?.title || null,
     created_at: node.createdAt as string,
     updated_at: node.updatedAt as string,
@@ -291,13 +293,15 @@ function parsePRNode(node: Record<string, unknown>): ReturnType<typeof import(".
 
   return {
     number: node.number as number,
-    title: node.title as string,
+    title: safe(node.title as string, MAX_TITLE_LEN),
     state: ((node.state as string) || "open").toLowerCase() as "open" | "closed" | "merged",
     url: (node.url as string) || undefined,
-    author: author?.login || "unknown",
-    branch: (node.headRefName as string) || "",
-    labels: labels.map((l) => l.name),
-    reviewers: reviewRequests.map((r) => r.requestedReviewer?.login || "").filter(Boolean),
+    author: safe(author?.login, MAX_LOGIN_LEN) || "unknown",
+    branch: safe(node.headRefName as string, MAX_TITLE_LEN),
+    labels: labels.map((l) => safe(l.name, MAX_LABEL_LEN)).filter(Boolean),
+    reviewers: reviewRequests
+      .map((r) => safe(r.requestedReviewer?.login, MAX_LOGIN_LEN))
+      .filter(Boolean),
     created_at: node.createdAt as string,
     updated_at: node.updatedAt as string,
     checks_status: checksStatus,
@@ -379,119 +383,123 @@ export async function fetchGitHubGraphQLData(
   const { owner, repo } = ownerRepo;
   const result: GitHubGraphQLData = {};
 
-  // Fetch issues with comments and reactions
-  if (includeIssues) {
-    try {
-      const issueData = await graphqlQuery<{
-        repository: { issues: { nodes: Record<string, unknown>[] } };
-      }>(cwd, ISSUES_QUERY, { owner, repo, limit });
+  // Run all independent queries in parallel
+  const [issueData, prData, milestoneData, releaseData, projectData] = await Promise.all([
+    includeIssues
+      ? graphqlQuery<{ repository: { issues: { nodes: Record<string, unknown>[] } } }>(
+          cwd,
+          ISSUES_QUERY,
+          { owner, repo, limit }
+        ).catch((e: unknown) => {
+          warn(`GitHub issues query failed: ${e instanceof Error ? e.message : String(e)}`);
+          return null;
+        })
+      : Promise.resolve(null),
+    includePRs
+      ? graphqlQuery<{ repository: { pullRequests: { nodes: Record<string, unknown>[] } } }>(
+          cwd,
+          PULL_REQUESTS_QUERY,
+          { owner, repo, limit: Math.min(limit, 30) }
+        ).catch((e: unknown) => {
+          warn(`GitHub pull requests query failed: ${e instanceof Error ? e.message : String(e)}`);
+          return null;
+        })
+      : Promise.resolve(null),
+    includeMilestones
+      ? graphqlQuery<{ repository: { milestones: { nodes: Record<string, unknown>[] } } }>(
+          cwd,
+          MILESTONES_QUERY,
+          { owner, repo }
+        ).catch((e: unknown) => {
+          warn(`GitHub milestones query failed: ${e instanceof Error ? e.message : String(e)}`);
+          return null;
+        })
+      : Promise.resolve(null),
+    includeReleases
+      ? graphqlQuery<{ repository: { releases: { nodes: Record<string, unknown>[] } } }>(
+          cwd,
+          RELEASES_QUERY,
+          { owner, repo, limit: 10 }
+        ).catch((e: unknown) => {
+          warn(`GitHub releases query failed: ${e instanceof Error ? e.message : String(e)}`);
+          return null;
+        })
+      : Promise.resolve(null),
+    includeProjects
+      ? graphqlQuery<{ repository: { projectsV2: { nodes: Record<string, unknown>[] } } }>(
+          cwd,
+          PROJECTS_QUERY,
+          { owner, repo }
+        ).catch((e: unknown) => {
+          warn(`GitHub projects query failed: ${e instanceof Error ? e.message : String(e)}`);
+          return null;
+        })
+      : Promise.resolve(null),
+  ]);
 
-      if (issueData?.repository?.issues?.nodes) {
-        result.issues = issueData.repository.issues.nodes.map(parseIssueNode);
-      }
-    } catch {
-      // Silent fail - fallback to REST API
-    }
+  // Process issues
+  if (issueData?.repository?.issues?.nodes) {
+    result.issues = issueData.repository.issues.nodes.map(parseIssueNode);
   }
 
-  // Fetch pull requests with checks and reviews
-  if (includePRs) {
-    try {
-      const prData = await graphqlQuery<{
-        repository: { pullRequests: { nodes: Record<string, unknown>[] } };
-      }>(cwd, PULL_REQUESTS_QUERY, { owner, repo, limit: Math.min(limit, 30) });
-
-      if (prData?.repository?.pullRequests?.nodes) {
-        result.pull_requests = prData.repository.pullRequests.nodes.map(parsePRNode);
-      }
-    } catch {
-      // Silent fail - fallback to REST API
-    }
+  // Process pull requests
+  if (prData?.repository?.pullRequests?.nodes) {
+    result.pull_requests = prData.repository.pullRequests.nodes.map(parsePRNode);
   }
 
-  // Fetch milestones with issue counts
-  if (includeMilestones) {
-    try {
-      const milestoneData = await graphqlQuery<{
-        repository: { milestones: { nodes: Record<string, unknown>[] } };
-      }>(cwd, MILESTONES_QUERY, { owner, repo });
+  // Process milestones
+  if (milestoneData?.repository?.milestones?.nodes) {
+    result.milestones = milestoneData.repository.milestones.nodes.map((m) => {
+      const issues = (m.issues as { nodes: Array<{ number: number }> })?.nodes || [];
+      const closed = (m.closedIssues as { totalCount: number })?.totalCount || 0;
+      const total = (m.issues as { totalCount: number })?.totalCount || issues.length;
+      const open = total - closed;
 
-      if (milestoneData?.repository?.milestones?.nodes) {
-        result.milestones = milestoneData.repository.milestones.nodes.map((m) => {
-          const issues = (m.issues as { nodes: Array<{ number: number }> })?.nodes || [];
-          const closed = (m.closedIssues as { totalCount: number })?.totalCount || 0;
-          const total = (m.issues as { totalCount: number })?.totalCount || issues.length;
-          const open = total - closed;
-
-          return {
-            title: m.title as string,
-            description: (m.description as string) || "",
-            due_date: (m.dueOn as string) || null,
-            progress: {
-              open,
-              closed,
-              percent: total > 0 ? Math.round((closed / total) * 100) : 0,
-            },
-            issues: issues.map((i) => i.number),
-          };
-        });
-      }
-    } catch {
-      // Silent fail
-    }
+      return {
+        title: m.title as string,
+        description: (m.description as string) || "",
+        due_date: (m.dueOn as string) || null,
+        progress: {
+          open,
+          closed,
+          percent: total > 0 ? Math.round((closed / total) * 100) : 0,
+        },
+        issues: issues.map((i) => i.number),
+      };
+    });
   }
 
-  // Fetch releases
-  if (includeReleases) {
-    try {
-      const releaseData = await graphqlQuery<{
-        repository: { releases: { nodes: Record<string, unknown>[] } };
-      }>(cwd, RELEASES_QUERY, { owner, repo, limit: 10 });
-
-      if (releaseData?.repository?.releases?.nodes) {
-        result.releases = releaseData.repository.releases.nodes.map((r) => ({
-          tag_name: r.tagName as string,
-          name: (r.name as string) || (r.tagName as string),
-          created_at: r.createdAt as string,
-          url: r.url as string,
-          author: (r.author as { login: string })?.login || "unknown",
-          prerelease: !!r.isPrerelease,
-        }));
-      }
-    } catch {
-      // Silent fail
-    }
+  // Process releases
+  if (releaseData?.repository?.releases?.nodes) {
+    result.releases = releaseData.repository.releases.nodes.map((r) => ({
+      tag_name: r.tagName as string,
+      name: (r.name as string) || (r.tagName as string),
+      created_at: r.createdAt as string,
+      url: r.url as string,
+      author: (r.author as { login: string })?.login || "unknown",
+      prerelease: !!r.isPrerelease,
+    }));
   }
 
-  // Fetch project boards
-  if (includeProjects) {
-    try {
-      const projectData = await graphqlQuery<{
-        repository: { projectsV2: { nodes: Record<string, unknown>[] } };
-      }>(cwd, PROJECTS_QUERY, { owner, repo });
+  // Process project boards
+  if (projectData?.repository?.projectsV2?.nodes) {
+    result.project_boards = projectData.repository.projectsV2.nodes
+      .filter((p) => p !== null)
+      .map((p) => {
+        const columns = (p.columns as { nodes: Array<{ name: string }> })?.nodes || [];
+        const itemsCount = (p.items as { totalCount: number })?.totalCount || 0;
 
-      if (projectData?.repository?.projectsV2?.nodes) {
-        result.project_boards = projectData.repository.projectsV2.nodes
-          .filter((p) => p !== null)
-          .map((p) => {
-            const columns = (p.columns as { nodes: Array<{ name: string }> })?.nodes || [];
-            const itemsCount = (p.items as { totalCount: number })?.totalCount || 0;
-
-            return {
-              number: p.number as number,
-              title: p.title as string,
-              state: ((p.state as string) || "open").toLowerCase() as "open" | "closed",
-              url: p.url as string,
-              columns: columns.map((c) => ({
-                name: c.name,
-                cards_count: itemsCount, // Approximate - actual per-column count requires more complex query
-              })),
-            };
-          });
-      }
-    } catch {
-      // Silent fail
-    }
+        return {
+          number: p.number as number,
+          title: p.title as string,
+          state: ((p.state as string) || "open").toLowerCase() as "open" | "closed",
+          url: p.url as string,
+          columns: columns.map((c) => ({
+            name: c.name,
+            cards_count: itemsCount, // Approximate - actual per-column count requires more complex query
+          })),
+        };
+      });
   }
 
   return result;

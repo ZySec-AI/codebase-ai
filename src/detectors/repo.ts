@@ -24,19 +24,19 @@ export const repoDetector: Detector = {
 };
 
 async function getRemoteUrl(ctx: ScanContext): Promise<string | null> {
-  const result = await ctx.exec("git remote get-url origin 2>/dev/null");
+  const result = await ctx.exec("git", ["remote", "get-url", "origin"]);
   return result || null;
 }
 
 async function getDefaultBranch(ctx: ScanContext): Promise<string | null> {
   // Try symbolic ref first
-  const branch = await ctx.exec("git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null");
+  const branch = await ctx.exec("git", ["symbolic-ref", "refs/remotes/origin/HEAD"]);
   if (branch) {
     return branch.replace("refs/remotes/origin/", "");
   }
 
   // Fallback: check if main or master exists
-  const branches = await ctx.exec("git branch --list main master 2>/dev/null");
+  const branches = await ctx.exec("git", ["branch", "--list", "main", "master"]);
   if (branches.includes("main")) {
     return "main";
   }
@@ -45,14 +45,17 @@ async function getDefaultBranch(ctx: ScanContext): Promise<string | null> {
   }
 
   // Last resort: current branch
-  const current = await ctx.exec("git branch --show-current 2>/dev/null");
+  const current = await ctx.exec("git", ["branch", "--show-current"]);
   return current || null;
 }
 
 async function getActiveBranches(ctx: ScanContext): Promise<string[]> {
-  const output = await ctx.exec(
-    "git branch -a --sort=-committerdate --format='%(refname:short)' 2>/dev/null"
-  );
+  const output = await ctx.exec("git", [
+    "branch",
+    "-a",
+    "--sort=-committerdate",
+    "--format=%(refname:short)",
+  ]);
   if (!output) {
     return [];
   }

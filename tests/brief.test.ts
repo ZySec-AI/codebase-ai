@@ -133,9 +133,9 @@ describe("generateBrief", () => {
     expect(brief).not.toContain("format:");
   });
 
-  it("includes available commands section", () => {
+  it("does not include static Available Commands boilerplate", () => {
     const brief = generateBrief(minimalManifest());
-    expect(brief).toContain("## Available Commands");
-    expect(brief).toContain("npx codebase brief");
+    // The Available Commands section was removed to reduce token bloat per session
+    expect(brief).not.toContain("## Available Commands");
   });
 });

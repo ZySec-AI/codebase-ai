@@ -1,11 +1,13 @@
 import { createInterface } from "node:readline";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, rename } from "node:fs/promises";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { execFile } from "node:child_process";
 import { queryPath } from "../utils/json-path.js";
 import { scan } from "../scanner/engine.js";
 import { generateBrief } from "./brief.js";
+import { rankIssues } from "../github/sync.js";
 import type { Manifest } from "../types.js";
 
 interface JsonRpcRequest {
@@ -38,7 +40,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "get_codebase",
     description:
-      "Get structured project data. Use 'category' to get a specific section: repo, structure, stack, commands, dependencies, config, git, quality, patterns, status, roadmap, decisions. Without category returns everything.",
+      "Get structured project data. Use 'category' to get a specific section: repo, structure, stack, commands, dependencies, config, git, quality, patterns, status, roadmap, decisions. Use 'fields' for sparse selection within a category, e.g. fields: ['languages', 'frameworks']. Without category returns everything.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -46,6 +48,12 @@ const TOOL_DEFINITIONS = [
           type: "string" as const,
           description:
             "Section to retrieve: repo, structure, stack, commands, dependencies, config, git, quality, patterns, status, roadmap, decisions",
+        },
+        fields: {
+          type: "array" as const,
+          items: { type: "string" as const },
+          description:
+            "Optional. When category is specified, return only these keys from that section. E.g. ['languages', 'frameworks'] for stack.",
         },
       },
     },
@@ -215,8 +223,18 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
       case "get_codebase": {
         const manifest = await loadOrScanManifest(root);
         const category = args.category as string | undefined;
+        const fields = args.fields as string[] | undefined;
         if (category) {
-          const data = (manifest as Record<string, unknown>)[category];
+          const data = (manifest as unknown as Record<string, unknown>)[category];
+          if (fields?.length && data && typeof data === "object" && data !== null) {
+            const sparse: Record<string, unknown> = {};
+            for (const f of fields) {
+              sparse[f] = (data as Record<string, unknown>)[f];
+            }
+            return respond(req.id, {
+              content: [{ type: "text", text: JSON.stringify(sparse, null, 2) }],
+            });
+          }
           return respond(req.id, {
             content: [{ type: "text", text: JSON.stringify(data ?? null, null, 2) }],
           });
@@ -229,7 +247,7 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
       case "query_codebase": {
         const manifest = await loadOrScanManifest(root);
         const path = args.path as string;
-        const value = queryPath(manifest as Record<string, unknown>, path);
+        const value = queryPath(manifest as unknown as Record<string, unknown>, path);
         return respond(req.id, {
           content: [{ type: "text", text: JSON.stringify(value ?? null, null, 2) }],
         });
@@ -237,17 +255,17 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
 
       case "get_next_task": {
         const manifest = await loadOrScanManifest(root, true);
-        const next = getNextTask(manifest);
+        const result = getNextTask(manifest);
         return respond(req.id, {
-          content: [{ type: "text", text: next }],
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         });
       }
 
       case "get_blockers": {
         const manifest = await loadOrScanManifest(root, true);
-        const blockers = getBlockers(manifest);
+        const result = getBlockers(manifest);
         return respond(req.id, {
-          content: [{ type: "text", text: blockers }],
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         });
       }
 
@@ -266,19 +284,35 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
       }
 
       case "list_commands": {
-        const commandsDir = join(root, ".claude", "commands");
-        if (!existsSync(commandsDir)) {
+        const projectCommandsDir = join(root, ".claude", "commands");
+        const globalCommandsDir = join(homedir(), ".claude", "commands");
+
+        const seenNames = new Set<string>();
+        const allFiles: string[] = [];
+
+        for (const dir of [projectCommandsDir, globalCommandsDir]) {
+          if (existsSync(dir)) {
+            for (const f of readdirSync(dir)) {
+              if (f.endsWith(".md") && !seenNames.has(f)) {
+                seenNames.add(f);
+                allFiles.push(f);
+              }
+            }
+          }
+        }
+
+        if (allFiles.length === 0) {
           return respond(req.id, {
             content: [{ type: "text", text: "No slash commands installed. Run: codebase setup" }],
           });
         }
-        const files = readdirSync(commandsDir).filter((f) => f.endsWith(".md"));
-        const names = files.map((f) => "/" + f.replace(/\.md$/, "")).join(", ");
+
+        const names = allFiles.map((f) => "/" + f.replace(/\.md$/, "")).join(", ");
         return respond(req.id, {
           content: [
             {
               type: "text",
-              text: `Installed commands (${files.length}): ${names}\n\nLoop: /simulate → /build → /launch`,
+              text: `Installed commands (${allFiles.length}): ${names}\n\nLoop: /simulate → /build → /launch`,
             },
           ],
         });
@@ -287,7 +321,11 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
       case "rescan_project": {
         const syncGh = args.sync === true;
         const manifest = await scan(root, { quiet: true, sync: syncGh });
-        await writeFile(join(root, ".codebase.json"), JSON.stringify(manifest, null, 2), "utf-8");
+        const manifestPath = join(root, ".codebase.json");
+        const tmpPath = manifestPath + ".tmp";
+        // Atomic write: write to temp file first, then rename to avoid torn reads
+        await writeFile(tmpPath, JSON.stringify(manifest, null, 2), "utf-8");
+        await rename(tmpPath, manifestPath);
         return respond(req.id, {
           content: [
             {
@@ -315,83 +353,123 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
+const _rawTtlHours = Number(process.env.CODEBASE_MANIFEST_TTL_HOURS);
+const MANIFEST_TTL_MS =
+  (Number.isFinite(_rawTtlHours) && _rawTtlHours > 0 ? _rawTtlHours : 24) * 60 * 60 * 1000;
+
 async function loadOrScanManifest(root: string, withSync = false): Promise<Manifest> {
   try {
     const content = await readFile(join(root, ".codebase.json"), "utf-8");
-    return JSON.parse(content);
+    const manifest = JSON.parse(content) as Manifest;
+    // Serve cached manifest only if it is fresh enough
+    if (manifest.generated_at) {
+      const age = Date.now() - new Date(manifest.generated_at).getTime();
+      if (age <= MANIFEST_TTL_MS) {
+        return manifest;
+      }
+    }
+    // Manifest is stale — rescan silently
+    return (await scan(root, { quiet: true, sync: withSync })) as Manifest;
   } catch {
     return (await scan(root, { quiet: true, sync: withSync })) as Manifest;
   }
 }
 
-function getNextTask(manifest: Manifest): string {
-  if (!manifest.status?.priorities?.length) {
-    return "No open issues found. The project has no tracked tasks. You can create issues with the create_issue tool when you identify work to do.";
+function getNextTask(manifest: Manifest): Record<string, unknown> {
+  const allOpen = (manifest.status?.issues || []).filter((i) => i.state === "open");
+  const priorities = manifest.status?.priorities?.length
+    ? manifest.status.priorities
+    : rankIssues(allOpen);
+
+  if (!priorities.length) {
+    return {
+      summary:
+        "No open issues found. The project has no tracked tasks. You can create issues with the create_issue tool when you identify work to do.",
+      task: null,
+      queue: [],
+    };
   }
 
-  const top = manifest.status.priorities[0];
-  const labels = top.labels.length ? ` [${top.labels.join(", ")}]` : "";
-  const assignee = top.assignee ? ` (assigned to @${top.assignee})` : "";
-  const mapped = top.mapped_files?.length ? `\nStart in: ${top.mapped_files.join(", ")}` : "";
+  const top = priorities[0];
+  const queue = priorities.slice(1, 4).map((i) => ({
+    number: i.number,
+    title: i.title,
+    labels: i.labels,
+  }));
 
-  let result = `NEXT TASK: #${top.number} — ${top.title}${labels}${assignee}${mapped}`;
-
-  // Show 2 more in the queue
-  const queue = manifest.status.priorities.slice(1, 4);
-  if (queue.length) {
-    result += "\n\nUp next in queue:";
-    for (const issue of queue) {
-      result += `\n  #${issue.number} ${issue.title} [${issue.labels.join(", ") || "no labels"}]`;
-    }
+  const summaryParts = [`NEXT TASK: #${top.number} — ${top.title}`];
+  if (top.labels.length) {
+    summaryParts.push(`[${top.labels.join(", ")}]`);
+  }
+  if (top.assignee) {
+    summaryParts.push(`(assigned to @${top.assignee})`);
+  }
+  if (top.mapped_files?.length) {
+    summaryParts.push(`Start in: ${top.mapped_files.join(", ")}`);
   }
 
-  return result;
+  return {
+    summary: summaryParts.join(" "),
+    task: {
+      number: top.number,
+      title: top.title,
+      labels: top.labels,
+      assignee: top.assignee,
+      mapped_files: top.mapped_files || [],
+      url: top.url,
+    },
+    queue,
+  };
 }
 
-function getBlockers(manifest: Manifest): string {
-  const lines: string[] = [];
+function getBlockers(manifest: Manifest): Record<string, unknown> {
+  const blocked = (manifest.status?.issues || []).filter(
+    (i) =>
+      i.state === "open" &&
+      i.labels.some(
+        (l) => l.toLowerCase().includes("blocked") || l.toLowerCase().includes("blocker")
+      )
+  );
 
-  if (manifest.status?.issues) {
-    const blocked = manifest.status.issues.filter(
-      (i) =>
-        i.state === "open" &&
-        i.labels.some(
-          (l) => l.toLowerCase().includes("blocked") || l.toLowerCase().includes("blocker")
-        )
-    );
+  const waitingReview = (manifest.status?.pull_requests || []).filter(
+    (pr) => pr.state === "open" && pr.reviewers.length > 0
+  );
 
+  const uncommittedChanges = manifest.git?.uncommitted_changes ?? false;
+  const hasBlockers = blocked.length > 0 || waitingReview.length > 0 || uncommittedChanges;
+
+  const summaryParts: string[] = [];
+  if (!hasBlockers) {
+    summaryParts.push("No blockers found. All clear to proceed with the next task.");
+  } else {
     if (blocked.length) {
-      lines.push("BLOCKED ISSUES:");
-      for (const i of blocked) {
-        lines.push(`  #${i.number} ${i.title} [${i.labels.join(", ")}]`);
-      }
+      summaryParts.push(`${blocked.length} blocked issue(s)`);
     }
-  }
-
-  if (manifest.status?.pull_requests) {
-    const waitingReview = manifest.status.pull_requests.filter(
-      (pr) => pr.state === "open" && pr.reviewers.length > 0
-    );
-
     if (waitingReview.length) {
-      lines.push("\nPRs WAITING FOR REVIEW:");
-      for (const pr of waitingReview) {
-        lines.push(`  #${pr.number} ${pr.title} → reviewers: ${pr.reviewers.join(", ")}`);
-      }
+      summaryParts.push(`${waitingReview.length} PR(s) awaiting review`);
+    }
+    if (uncommittedChanges) {
+      summaryParts.push("uncommitted changes in working directory");
     }
   }
 
-  if (manifest.git?.uncommitted_changes) {
-    lines.push(
-      "\nWARNING: Uncommitted changes detected. Consider committing before starting new work."
-    );
-  }
-
-  if (lines.length === 0) {
-    return "No blockers found. All clear to proceed with the next task.";
-  }
-
-  return lines.join("\n");
+  return {
+    summary: summaryParts.join(", "),
+    has_blockers: hasBlockers,
+    blocked_issues: blocked.map((i) => ({
+      number: i.number,
+      title: i.title,
+      labels: i.labels,
+      url: i.url,
+    })),
+    prs_waiting_review: waitingReview.map((pr) => ({
+      number: pr.number,
+      title: pr.title,
+      reviewers: pr.reviewers,
+      url: pr.url,
+    })),
+    uncommitted_changes: uncommittedChanges,
+  };
 }
 
 function ghExecArgs(cwd: string, args: string[]): Promise<string> {
@@ -413,7 +491,10 @@ async function ghCreateIssue(root: string, args: Record<string, unknown>): Promi
 
   const ghArgs = ["issue", "create", "--title", title, "--body", body];
   if (labels?.length) {
-    ghArgs.push("--label", labels.join(","));
+    const safeLabels = labels.filter((l) => !l.includes(","));
+    if (safeLabels.length) {
+      ghArgs.push("--label", safeLabels.join(","));
+    }
   }
 
   const url = await ghExecArgs(root, ghArgs);

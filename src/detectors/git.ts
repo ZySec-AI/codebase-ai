@@ -20,7 +20,7 @@ export const gitDetector: Detector = {
 };
 
 async function getRecentCommits(ctx: ScanContext): Promise<string[]> {
-  const output = await ctx.exec('git log --oneline -5 --format="%s" 2>/dev/null');
+  const output = await ctx.exec("git", ["log", "--oneline", "-5", "--format=%s"]);
   if (!output) {
     return [];
   }
@@ -28,7 +28,7 @@ async function getRecentCommits(ctx: ScanContext): Promise<string[]> {
 }
 
 async function getLastCommitters(ctx: ScanContext): Promise<string[]> {
-  const output = await ctx.exec("git shortlog -sn --no-merges -5 2>/dev/null");
+  const output = await ctx.exec("git", ["shortlog", "-sn", "--no-merges", "-5"]);
   if (!output) {
     return [];
   }
@@ -39,6 +39,6 @@ async function getLastCommitters(ctx: ScanContext): Promise<string[]> {
 }
 
 async function hasUncommittedChanges(ctx: ScanContext): Promise<boolean> {
-  const output = await ctx.exec("git status --porcelain 2>/dev/null");
+  const output = await ctx.exec("git", ["status", "--porcelain"]);
   return output.length > 0;
 }

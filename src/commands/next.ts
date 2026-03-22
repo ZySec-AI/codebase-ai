@@ -2,6 +2,7 @@ import { resolve, join } from "node:path";
 import { readFile } from "node:fs/promises";
 import type { CLIOptions, Manifest } from "../types.js";
 import { error, log, bold, info } from "../utils/output.js";
+import { rankIssues } from "../github/sync.js";
 
 /**
  * `codebase next` — returns the highest-priority task to work on.
@@ -40,8 +41,13 @@ export async function runNext(options: CLIOptions): Promise<void> {
     log("");
   }
 
-  // Show next task
-  const next = status.priorities?.[0];
+  // Show next task — fall back to live ranking if priorities list is stale/empty
+  let priorities = status.priorities ?? [];
+  if (!priorities.length) {
+    const allOpen = (manifest.status?.issues ?? []).filter((i) => i.state === "open");
+    priorities = rankIssues(allOpen);
+  }
+  const next = priorities[0];
   if (!next) {
     log("No open tasks in the backlog. Create one:");
     log('  codebase issue create "task title"');

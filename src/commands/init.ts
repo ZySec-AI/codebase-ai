@@ -1,7 +1,7 @@
 import { resolve, join } from "node:path";
 import { existsSync, writeFileSync, readFileSync } from "node:fs";
 import { execFile } from "node:child_process";
-import { writeFile } from "node:fs/promises";
+import { writeFile, rename } from "node:fs/promises";
 import { homedir } from "node:os";
 import type { CLIOptions, Integration } from "../types.js";
 import { scan, summarizeCategory } from "../scanner/engine.js";
@@ -25,9 +25,57 @@ import { log, success, info, warn, heading, setQuiet } from "../utils/output.js"
  * After this, the user never runs another codebase command manually.
  * Everything stays alive through hooks, MCP, and AI tool integrations.
  */
+/**
+ * Detect if the project has already been initialized:
+ * .codebase.json exists AND at least one AI tool has injection markers present.
+ */
+function isAlreadyInitialized(root: string): boolean {
+  if (!existsSync(join(root, ".codebase.json"))) {
+    return false;
+  }
+  // Check for Claude injection marker in CLAUDE.md — require BOTH start AND end markers
+  const claudeMd = join(root, "CLAUDE.md");
+  if (existsSync(claudeMd)) {
+    try {
+      const content = readFileSync(claudeMd, "utf-8");
+      const hasHtmlMarkers =
+        content.includes("<!-- codebase:start -->") && content.includes("<!-- codebase:end -->");
+      const hasHashMarkers =
+        content.includes("# codebase:start") && content.includes("# codebase:end");
+      if (hasHtmlMarkers || hasHashMarkers) {
+        return true;
+      }
+    } catch {
+      /* unreadable */
+    }
+  }
+  return false;
+}
+
 export async function runInit(options: CLIOptions): Promise<void> {
   setQuiet(options.quiet);
   const root = resolve(options.path);
+
+  // If already initialized and not forced, just refresh the manifest
+  if (isAlreadyInitialized(root) && !options.force) {
+    heading("codebase — refreshing project manifest\n");
+    const ghStatus = await checkGhDetailed();
+    const ghAvailable = ghStatus === "authenticated";
+    log(`Scanning ${root}...`);
+    const manifest = await scan(root, {
+      depth: options.depth,
+      categories: options.categories.length ? options.categories : undefined,
+      quiet: options.quiet,
+      sync: ghAvailable,
+    });
+    const outputPath = join(root, ".codebase.json");
+    const content = JSON.stringify(manifest, null, 2);
+    await writeFile(outputPath, content, "utf-8");
+    const sizeKB = (Buffer.byteLength(content) / 1024).toFixed(1);
+    success(`Manifest refreshed — .codebase.json (${sizeKB} KB)`);
+    info("Already initialized. Run with --force to force full re-setup.");
+    return;
+  }
 
   heading("codebase — activating project intelligence\n");
 
@@ -103,14 +151,18 @@ export async function runInit(options: CLIOptions): Promise<void> {
   }
 
   for (const tool of tools) {
-    tool.inject(root);
-    success(`${tool.name} — instructions injected`);
+    const result = await tool.inject(root);
+    if (result.ok) {
+      success(`${tool.name} — instructions injected`);
+    } else {
+      warn(`${tool.name} — injection failed: ${result.message || "unknown error"}`);
+    }
   }
 
   // ─── Step 4: Auto-configure MCP in supported tools ─────────────
   heading("MCP Server (native AI tool access)");
 
-  const mcpConfigured = autoConfigureMcp(root, toolNames);
+  const mcpConfigured = await autoConfigureMcp(root, toolNames);
   if (mcpConfigured.length) {
     for (const tool of mcpConfigured) {
       success(`${tool} — MCP server auto-configured`);
@@ -215,7 +267,10 @@ export function detectGlobalTools(): Integration[] {
 /**
  * Auto-configure MCP server in Claude Code via project-level .mcp.json.
  */
-export function autoConfigureMcp(root: string, detectedTools: Set<string>): string[] {
+export async function autoConfigureMcp(
+  root: string,
+  detectedTools: Set<string>
+): Promise<string[]> {
   const configured: string[] = [];
   const mcpEntry = {
     command: "npx",
@@ -225,7 +280,7 @@ export function autoConfigureMcp(root: string, detectedTools: Set<string>): stri
 
   if (detectedTools.has("claude") || detectedTools.size === 0) {
     const projectMcpPath = join(root, ".mcp.json");
-    if (configureMcpFile(projectMcpPath, "codebase", mcpEntry)) {
+    if (await configureMcpFile(projectMcpPath, "codebase", mcpEntry)) {
       configured.push("Claude Code (project .mcp.json)");
     }
   }
@@ -233,11 +288,11 @@ export function autoConfigureMcp(root: string, detectedTools: Set<string>): stri
   return configured;
 }
 
-export function configureMcpFile(
+export async function configureMcpFile(
   filePath: string,
   serverName: string,
   entry: Record<string, unknown>
-): boolean {
+): Promise<boolean> {
   let config: Record<string, unknown> = {};
 
   if (existsSync(filePath)) {
@@ -259,6 +314,8 @@ export function configureMcpFile(
   }
   (config.mcpServers as Record<string, unknown>)[serverName] = entry;
 
-  writeFileSync(filePath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+  const tmpPath = `${filePath}.tmp`;
+  await writeFile(tmpPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+  await rename(tmpPath, filePath);
   return true;
 }

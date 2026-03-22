@@ -206,15 +206,5 @@ export function generateBrief(m: Manifest): string {
     }
   }
 
-  // ─── Available Actions ─────────────────────────────────────────
-  sections.push("\n## Available Commands");
-  sections.push("Use these commands — don't explore files to find this information:");
-  sections.push("- `npx codebase next` — highest-priority task + what's in progress");
-  sections.push("- `npx codebase status` — kanban board, priorities, milestones");
-  sections.push("- `npx codebase query <path>` — any data point (e.g. `commands.test`)");
-  sections.push('- `npx codebase issue create "title"` — track bugs/features/TODOs');
-  sections.push('- `npx codebase issue close <n> --reason "why"` — close after fixing');
-  sections.push("- `npx codebase brief` — re-read this briefing after changes");
-
   return sections.join("\n");
 }

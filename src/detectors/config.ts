@@ -197,15 +197,16 @@ function parseEnvFile(
       continue;
     }
 
-    // Parse VAR=value or VAR=value syntax
+    // Parse VAR=value syntax — capture name only, NEVER store the value (security: prevent secret leakage)
     const match = trimmed.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/);
     if (match) {
       const [, name, value] = match;
+      // Use value only to determine if the var is unset/required — value is never written to manifest
       const isEmpty = value === '""' || value === "''" || value === "";
 
       envVars[name] = {
         description: currentComment || undefined,
-        required: isProductionEnv || isEmpty, // Mark as required if it's empty or from production .env
+        required: isProductionEnv || isEmpty,
       };
 
       currentComment = ""; // Reset comment for next variable

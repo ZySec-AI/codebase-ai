@@ -70,9 +70,9 @@ describe("parseArgs", () => {
     expect(opts.positionals[0]).toBe("stack.languages");
   });
 
-  it("parses --raw flag", () => {
-    const opts = parseArgs(["query", "commands.test", "--raw"]);
+  it("parses --force flag", () => {
+    const opts = parseArgs(["query", "commands.test", "--force"]);
     expect(opts.command).toBe("query");
-    expect(opts.raw).toBe(true);
+    expect(opts.force).toBe(true);
   });
 });

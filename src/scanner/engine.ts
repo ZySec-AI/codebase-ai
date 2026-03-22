@@ -19,7 +19,7 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Man
   // Incremental: return cached manifest if nothing changed
   if (options.incremental) {
     const cache = loadCache(root);
-    if (cache && isCacheValid(root, cache, ctx.files.length)) {
+    if (cache && (await isCacheValid(root, cache, ctx.files.length))) {
       return cache.manifest;
     }
   }
@@ -42,12 +42,22 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Man
     generated_at: new Date().toISOString(),
   };
 
+  const warnings: string[] = [];
+
   for (const result of results) {
     if (result.status === "fulfilled") {
-      (manifest as Record<string, unknown>)[result.value.category] = result.value.data;
-    } else if (!options.quiet) {
-      warn(`Detector failed: ${result.reason}`);
+      (manifest as unknown as Record<string, unknown>)[result.value.category] = result.value.data;
+    } else {
+      const msg = `Detector failed: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
+      warnings.push(msg);
+      if (!options.quiet) {
+        warn(msg);
+      }
     }
+  }
+
+  if (warnings.length > 0) {
+    manifest._warnings = warnings;
   }
 
   // GitHub sync (optional, requires `gh` CLI)
@@ -68,7 +78,7 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Man
 
   // Incremental: save cache for next run
   if (options.incremental) {
-    saveCache(root, ctx.files.length, manifest);
+    await saveCache(root, ctx.files.length, manifest);
   }
 
   return manifest;

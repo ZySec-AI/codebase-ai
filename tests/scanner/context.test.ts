@@ -249,32 +249,32 @@ describe("createScanContext", () => {
   });
 
   describe("exec", () => {
-    it("executes shell command and returns stdout", async () => {
+    it("executes command and returns stdout", async () => {
       writeFileSync(join(tempDir, "test.txt"), "content", "utf-8");
 
       const ctx = await createScanContext(tempDir);
-      const result = await ctx.exec("echo 'hello'");
+      const result = await ctx.exec("echo", ["hello"]);
 
       expect(result).toBe("hello");
     });
 
     it("returns empty string on command failure", async () => {
       const ctx = await createScanContext(tempDir);
-      const result = await ctx.exec("exit 1");
+      const result = await ctx.exec("false", []);
 
       expect(result).toBe("");
     });
 
     it("returns empty string on command failure (non-zero exit)", async () => {
       const ctx = await createScanContext(tempDir);
-      const result = await ctx.exec("exit 1");
+      const result = await ctx.exec("false", []);
 
       expect(result).toBe("");
     });
 
     it("trims whitespace from output", async () => {
       const ctx = await createScanContext(tempDir);
-      const result = await ctx.exec("echo '  test  '");
+      const result = await ctx.exec("echo", ["  test  "]);
 
       expect(result).toBe("test"); // exec returns trimmed output
     });

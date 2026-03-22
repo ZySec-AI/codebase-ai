@@ -165,7 +165,7 @@ function readKey(): Promise<string> {
 
 export async function checkForUpdate(): Promise<void> {
   // Skip in CI, piped output, or explicitly disabled
-  if (process.env.CI || process.env.NO_UPDATE_CHECK) {
+  if (process.env.CI || process.env.NO_UPDATE_CHECK || process.env.CODEBASE_NO_UPDATE_CHECK) {
     return;
   }
   if (!process.stdout.isTTY || !process.stdin.isTTY) {

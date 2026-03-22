@@ -1,5 +1,5 @@
 import { resolve, join } from "node:path";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, rename } from "node:fs/promises";
 import type { CLIOptions, Manifest } from "../types.js";
 import { syncGitHub } from "../github/sync.js";
 import { log, heading, error, info, bold } from "../utils/output.js";
@@ -21,10 +21,27 @@ export async function runStatus(options: CLIOptions): Promise<void> {
       error("Could not sync. Is `gh` CLI installed and authenticated?");
       process.exit(1);
     }
-    if (manifest) {
+    if (ghData && manifest) {
       manifest.status = ghData.status;
       manifest.roadmap = ghData.roadmap;
       manifest.decisions = ghData.decisions;
+
+      // Persist synced data back to .codebase.json atomically
+      try {
+        const manifestPath = join(root, ".codebase.json");
+        const existing = JSON.parse(await readFile(manifestPath, "utf-8")) as Manifest;
+        const updated = {
+          ...existing,
+          status: ghData.status,
+          roadmap: ghData.roadmap,
+          decisions: ghData.decisions,
+        };
+        const tmpPath = manifestPath + ".tmp";
+        await writeFile(tmpPath, JSON.stringify(updated, null, 2), "utf-8");
+        await rename(tmpPath, manifestPath);
+      } catch {
+        // Non-fatal: display continues even if write fails
+      }
     }
   }
 

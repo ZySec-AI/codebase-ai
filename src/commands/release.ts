@@ -17,14 +17,37 @@ export async function runRelease(options: CLIOptions): Promise<void> {
     error("gh CLI not authenticated. Run: gh auth login");
     process.exit(1);
   }
-  const hasRemote = await execGitStr(root, "git remote get-url origin 2>/dev/null");
+  const hasRemote = await execGitStr(root, "remote", "get-url", "origin");
   if (!hasRemote) {
     error("No git remote. Run: git remote add origin <url>");
     process.exit(1);
   }
 
-  // ── Gate 1a: No critical/high bugs ───────────────────────────
+  // ── Gate 1a: No open bugs ─────────────────────────────────────
   log("\nChecking launch gates...");
+
+  // Check manifest for open bug issues (fast, no API call needed)
+  const manifestPath = join(root, ".codebase.json");
+  if (existsSync(manifestPath) && !options.dryRun) {
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+      const openBugs = (manifest.status?.issues || []).filter(
+        (i: { state: string; labels: string[] }) =>
+          i.state === "open" && i.labels.some((l: string) => l.toLowerCase().includes("bug"))
+      );
+      if (openBugs.length > 0 && !options.force) {
+        error(`Gate 1a FAILED — ${openBugs.length} open bug issue(s) in manifest`);
+        for (const b of openBugs.slice(0, 5)) {
+          log(`  #${b.number}: ${b.title} [${b.labels.join(", ")}]`);
+        }
+        log("\n  Fix: resolve open bugs or run /simulate. Use --force to skip this gate.");
+        process.exit(1);
+      }
+    } catch {
+      /* manifest unreadable — fall through to live check */
+    }
+  }
+
   const [critical, high] = await Promise.all([
     countIssues(root, ["bug", "critical"]),
     countIssues(root, ["bug", "high"]),
@@ -40,7 +63,7 @@ export async function runRelease(options: CLIOptions): Promise<void> {
     log("\n  Fix: run /simulate, or close with wontfix label");
     process.exit(1);
   }
-  success("Gate 1a — no critical/high bugs");
+  success("Gate 1a — no open bugs");
 
   // ── Gate 1b: Test suite ───────────────────────────────────────
   const testCmd = detectTestCmd(root);
@@ -79,14 +102,14 @@ export async function runRelease(options: CLIOptions): Promise<void> {
   }
 
   // ── Gate 3: Branch clean and current ─────────────────────────
-  const dirty = await execGitStr(root, "git status --short");
+  const dirty = await execGitStr(root, "status", "--short");
   if (dirty) {
     error("Gate 3 FAILED — uncommitted changes");
     log(dirty);
     process.exit(1);
   }
-  await execGitStr(root, "git fetch origin develop 2>/dev/null || true");
-  const behind = await execGitStr(root, "git log HEAD..origin/develop --oneline 2>/dev/null");
+  await execGitStr(root, "fetch", "origin", "develop");
+  const behind = await execGitStr(root, "log", "HEAD..origin/develop", "--oneline");
   if (behind) {
     error("Gate 3 FAILED — branch is behind origin/develop");
     log("  Fix: git pull origin develop");
@@ -150,9 +173,9 @@ export async function runRelease(options: CLIOptions): Promise<void> {
 
 // ─── Release gate helpers ────────────────────────────────────────
 
-function execGitStr(root: string, cmd: string): Promise<string> {
+function execGitStr(root: string, ...args: string[]): Promise<string> {
   return new Promise((resolve) => {
-    execFile("sh", ["-c", cmd], { cwd: root, timeout: 30_000 }, (err, stdout) => {
+    execFile("git", args, { cwd: root, timeout: 30_000 }, (err, stdout) => {
       resolve(err ? "" : stdout.trim());
     });
   });
@@ -230,8 +253,9 @@ function detectTestCmd(root: string): string | null {
 }
 
 function runTestSuite(root: string, cmd: string): Promise<{ ok: boolean; output: string }> {
+  const [bin, ...args] = cmd.split(" ");
   return new Promise((resolve) => {
-    execFile("sh", ["-c", cmd], { cwd: root, timeout: 120_000 }, (err, stdout, stderr) => {
+    execFile(bin, args, { cwd: root, timeout: 120_000 }, (err, stdout, stderr) => {
       resolve({ ok: !err, output: stdout + stderr });
     });
   });
@@ -260,7 +284,7 @@ async function getWorldClassScore(root: string): Promise<number | null> {
 }
 
 async function nextVersion(root: string): Promise<string> {
-  const latest = await execGitStr(root, "git describe --tags --abbrev=0 2>/dev/null");
+  const latest = await execGitStr(root, "describe", "--tags", "--abbrev=0");
   if (!latest) {
     return "v0.1.0";
   }

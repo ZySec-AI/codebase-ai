@@ -69,9 +69,9 @@ export async function createScanContext(
       return globFilter(files, pattern);
     },
 
-    async exec(cmd: string): Promise<string> {
+    exec(cmd: string, args: string[]): Promise<string> {
       return new Promise((resolve) => {
-        execFile("sh", ["-c", cmd], { cwd: root, timeout: 10_000 }, (err, stdout) => {
+        execFile(cmd, args, { cwd: root, timeout: 10_000 }, (err, stdout) => {
           resolve(err ? "" : stdout.trim());
         });
       });

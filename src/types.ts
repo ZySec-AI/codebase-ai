@@ -6,7 +6,13 @@ export interface ScanContext {
   readFile(path: string): Promise<string>;
   fileExists(path: string): boolean;
   glob(pattern: string): string[];
-  exec(cmd: string): Promise<string>;
+  /**
+   * Execute a command safely using execFile (no shell interpolation).
+   * @param cmd  The executable name, e.g. "git"
+   * @param args Arguments array, e.g. ["log", "--oneline", "-5"]
+   * Returns stdout on success, empty string on error/timeout.
+   */
+  exec(cmd: string, args: string[]): Promise<string>;
 }
 
 export interface Detector {
@@ -15,19 +21,41 @@ export interface Detector {
   detect(ctx: ScanContext): Promise<Record<string, unknown>>;
 }
 
+export interface InjectResult {
+  ok: boolean;
+  message?: string;
+}
+
 export interface Integration {
   name: string;
   detect(root: string): boolean;
-  inject(root: string): void;
+  inject(root: string): Promise<InjectResult>;
   remove(root: string): void;
 }
 
 // ─── Manifest Schema ─────────────────────────────────────────────
 
+/** Valid category keys for dynamic manifest access. */
+export type ManifestCategory =
+  | "project"
+  | "repo"
+  | "structure"
+  | "stack"
+  | "commands"
+  | "dependencies"
+  | "config"
+  | "git"
+  | "quality"
+  | "patterns"
+  | "status"
+  | "roadmap"
+  | "decisions";
+
 export interface Manifest {
   version: string;
   generated_at: string;
-  [key: string]: unknown; // Index signature for dynamic property access
+  /** Warnings from detectors that failed or returned partial data. AI tools should inspect this. */
+  _warnings?: string[];
 
   // Project identity
   project?: ProjectData;
@@ -248,7 +276,7 @@ export interface CLIOptions {
   categories: string[];
   incremental: boolean;
   quiet: boolean;
-  raw: boolean;
+  force: boolean;
   verbose: boolean;
   port: number;
   tools: string[];
