@@ -7,7 +7,7 @@ const { version } = require("./package.json");
 export default defineConfig({
   entry: ["src/index.ts"],
   format: ["esm"],
-  target: "node18",
+  target: "node20",
   clean: true,
   minify: true,
   dts: false,

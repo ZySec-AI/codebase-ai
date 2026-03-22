@@ -82,7 +82,7 @@ function filterManifest(manifest: Manifest, categories: string[]): Manifest {
   for (const cat of categories) {
     const key = categoryMap[cat.toLowerCase()];
     if (key && manifest[key]) {
-      (result as any)[key] = manifest[key];
+      (result as unknown as Record<string, unknown>)[key] = manifest[key];
     }
   }
 

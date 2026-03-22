@@ -1,8 +1,7 @@
 import { get } from "https";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { join } from "path";
 import { execSync, spawnSync } from "child_process";
 
 const CACHE_DIR = join(homedir(), ".codebase");
@@ -21,13 +20,11 @@ const c = {
 };
 
 function getCurrentVersion(): string {
-  try {
-    const __dirname = dirname(fileURLToPath(import.meta.url));
-    const raw = readFileSync(join(__dirname, "../../package.json"), "utf8");
-    return (JSON.parse(raw) as { version: string }).version;
-  } catch {
-    return "0.0.0";
+  // __VERSION__ is injected at build time by tsup — works regardless of bundling
+  if (typeof __VERSION__ !== "undefined") {
+    return __VERSION__;
   }
+  return "0.0.0";
 }
 
 function isNewer(latest: string, current: string): boolean {

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ChildProcess } from "node:child_process";
 import { checkGraphQLSupport, fetchGitHubGraphQLData } from "../../src/github/graphql.js";
 
 // Mock child_process.execFile
@@ -16,7 +17,7 @@ describe("GitHub GraphQL Integration", () => {
       const { execFile } = await import("node:child_process");
       vi.mocked(execFile).mockImplementationOnce((cmd, args, options, callback) => {
         callback(null, "gh version 2.0.0", "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await checkGraphQLSupport("/test/cwd");
@@ -27,7 +28,7 @@ describe("GitHub GraphQL Integration", () => {
       const { execFile } = await import("node:child_process");
       vi.mocked(execFile).mockImplementationOnce((cmd, args, options, callback) => {
         callback(null, "gh version 2.23.0", "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await checkGraphQLSupport("/test/cwd");
@@ -38,7 +39,7 @@ describe("GitHub GraphQL Integration", () => {
       const { execFile } = await import("node:child_process");
       vi.mocked(execFile).mockImplementationOnce((cmd, args, options, callback) => {
         callback(null, "gh version 1.2.3", "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await checkGraphQLSupport("/test/cwd");
@@ -49,7 +50,7 @@ describe("GitHub GraphQL Integration", () => {
       const { execFile } = await import("node:child_process");
       vi.mocked(execFile).mockImplementationOnce((cmd, args, options, callback) => {
         callback(new Error("gh not found"), "", "gh: command not found");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await checkGraphQLSupport("/test/cwd");
@@ -60,7 +61,7 @@ describe("GitHub GraphQL Integration", () => {
       const { execFile } = await import("node:child_process");
       vi.mocked(execFile).mockImplementationOnce((cmd, args, options, callback) => {
         callback(null, "unknown version", "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await checkGraphQLSupport("/test/cwd");
@@ -91,7 +92,7 @@ describe("GitHub GraphQL Integration", () => {
           },
         };
         callback(null, JSON.stringify(response), "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
@@ -117,7 +118,7 @@ describe("GitHub GraphQL Integration", () => {
           },
         };
         callback(null, JSON.stringify(response), "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await fetchGitHubGraphQLData("/test/cwd", "git@github.com:owner/repo.git");
@@ -134,7 +135,7 @@ describe("GitHub GraphQL Integration", () => {
           errors: [{ message: "Could not resolve to a Repository" }],
         };
         callback(null, JSON.stringify(response), "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
@@ -148,7 +149,7 @@ describe("GitHub GraphQL Integration", () => {
 
       vi.mocked(execFile).mockImplementation((cmd, args, options, callback) => {
         callback(new Error("gh not authenticated"), "", "gh not authenticated");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
@@ -197,7 +198,7 @@ describe("GitHub GraphQL Integration", () => {
           },
         };
         callback(null, JSON.stringify(response), "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
@@ -257,7 +258,7 @@ describe("GitHub GraphQL Integration", () => {
           },
         };
         callback(null, JSON.stringify(response), "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
@@ -296,7 +297,7 @@ describe("GitHub GraphQL Integration", () => {
           },
         };
         callback(null, JSON.stringify(response), "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       // Only fetch issues and PRs
@@ -338,7 +339,7 @@ describe("GitHub GraphQL Integration", () => {
           },
         };
         callback(null, JSON.stringify(response), "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");
@@ -379,7 +380,7 @@ describe("GitHub GraphQL Integration", () => {
           },
         };
         callback(null, JSON.stringify(response), "");
-        return {} as any;
+        return {} as unknown as ChildProcess;
       });
 
       const result = await fetchGitHubGraphQLData("/test/cwd", "https://github.com/owner/repo.git");

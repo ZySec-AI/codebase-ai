@@ -209,8 +209,8 @@ ${bold("GLOBAL OPTIONS")}
   ${code("--quiet")}                     Minimal output
 
 ${bold("LEARN MORE")}
-  Docs:     ${link("https://github.com/your-repo/codebase#readme", "README.md")}
-  Issues:   ${link("https://github.com/your-repo/codebase/issues", "Report a bug")}
+  Docs:     ${link("https://github.com/ZySec-AI/codebase#readme", "README.md")}
+  Issues:   ${link("https://github.com/ZySec-AI/codebase/issues", "Report a bug")}
   Commands: ${command("codebase <command> --help")}  Show command-specific help
 `);
 }
@@ -252,7 +252,7 @@ ${bold("SEE ALSO")}
       : ""
   }${bold("MORE HELP")}
   ${command("codebase --help")}  Show all commands
-  ${link("https://github.com/your-repo/codebase/docs", "Full documentation")}
+  ${link("https://github.com/ZySec-AI/codebase/docs", "Full documentation")}
 `);
 }
 
