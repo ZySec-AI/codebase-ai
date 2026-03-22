@@ -38,6 +38,7 @@ const COMMANDS = new Set([
   "doctor",
   "fix",
   "release",
+  "plan",
 ]);
 
 export function parseArgs(argv: string[]): CLIOptions {

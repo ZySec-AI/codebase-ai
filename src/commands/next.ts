@@ -59,6 +59,10 @@ export async function runNext(options: CLIOptions): Promise<void> {
   if (next.labels.length) {
     log(`  Labels: ${next.labels.join(", ")}`);
   }
+  if (next.effort) {
+    const effortLabel = { S: "Small (hours)", M: "Medium (days)", L: "Large (weeks)" }[next.effort];
+    log(`  Effort: ${effortLabel}`);
+  }
   if (next.assignee) {
     log(`  Assignee: @${next.assignee}`);
   }
@@ -67,6 +71,15 @@ export async function runNext(options: CLIOptions): Promise<void> {
   }
   if (next.mapped_files?.length) {
     log(`  Start in: ${next.mapped_files.join(", ")}`);
+  }
+
+  // Show needs-verify queue
+  const needsVerify = status.kanban?.needs_verify ?? [];
+  if (needsVerify.length > 0) {
+    log(`\n${bold("NEEDS VERIFY (simulate to close):")}`);
+    for (const i of needsVerify.slice(0, 5)) {
+      log(`  #${i.number}: ${i.title}`);
+    }
   }
 
   // Show blockers

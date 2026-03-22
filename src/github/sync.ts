@@ -41,7 +41,7 @@ export async function syncGitHub(root: string): Promise<GitHubData | null> {
         github_available: false,
         issues: [],
         pull_requests: [],
-        kanban: { backlog: [], in_progress: [], done: [] },
+        kanban: { backlog: [], in_progress: [], needs_verify: [], done: [] },
         priorities: [],
       },
       roadmap: { milestones: [] },
@@ -185,6 +185,7 @@ export function parseIssue(raw: Record<string, unknown>): IssueData {
   const labels = (raw.labels as Array<{ name: string }>) || [];
   const assignees = (raw.assignees as Array<{ login: string }>) || [];
   const milestone = raw.milestone as { title: string } | null;
+  const body = (raw.body as string) || "";
 
   return {
     number: raw.number as number,
@@ -195,7 +196,21 @@ export function parseIssue(raw: Record<string, unknown>): IssueData {
     milestone: safe(milestone?.title, MAX_TITLE_LEN) || null,
     created_at: raw.createdAt as string,
     updated_at: raw.updatedAt as string,
+    effort: parseEffort(body),
   };
+}
+
+/** Extract effort estimate from structured issue body: **Effort:** S|M|L */
+function parseEffort(body: string): "S" | "M" | "L" | undefined {
+  const match = body.match(/\*\*Effort:\*\*\s*([SML])\b/i);
+  if (!match) {
+    return undefined;
+  }
+  const v = match[1].toUpperCase();
+  if (v === "S" || v === "M" || v === "L") {
+    return v;
+  }
+  return undefined;
 }
 
 // ─── Pull Requests ───────────────────────────────────────────────
@@ -396,12 +411,20 @@ function buildKanban(issues: IssueData[]): KanbanView {
     i.labels.some((l) => IN_PROGRESS_LABELS.includes(l.toLowerCase()))
   );
 
-  // Backlog: open but not in-progress
-  const backlog = open.filter((i) => !inProgress.includes(i));
+  // Needs-verify: built and awaiting simulation re-test before closing
+  const NEEDS_VERIFY_LABELS = ["status:needs-verify", "needs-verify", "needs-verification"];
+  const needsVerify = open.filter(
+    (i) =>
+      !inProgress.includes(i) && i.labels.some((l) => NEEDS_VERIFY_LABELS.includes(l.toLowerCase()))
+  );
+
+  // Backlog: open, not in-progress, not needs-verify
+  const backlog = open.filter((i) => !inProgress.includes(i) && !needsVerify.includes(i));
 
   return {
     backlog,
     in_progress: inProgress,
+    needs_verify: needsVerify,
     done: closed.slice(0, 20),
   };
 }
@@ -410,12 +433,17 @@ function buildKanban(issues: IssueData[]): KanbanView {
  * Canonical issue priority ranking — single source of truth used everywhere.
  * Lower number = higher priority.
  * Precedence: P0/critical/urgent > vibekit > P1/high/bug > P2/medium > arch > P3/low > feature > unlabeled
+ * Tiebreaker: effort S < M < L (prefer quick wins at same severity)
  */
 export function rankIssues(issues: IssueData[]): IssueData[] {
   const priorityOrder = (i: IssueData): number => {
     let best = 5;
     for (const label of i.labels) {
       const l = label.toLowerCase();
+      // Skip status: prefix labels — they're workflow state, not priority
+      if (l.startsWith("status:")) {
+        continue;
+      }
       if (l.includes("p0") || l.includes("critical") || l.includes("urgent")) {
         best = Math.min(best, 0);
       } else if (l === "vibekit") {
@@ -435,7 +463,32 @@ export function rankIssues(issues: IssueData[]): IssueData[] {
     return best;
   };
 
-  return [...issues].sort((a, b) => priorityOrder(a) - priorityOrder(b));
+  const effortOrder = (i: IssueData): number => {
+    switch (i.effort) {
+      case "S": {
+        return 0;
+      }
+      case "M": {
+        return 1;
+      }
+      case "L": {
+        return 2;
+      }
+      default: {
+        return 1;
+      } // treat unknown as medium
+    }
+  };
+
+  return [...issues].sort((a, b) => {
+    const pa = priorityOrder(a);
+    const pb = priorityOrder(b);
+    if (pa !== pb) {
+      return pa - pb;
+    }
+    // Same priority tier: prefer smaller effort (quick wins)
+    return effortOrder(a) - effortOrder(b);
+  });
 }
 
 function buildPriorities(issues: IssueData[]): IssueData[] {

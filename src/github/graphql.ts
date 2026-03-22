@@ -78,6 +78,7 @@ query($owner: String!, $repo: String!, $limit: Int) {
         labels(first: 10) { nodes { name } }
         assignees(first: 1) { nodes { login } }
         milestone { title }
+        body
         createdAt
         updatedAt
         comments { totalCount }

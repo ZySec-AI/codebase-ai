@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline";
 import { readFile, writeFile, rename } from "node:fs/promises";
 import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { execFile } from "node:child_process";
 import { queryPath } from "../utils/json-path.js";
@@ -135,6 +135,32 @@ const TOOL_DEFINITIONS = [
     inputSchema: {
       type: "object" as const,
       properties: {},
+    },
+  },
+
+  // ─── Plan (PLAN.md) ────────────────────────────────────────────
+  {
+    name: "get_plan",
+    description:
+      "Read the project's PLAN.md — Claude's persistent working memory across sessions. Contains current sprint goals, in-flight work, decisions log, and blockers. Call this after project_brief to restore loop context.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "update_plan",
+    description:
+      "Append a status update to PLAN.md. Use this at the end of each build or simulate cycle to record what was done, decisions made, and what's next. Creates PLAN.md if it doesn't exist.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        message: {
+          type: "string" as const,
+          description: "Status update text to append to PLAN.md Update Log section",
+        },
+      },
+      required: ["message"],
     },
   },
 
@@ -318,6 +344,45 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
         });
       }
 
+      case "get_plan": {
+        const planPath = join(resolve(root), "PLAN.md");
+        if (!existsSync(planPath)) {
+          return respond(req.id, {
+            content: [{ type: "text", text: "No PLAN.md found. Use update_plan to create one." }],
+          });
+        }
+        const planContent = await readFile(planPath, "utf-8");
+        return respond(req.id, {
+          content: [{ type: "text", text: planContent }],
+        });
+      }
+
+      case "update_plan": {
+        const planPath = join(resolve(root), "PLAN.md");
+        const message = args.message as string;
+        const timestamp = new Date().toISOString().split("T")[0];
+        const entry = `\n<!-- updated: ${timestamp} -->\n${message.trim()}\n`;
+
+        let planContent: string;
+        if (!existsSync(planPath)) {
+          planContent = `# PLAN.md — Autonomous Loop State\n\n> Managed by Claude. Updated each build/simulate cycle.\n\n## Current Sprint\n\n\n## In Flight\n\n\n## Decisions Log\n\n\n## Blocked\n\n\n## Update Log\n${entry}`;
+        } else {
+          const existing = await readFile(planPath, "utf-8");
+          if (existing.includes("## Update Log")) {
+            planContent = existing.replace(/(## Update Log\n)/, `$1${entry}`);
+          } else {
+            planContent = existing + `\n## Update Log\n${entry}`;
+          }
+        }
+
+        const tmpPath = planPath + ".tmp";
+        await writeFile(tmpPath, planContent, "utf-8");
+        await rename(tmpPath, planPath);
+        return respond(req.id, {
+          content: [{ type: "text", text: `PLAN.md updated.` }],
+        });
+      }
+
       case "rescan_project": {
         const syncGh = args.sync === true;
         const manifest = await scan(root, { quiet: true, sync: syncGh });
@@ -408,17 +473,33 @@ function getNextTask(manifest: Manifest): Record<string, unknown> {
     summaryParts.push(`Start in: ${top.mapped_files.join(", ")}`);
   }
 
+  const effortLabel = top.effort
+    ? { S: "Small (hours)", M: "Medium (days)", L: "Large (weeks)" }[top.effort]
+    : undefined;
+
+  if (effortLabel) {
+    summaryParts.push(`Effort: ${effortLabel}`);
+  }
+
+  // Surface needs_verify queue so AI knows what's pending simulation
+  const needsVerify = (manifest.status?.kanban?.needs_verify ?? []).map((i) => ({
+    number: i.number,
+    title: i.title,
+  }));
+
   return {
     summary: summaryParts.join(" "),
     task: {
       number: top.number,
       title: top.title,
       labels: top.labels,
+      effort: top.effort,
       assignee: top.assignee,
       mapped_files: top.mapped_files || [],
       url: top.url,
     },
     queue,
+    needs_verify: needsVerify,
   };
 }
 

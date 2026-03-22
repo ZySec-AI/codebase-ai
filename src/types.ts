@@ -195,6 +195,8 @@ export interface IssueData {
   created_at: string;
   updated_at: string;
   mapped_files?: string[];
+  /** Effort estimate parsed from issue body: S=hours, M=days, L=weeks */
+  effort?: "S" | "M" | "L";
   // Enhanced fields
   comments_count?: number;
   reactions?: {
@@ -235,6 +237,7 @@ export interface PullRequestData {
 export interface KanbanView {
   backlog: IssueData[];
   in_progress: IssueData[];
+  needs_verify: IssueData[];
   done: IssueData[];
 }
 

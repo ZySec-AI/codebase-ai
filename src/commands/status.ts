@@ -87,6 +87,14 @@ function printKanban(status: NonNullable<Manifest["status"]>): void {
     log(`  #${i.number} ${i.title}${assignee}`);
   }
 
+  const needsVerify = kanban.needs_verify ?? [];
+  if (needsVerify.length > 0) {
+    log(`\n${bold("NEEDS VERIFY")} (${needsVerify.length})`);
+    for (const i of needsVerify.slice(0, 10)) {
+      log(`  #${i.number} ${i.title}`);
+    }
+  }
+
   log(`\n${bold("DONE")} (${kanban.done.length} recent)`);
   for (const i of kanban.done.slice(0, 5)) {
     log(`  #${i.number} ${i.title}`);
