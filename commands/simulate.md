@@ -108,70 +108,253 @@ PREFLIGHT — CYCLE [N]
 
 ---
 
-## Phases 1–7 — Full Simulation Loop
+## Phase 1 — Customer Journeys
 
-Follow the complete `/vb-simulate` workflow:
+Skip if `--cx-only` was passed.
 
-- **Phase 1** — Customer Journeys (agent-browser, profile generation, triage, inline fixes)
-- **Phase 2** — UX Audit (9 dimensions, 3 iterations, page inventory, IA audit, fixes)
-- **Phase 3** — Performance Audit (Core Web Vitals via CDP)
-- **Phase 4** — Dedup
-- **Phase 5** — GitHub Output ([Sim] Cycle N parent issue, Highlights Index update)
-- **Phase 6** — GTM Sync (DEMO-SEQUENCE.md)
-- **Phase 7** — Status → Loop
+### 1a. Generate customer profiles
 
-### codebase integration points
+For each of `--count N` customers (default 3), generate a realistic persona:
+- **Name, role, company** — from roles in `docs/PRODUCT.md`
+- **Country** — from `$ARGUMENTS` or random if not specified
+- **Goals** — 3-5 tasks this persona would do in the app (derived from PRODUCT.md role tasks)
+- **Tech comfort** — varies (some savvy, some not)
 
-**After every inline fix commit**, refresh the manifest so `codebase next` stays current:
+### 1b. Run each journey sequentially
+
+For each customer, run a browser session via agent-browser:
+
 ```bash
-npx codebase scan-only --incremental --quiet --sync
+# Sync before starting
+git fetch origin && git checkout develop && git pull origin develop
+
+# Start browser session
+agent-browser open http://localhost:[port]
+agent-browser snapshot -i  # accessibility tree → @e1, @e2 refs
 ```
 
-**Issue creation** uses the standard `gh issue create` flow. After creating any issue, also run:
+**Login** using the detected mechanism from Phase 0:
 ```bash
-npx codebase issue create "[title]" --message "[body summary]" 2>/dev/null || true
-```
-This keeps the codebase manifest's issue list in sync.
-
-**Pre-work sync (run once at the start of each cycle):**
-```bash
-git fetch origin
-git status  # if dirty, stash first: git stash
-git checkout develop && git pull origin develop
+agent-browser auth login [role]  # if saved
+# OR navigate to login page and fill credentials from PRODUCT.md
 ```
 
-**Commit convention — one atomic commit per fix, never batch:**
+**Execute each goal** as a sequence of browser actions:
+1. Navigate to the relevant page
+2. `agent-browser snapshot -i` to read the accessibility tree
+3. Interact: `click @eN`, `fill @eN "value"`, navigate
+4. After each action, `snapshot -i` again to verify state changed
+5. `agent-browser screenshot` to capture evidence
+
+**Triage findings** during the journey:
+
+| Severity | Criteria | Action |
+|----------|----------|--------|
+| `critical` | App crash, data loss, security hole, blank page | Create issue immediately |
+| `high` | Feature broken, workflow blocked, wrong data shown | Create issue immediately |
+| `medium` | UI glitch, slow load, confusing UX, missing feedback | Create issue, fix inline if < 30 min |
+| `low` | Cosmetic, minor copy, alignment | Create issue, fix inline if < 10 min |
+
+**Inline fix flow** (for fixable bugs):
+1. Read the source file causing the bug
+2. Fix it
+3. Verify the fix via browser (`snapshot -i` → confirm change)
+4. Commit atomically:
 ```bash
-git add [specific files only — never git add .]
+git add [specific files only]
 git commit -m "fix([severity]): [short description]
 
 Simulation cycle [N] — [role] at [company]
 Page: [route]
 Closes #[issue-N if exists]"
 git push origin develop
+npx codebase scan-only --incremental --quiet --sync
 ```
 
-**If working files are dirty before checkout:**
+**Create GitHub issues** for everything found:
 ```bash
-git stash
-git checkout develop && git pull origin develop
-git stash pop
+gh issue create --title "[Sim] [severity]: [description]" \
+  --label "bug,[severity],sim" \
+  --body "## Bug Report
+**Cycle:** [N]
+**Customer:** [name] ([role] at [company])
+**Page:** [route]
+**Steps to reproduce:**
+1. [step]
+2. [step]
+
+**Expected:** [what should happen]
+**Actual:** [what happened]
+**Screenshot:** [attached or described]
+**Fixed inline:** [yes/no — if yes, commit SHA]"
 ```
 
-**After each full cycle** run a fresh scan:
+### 1c. Session log
+
+After each customer journey, write an HTML session log to `.vibekit/sessions/cycle-[N]-[role].html` with all screenshots, accessibility trees, and actions taken.
+
+---
+
+## Phase 2 — UX Audit
+
+Skip if `--journey-only` was passed.
+
+### 2a. Page inventory
+
+Crawl the app to build a page list:
+```bash
+agent-browser open http://localhost:[port]
+agent-browser snapshot -i
+```
+Navigate each link in the accessibility tree. Build a list of all unique routes.
+
+### 2b. Audit each page across 9 dimensions
+
+For each page, evaluate:
+
+| # | Dimension | What to check |
+|---|-----------|---------------|
+| 1 | **Visual hierarchy** | Clear heading structure, logical reading order, emphasis on primary actions |
+| 2 | **Navigation** | Breadcrumbs, back buttons, consistent nav, no dead ends |
+| 3 | **Forms & input** | Labels, validation messages, error recovery, tab order |
+| 4 | **Feedback** | Loading states, success/error messages, progress indicators |
+| 5 | **Accessibility** | Contrast ratios, ARIA labels, keyboard navigation, screen reader text |
+| 6 | **Responsive** | Layout at different viewport widths (if testable) |
+| 7 | **Content** | Spelling, grammar, placeholder text, missing copy |
+| 8 | **Performance** | Perceived speed, unnecessary spinners, layout shift |
+| 9 | **Consistency** | Same patterns used across pages, no style drift |
+
+Score each dimension 1-10. Repeat for `--iterations N` passes (default 3), improving scores each pass by fixing what you can inline.
+
+### 2c. Fix and commit
+
+Same inline fix flow as Phase 1. One commit per fix, push to develop.
+
+---
+
+## Phase 3 — Performance Audit
+
+Quick performance check on the top 5 most-visited pages:
+1. Navigate to each page
+2. Note perceived load time (fast/medium/slow)
+3. Check for layout shifts (`snapshot -i` before and after full load)
+4. Check for unnecessary network requests if visible in page behavior
+
+Create issues for any `medium` or `slow` pages with label `performance,sim`.
+
+---
+
+## Phase 4 — Dedup
+
+Before creating the cycle summary, deduplicate findings:
+```bash
+EXISTING=$(gh issue list --label "sim" --state open --json title --jq '.[].title')
+```
+Skip creating any issue whose title matches an existing open issue (fuzzy — same key words).
+
+---
+
+## Phase 5 — GitHub Output
+
+### 5a. Create cycle parent issue
+
+```bash
+gh issue create \
+  --title "[Sim] Cycle [N] — [date]" \
+  --label "cycle,sim" \
+  --body "## Simulation Cycle [N]
+
+**Date:** [ISO date]
+**Customers:** [count]
+**Bugs found:** [N] (critical: [N], high: [N], medium: [N], low: [N])
+**Fixed inline:** [N]
+**Issues created:** [list of #numbers]
+
+### UX Audit Scores
+| Dimension | Score |
+|-----------|-------|
+| Visual hierarchy | [N]/10 |
+| Navigation | [N]/10 |
+| Forms & input | [N]/10 |
+| Feedback | [N]/10 |
+| Accessibility | [N]/10 |
+| Responsive | [N]/10 |
+| Content | [N]/10 |
+| Performance | [N]/10 |
+| Consistency | [N]/10 |
+| **Average** | **[N]/10** |
+
+### Highlights
+[Notable positive findings — things working well]
+
+### Session Logs
+[Links to .vibekit/sessions/ HTML files]"
+```
+
+### 5b. Update Highlights Index
+
+Find the Highlights Index issue and append new highlights:
+```bash
+HIGHLIGHTS_N=$(gh issue list --label "highlight" --state all --limit 1 --json number --jq '.[0].number // empty')
+if [ -n "$HIGHLIGHTS_N" ]; then
+  gh issue comment $HIGHLIGHTS_N --body "## Cycle [N] Highlights
+[list of positive findings]"
+fi
+```
+
+---
+
+## Phase 6 — Refresh
+
 ```bash
 npx codebase scan-only --quiet --sync
 ```
 
-Use agent-browser for all browser automation. One sequential browser session per journey — no parallel tabs. Example session:
-```bash
-agent-browser open http://localhost:[port]
-agent-browser snapshot -i              # get @e1, @e2 refs from accessibility tree
-agent-browser click @e1
-agent-browser fill @e2 "value"
-agent-browser screenshot               # capture evidence
+---
+
+## Phase 7 — Loop
+
+Print cycle summary:
+```
+CYCLE [N] COMPLETE
+════════════════════════════════════════════════════
+  Bugs found:      [N]
+  Fixed inline:    [N]
+  Issues created:  [N]
+  UX average:      [N]/10
+  Carry bugs:      [N]
+════════════════════════════════════════════════════
 ```
 
-Auth persistence: `agent-browser auth save <role>` after login, `agent-browser auth login <role>` to restore. State: `agent-browser state save/load <name>` between pages.
+If running in continuous mode (no `--journey-only` or `--cx-only`): increment cycle number, return to Phase 0 preflight.
 
-All other behavior follows the `/vb-simulate` specification exactly.
+Otherwise: exit.
+
+---
+
+## Ground Rules
+
+1. **One fix, one commit** — never batch unrelated changes
+2. **`git add [specific files]`** — never `git add .`
+3. **Always push to develop** — no feature branches for inline fixes
+4. **Create issues for everything** — even things you fix, so there's a record
+5. **No force push** — use `git revert` to undo
+6. **Read PRODUCT.md** — personas and roles come from there, never hardcoded
+7. **Sequential browser sessions** — one tab at a time, no parallel navigation
+8. **Screenshot evidence** — every bug needs visual proof
+9. **Dedup before creating** — don't file duplicate issues
+10. **Refresh manifest after every fix** — keeps `codebase next` current
+
+## Browser Automation Reference (agent-browser)
+
+```bash
+agent-browser open <url>           # navigate to URL
+agent-browser snapshot -i          # accessibility tree → @e1, @e2 element refs
+agent-browser click @e1            # click element
+agent-browser fill @e2 "text"      # type into input
+agent-browser screenshot           # capture current page
+agent-browser auth save <profile>  # save auth state
+agent-browser auth login <profile> # restore auth state
+agent-browser state save <name>    # save page state
+agent-browser state load <name>    # restore page state
+```

@@ -114,6 +114,11 @@ export function generateBrief(m: Manifest): string {
       statusParts.push("\n### NEXT TASK (highest priority)");
       const labels = nextTask.labels.length ? ` [${nextTask.labels.join(", ")}]` : "";
       statusParts.push(`#${nextTask.number}: ${nextTask.title}${labels}`);
+      if (nextTask.body) {
+        const snippet =
+          nextTask.body.length > 300 ? nextTask.body.slice(0, 300) + "…" : nextTask.body;
+        statusParts.push(snippet);
+      }
       if (nextTask.mapped_files?.length) {
         statusParts.push(`Start in: ${nextTask.mapped_files.join(", ")}`);
       }
