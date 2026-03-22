@@ -35,7 +35,8 @@
   },
   "files": [
     "dist",
-    "commands"
+    "commands",
+    "skills"
   ],
   "keywords": [
     "codebase",

@@ -77,6 +77,10 @@ export async function runSetup(options: CLIOptions): Promise<void> {
     installClaudeCommands(root);
   }
 
+  // ── Step 4b: Claude skills ──────────────────────────────────
+  heading("Claude Skills");
+  installClaudeSkills();
+
   // ── Step 5: Gitignore ─────────────────────────────────────────
   updateGitignore(root);
   appendToGitignore(root, [
@@ -209,6 +213,69 @@ function installClaudeCommands(root: string): void {
     info("Available: /setup /simulate /build /launch /review");
     info("Tip: commit .claude/commands/ to share these with your team");
   }
+}
+
+// ─── Claude skills installation ──────────────────────────────────
+
+function installClaudeSkills(): void {
+  // skills/ is always a sibling of dist/ in the npm package
+  const skillsSource = join(dirname(new URL(import.meta.url).pathname), "..", "skills");
+
+  if (!existsSync(skillsSource)) {
+    warn("Skills not found in package — skipping");
+    return;
+  }
+
+  const files = readdirSync(skillsSource).filter((f) => f.endsWith(".skill"));
+  if (files.length === 0) {
+    info("No skill files found in package");
+    return;
+  }
+
+  const destDir = join(process.env["HOME"] ?? "~", ".claude", "skills");
+  mkdirSync(destDir, { recursive: true });
+
+  let installed = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  for (const file of files) {
+    const src = join(skillsSource, file);
+    const dest = join(destDir, file);
+    if (existsSync(dest)) {
+      const srcBuf = readFileSync(src);
+      const destBuf = readFileSync(dest);
+      if (!srcBuf.equals(destBuf)) {
+        copyFileSync(src, dest);
+        updated++;
+      } else {
+        skipped++;
+      }
+    } else {
+      copyFileSync(src, dest);
+      installed++;
+    }
+  }
+
+  const parts: string[] = [];
+  if (installed > 0) {
+    parts.push(`${installed} new`);
+  }
+  if (updated > 0) {
+    parts.push(`${updated} updated`);
+  }
+  if (skipped > 0) {
+    parts.push(`${skipped} unchanged`);
+  }
+
+  const names = files.map((f) => f.replace(/\.skill$/, "")).join(", ");
+
+  if (installed > 0 || updated > 0) {
+    success(`Skills → ~/.claude/skills/ (${parts.join(", ")})`);
+  } else {
+    info(`Skills up to date → ~/.claude/skills/`);
+  }
+  info(`Available: ${names}`);
 }
 
 // ─── Claude Code hooks ────────────────────────────────────────────

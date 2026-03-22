@@ -68,6 +68,7 @@ Follow the complete `/vb-review` workflow across all phases:
 - **Phase 0** — Scope (`--pr N` or full codebase)
 - **Phase 1** — Security Review (OWASP top 10, CVEs, secrets, auth/authz)
 - **Phase 2** — Quality Review (CLAUDE.md conventions, dead code, lint, complexity, defensive programming, minimal code)
+- **Phase 2b** — Dead Code Declutter (stack-aware — runs `/py-declutter` for Python, `/nextjs-declutter` for Next.js)
 - **Phase 3** — Dependency Health (outdated, vulnerable, alternatives)
 - **Phase 4** — UI/Accessibility (contrast, ARIA, keyboard, responsive)
 - **Phase 5** — Consolidate & prioritize
@@ -148,6 +149,45 @@ Auto-fix:      [yes | no]
 ```
 
 All other behavior (security agent prompts, CVE research, accessibility checks, test generation) follows the `/vb-review` specification exactly.
+
+---
+
+## Phase 2b — Dead Code Declutter (Stack-Aware)
+
+After the quality review, detect the project stack from the brief and run the appropriate declutter skill if installed. This is automatic — no flags needed.
+
+### Detection logic
+
+```bash
+# Read stack from brief (already loaded in Phase 0)
+LANGUAGES=$(node -e "try{const b=require('/tmp/cb-brief.json');console.log((b.stack?.languages||[]).join(','))}catch{}" 2>/dev/null)
+FRAMEWORKS=$(node -e "try{const b=require('/tmp/cb-brief.json');console.log((b.stack?.frameworks||[]).join(','))}catch{}" 2>/dev/null)
+```
+
+### Dispatch rules
+
+| Condition | Action |
+|-----------|--------|
+| `LANGUAGES` contains `python` | Run `/py-declutter` |
+| `FRAMEWORKS` contains `next` or `nextjs` | Run `/nextjs-declutter` |
+| Both match | Run both sequentially (Python first, then Next.js) |
+| Neither matches | Skip Phase 2b — log: "No declutter skill matches this stack" |
+
+### Execution
+
+When a matching skill is detected, invoke it directly via the Skill tool:
+- The skill handles its own analysis, confidence scoring, and auto-removal
+- Findings with confidence <80% are reported as GitHub Issues (labeled `review,quality,dead-code`)
+- Findings with confidence >=80% are auto-removed if `--fix` is active, otherwise reported as issues
+- After the skill completes, include its KPI summary (files removed, lines eliminated, functions cleaned) in the Phase 8 summary
+
+### If skill is not installed
+
+If the matching skill file is not found in `~/.claude/skills/`, log:
+```
+  Skill [name] not installed — run: codebase setup
+```
+Then continue to Phase 3. Do not fail the review.
 
 ---
 
