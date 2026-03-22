@@ -1,31 +1,48 @@
 # Usage
 
+## Quick Start (30 seconds)
+
+```bash
+npx codebase-ai          # one command — scans project, wires AI tools, installs hooks
+```
+
+That's it. Every AI tool that reads `CLAUDE.md` or `.codebase.json` now understands your project.
+
+For the full autonomous loop (simulate → build → launch):
+```bash
+codebase setup            # installs slash commands, skills, GitHub labels, PRODUCT.md
+```
+
+---
+
 ## Quick Reference
 
 ```bash
-# One-time setup
-npx codebase-ai                       # full setup: scan + CLAUDE.md + hooks + MCP
-
-# AI-facing commands (Claude calls these)
-codebase brief                        # full project briefing
-codebase next                         # what should I work on?
-codebase status                       # kanban, priorities, milestones
-codebase query <path>                 # query specific field
+# AI-facing (Claude calls these automatically)
+codebase brief                              # full project briefing — run first
+codebase next                               # highest-priority task to work on
+codebase status                             # kanban board, priorities, milestones
+codebase query stack.languages              # query any field by dot-path
 
 # Issues
-codebase issue create "title"         # create GitHub issue
-codebase issue close <n> --reason "why"   # close with reason
-codebase issue comment <n> --message "text"  # add audit trail comment
-codebase issue list                   # list all issues
+codebase issue create "Fix auth bug"        # create GitHub issue
+codebase issue close 42 --reason "Fixed"    # close with reason
+codebase issue list                         # list all issues
+
+# Autonomous loop (slash commands in Claude Code)
+/simulate                                   # customer journeys + UX audit
+/build                                      # implement issues autonomously
+/launch                                     # gate check → release → merge to main
+/review                                     # security + quality + deps + accessibility audit
+
+# Skills
+codebase skills                             # list installed skills
 
 # Maintenance
-codebase scan                         # refresh .codebase.json
-codebase release                      # gate check → tag → develop→main
-codebase doctor                       # health check
-codebase fix                          # auto-repair issues
-
-# MCP server
-codebase mcp                          # start MCP server (stdio)
+codebase scan                               # refresh .codebase.json (lightweight)
+codebase doctor                             # health check
+codebase fix                                # auto-repair issues
+codebase release                            # gate check → tag → merge develop→main
 ```
 
 ---
@@ -34,7 +51,7 @@ codebase mcp                          # start MCP server (stdio)
 
 ### `npx codebase-ai` / `codebase init`
 
-Full one-time setup. Scans project, configures Claude Code, installs hooks.
+Full one-time setup. Scans project, configures AI tools, installs hooks.
 
 ```bash
 npx codebase-ai                       # complete setup
@@ -45,43 +62,60 @@ codebase init --sync                  # include GitHub data
 1. Scans project (stack, commands, structure, patterns)
 2. Syncs GitHub data (issues, PRs, milestones) if `gh` CLI is available
 3. Writes `.codebase.json`
-4. Injects into `CLAUDE.md`
-5. Writes `.mcp.json`
-6. Installs git hooks (pre-commit, post-commit, post-checkout, commit-msg)
-7. Installs Claude Code hooks (`.claude/hooks/`)
-8. Installs slash commands (`.claude/commands/`)
-9. Updates `.gitignore`
+4. Injects into `CLAUDE.md` (commands, rules, maintenance, MCP tools)
+5. Configures MCP server in `.mcp.json`
+6. Installs git hooks (pre-commit, post-commit, commit-msg)
+7. Updates `.gitignore`
+
+---
+
+### `codebase setup`
+
+Full vibekit bootstrap. Runs `init` plus installs the autonomous loop infrastructure.
+
+```bash
+codebase setup                        # full setup for autonomous loop
+```
+
+**What it adds beyond `init`:**
+1. Claude Code hooks (git-guard for branch protection, PR reminders)
+2. Slash commands → `.claude/commands/` (/simulate, /build, /launch, /review, /setup)
+3. Skills → `.claude/skills/` + `~/.claude/skills/` (py-declutter, nextjs-declutter, arch-review, vibeloop)
+4. agent-browser (headless Chrome for /simulate)
+5. GitHub labels (bug, arch, sim, critical, high, medium, low, vibekit, etc.)
+6. `docs/PRODUCT.md` skeleton (personas, roles, dev credentials)
+7. `.vibekit/` directory for loop state
 
 ---
 
 ### `codebase scan`
 
-Generate `.codebase.json` manifest.
+Lightweight manifest refresh. Updates `.codebase.json` without touching AI tool configs.
 
 ```bash
 codebase scan                         # scan current dir
-codebase scan --depth 6               # directory tree depth (default: 4)
-codebase scan --quiet                 # no stdout, just write file
-codebase scan --sync                  # sync GitHub data (requires gh)
+codebase scan --depth 6               # deeper directory tree (default: 4)
+codebase scan --quiet                 # no stdout
+codebase scan --sync                  # also refresh GitHub data
 ```
 
 ---
 
-### `codebase brief` (AI-facing)
+### `codebase brief`
 
-Full project briefing. Claude calls this at session start.
+Full project briefing. AI agents call this at session start.
 
 ```bash
 codebase brief                        # everything in one call
 ```
 
-Returns: project identity, tech stack, commands, structure, current status, next task, blockers, recent decisions.
+Returns: project identity, tech stack, commands, structure, current status (kanban, priorities), next task with body snippet, blockers, milestones, recent decisions, recent commits.
 
 ---
 
-### `codebase next` (AI-facing)
+### `codebase next`
 
-Show highest-priority task.
+Highest-priority task to work on, with issue body and mapped files.
 
 ```bash
 codebase next                         # what should I work on?
@@ -89,46 +123,56 @@ codebase next                         # what should I work on?
 
 ---
 
-### `codebase status` (AI-facing)
+### `codebase status`
 
 Kanban board, priorities, and milestones.
 
 ```bash
 codebase status                       # full project status
+codebase status --mine                # only your assigned items
 ```
 
 ---
 
 ### `codebase query`
 
-Query specific field using dot-path notation.
+Query any field using dot-path notation.
 
 ```bash
 codebase query stack.languages            # ["typescript"]
 codebase query commands.test              # "npx vitest run"
-codebase query commands.test --raw        # npx vitest run (plain text)
-codebase query repo.is_monorepo           # false
+codebase query commands.test --force      # npx vitest run (plain text, no JSON)
 
-# Pipe into other commands
-codebase query commands.test --raw | sh   # run tests directly
+# Run commands directly
+codebase query commands.test --force | sh
 ```
 
 **Common paths:**
 - `stack.languages`, `stack.frameworks`, `stack.database`
 - `commands.dev`, `commands.test`, `commands.build`, `commands.lint`
 - `repo.is_monorepo`, `repo.default_branch`
-- `structure.entry_points`
-- `dependencies.notable`
+- `structure.entry_points`, `patterns.architecture`
+- `dependencies.notable`, `dependencies.direct_count`
 
 ---
 
-### `codebase setup`
+### `codebase skills`
 
-Re-run wiring. Safe to run multiple times.
+List installed Claude skills with descriptions.
 
 ```bash
-codebase setup                        # update commands, hooks, CLAUDE.md, MCP config
+codebase skills                       # show all installed skills
 ```
+
+Skills extend `/review` and other commands with stack-specific analysis. Installed by `codebase setup`.
+
+**Bundled skills:**
+| Skill | What it does |
+|-------|--------------|
+| py-declutter | Python dead code elimination via AST call graph |
+| nextjs-declutter | Next.js dead code via import graph analysis |
+| arch-review | 5-expert architecture review (3 cycles) |
+| vibeloop | Autonomous build → simulate → launch loop |
 
 ---
 
@@ -141,32 +185,40 @@ codebase issue create "Fix auth bug"                       # create
 codebase issue close 42 --reason "Fixed in PR #43"         # close with reason
 codebase issue comment 42 --message "Refactored auth flow" # add comment
 codebase issue list                                        # list all
-codebase issue list --mine                                 # list assigned to you
+codebase issue list --mine                                 # list yours
 ```
 
 ---
 
 ### `codebase mcp`
 
-Start MCP server for native Claude Code integration.
+Start MCP server for IDE/agent integrations (Claude Desktop, Cursor, Cline, etc.).
 
 ```bash
 codebase mcp                           # start stdio MCP server
 ```
 
-Add to `.mcp.json`:
-```json
-{
-  "mcpServers": {
-    "codebase": {
-      "command": "npx",
-      "args": ["codebase-ai", "mcp"]
-    }
-  }
-}
-```
+**MCP tools available:**
+| Tool | What it does |
+|------|--------------|
+| `project_brief` | Full project briefing (call first) |
+| `get_next_task` | Highest-priority task with body |
+| `get_blockers` | Issues blocked, PRs failing, merge conflicts |
+| `get_issue` | Full issue detail by number |
+| `get_pr` | Full PR detail by number |
+| `create_issue` | Create GitHub issue |
+| `close_issue` | Close issue with comment |
+| `update_issue` | Add/remove labels, set assignee |
+| `refresh_status` | Refresh GitHub data (fast, no filesystem scan) |
+| `rescan_project` | Full rescan + optional GitHub sync |
+| `list_commands` | List installed slash commands |
+| `list_skills` | List installed skills |
+| `get_plan` | Read PLAN.md (loop memory) |
+| `update_plan` | Append to PLAN.md |
+| `get_codebase` | Get structured manifest data |
+| `query_codebase` | Query specific field by dot-path |
 
-`codebase setup` writes this automatically.
+`codebase init` writes `.mcp.json` automatically.
 
 ---
 
@@ -175,7 +227,7 @@ Add to `.mcp.json`:
 Quality gates → tag → merge `develop → main` → GitHub Release.
 
 ```bash
-codebase release                      # auto-increment version and release
+codebase release                      # auto-increment version
 codebase release v1.2.0               # explicit version
 codebase release --dry-run            # preview without tagging
 ```
@@ -188,25 +240,33 @@ codebase release --dry-run            # preview without tagging
 
 ---
 
-### `codebase doctor`
+### `codebase doctor` / `codebase fix`
 
-Diagnose setup issues.
+Health check and auto-repair.
 
 ```bash
-codebase doctor                       # run health check
+codebase doctor                       # diagnose issues
+codebase fix                          # auto-repair everything
 ```
 
-Checks: manifest freshness, CLAUDE.md injection, MCP config, git hooks, Claude Code hooks, `.gitignore`.
+**Checks:** manifest freshness, detector coverage, CLAUDE.md injection, MCP config, git hooks, Claude Code hooks, slash commands, skills, GitHub CLI status, `.gitignore`.
 
 ---
 
-### `codebase fix`
+## Autonomous Loop
 
-Auto-repair anything `doctor` flags.
+After running `codebase setup`, the full autonomous development loop is available:
 
-```bash
-codebase fix                          # auto-repair all issues
 ```
+/simulate → /build → /launch
+```
+
+1. **`/simulate`** — Generates customer personas from `docs/PRODUCT.md`, runs browser journeys via agent-browser, performs 9-dimension UX audit (3 iterations), fixes bugs inline, creates GitHub issues for everything found
+2. **`/build`** — Picks highest-priority `arch`/`vibekit` issue, implements it, runs tests, verifies via browser, commits, polls for new issues, repeats up to 20 rounds
+3. **`/launch`** — Checks all gates (bugs, tests, UX score, clean branch), generates release notes, creates GitHub release, merges develop → main
+4. **`/review`** — Security (OWASP), quality (conventions, dead code), dependency health, accessibility audit. Auto-dispatches stack-specific skills (py-declutter for Python, nextjs-declutter for Next.js)
+
+All commands are fully self-contained — every phase specified inline with exact shell commands.
 
 ---
 
@@ -214,13 +274,14 @@ codebase fix                          # auto-repair all issues
 
 | Option | Description |
 |--------|-------------|
-| `--help, -h` | Show help |
+| `--help, -h` | Show help (or `<command> --help` for command-specific) |
 | `--version, -v` | Show version |
 | `--verbose` | Detailed output |
 | `--quiet` | Minimal output |
 | `--path <dir>` | Target directory (default: current) |
 | `--dry-run` | Preview without applying |
 | `--sync` | Include GitHub data |
+| `--force` | Skip gates / plain text output (replaces deprecated `--raw`) |
 
 ---
 
@@ -228,41 +289,27 @@ codebase fix                          # auto-repair all issues
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CODEBASE_PORT` | `7432` | MCP server port |
+| `CODEBASE_MANIFEST_TTL_HOURS` | `24` | How long before manifest is considered stale |
 | `CODEBASE_DEPTH` | `4` | Directory tree depth |
 | `CODEBASE_QUIET` | `false` | Suppress stdout |
+| `CODEBASE_NO_UPDATE_CHECK` | — | Skip npm update check |
+| `NO_COLOR` | — | Disable colored output |
 
 ---
 
-## Language-Specific Examples
+## Language Support
 
-### JavaScript / TypeScript
+Works with any project. Auto-detects:
 
-```bash
-codebase scan                        # detects package.json, tsconfig.json
-codebase query commands.test --raw | sh  # runs: npm test / npx vitest run
-```
-
-### Python
-
-```bash
-codebase scan                        # detects pyproject.toml, poetry.lock, uv.lock
-codebase query commands.test --raw | sh  # runs: poetry run pytest / uv run pytest
-```
-
-### Rust
-
-```bash
-codebase scan                        # detects Cargo.toml
-codebase query commands.test --raw | sh  # runs: cargo test
-```
-
-### Go
-
-```bash
-codebase scan                        # detects go.mod
-codebase query commands.test --raw | sh  # runs: go test ./...
-```
+| Language | Detected from | Test command |
+|----------|---------------|-------------|
+| JavaScript / TypeScript | `package.json`, `tsconfig.json` | `npm test` / `npx vitest run` |
+| Python | `pyproject.toml`, `requirements.txt` | `pytest` / `uv run pytest` |
+| Rust | `Cargo.toml` | `cargo test` |
+| Go | `go.mod` | `go test ./...` |
+| Java | `pom.xml`, `build.gradle` | `mvn test` / `gradle test` |
+| Ruby | `Gemfile` | `bundle exec rspec` |
+| PHP | `composer.json` | `phpunit` |
 
 ---
 
