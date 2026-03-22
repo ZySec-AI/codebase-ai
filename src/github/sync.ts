@@ -197,6 +197,7 @@ export function parseIssue(raw: Record<string, unknown>): IssueData {
     created_at: raw.createdAt as string,
     updated_at: raw.updatedAt as string,
     effort: parseEffort(body),
+    body: safe((raw.body as string) || "", 2000),
   };
 }
 

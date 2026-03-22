@@ -211,6 +211,7 @@ export interface IssueData {
   };
   timeline_events?: number;
   url?: string;
+  body?: string;
 }
 
 export interface PullRequestData {

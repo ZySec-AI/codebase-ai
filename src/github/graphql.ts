@@ -256,6 +256,7 @@ function parseIssueNode(node: Record<string, unknown>): ReturnType<
       eyes: reactions.eyes || 0,
     },
     timeline_events: timeline?.totalCount || 0,
+    body: safe((node.body as string) || "", 2000),
   };
 }
 

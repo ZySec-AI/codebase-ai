@@ -7,7 +7,7 @@ import { execFile } from "node:child_process";
 import { queryPath } from "../utils/json-path.js";
 import { scan } from "../scanner/engine.js";
 import { generateBrief } from "./brief.js";
-import { rankIssues } from "../github/sync.js";
+import { rankIssues, syncGitHub } from "../github/sync.js";
 import type { Manifest } from "../types.js";
 
 interface JsonRpcRequest {
@@ -137,6 +137,15 @@ const TOOL_DEFINITIONS = [
       properties: {},
     },
   },
+  {
+    name: "list_skills",
+    description:
+      "List installed Claude Code skills with their names and descriptions. Skills extend /review and other commands with stack-specific analysis.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
 
   // ─── Plan (PLAN.md) ────────────────────────────────────────────
   {
@@ -164,6 +173,32 @@ const TOOL_DEFINITIONS = [
     },
   },
 
+  // ─── Issue & PR Detail ─────────────────────────────────────────
+  {
+    name: "get_issue",
+    description:
+      "Get full details of a specific GitHub issue by number, including body, comments, and linked PRs. Use this when working on an issue and need its complete specification.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        number: { type: "number" as const, description: "Issue number" },
+      },
+      required: ["number"],
+    },
+  },
+  {
+    name: "get_pr",
+    description:
+      "Get full details of a specific pull request by number, including body, review status, checks, and diff stats.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        number: { type: "number" as const, description: "PR number" },
+      },
+      required: ["number"],
+    },
+  },
+
   // ─── Rescan ────────────────────────────────────────────────────
   {
     name: "rescan_project",
@@ -177,6 +212,15 @@ const TOOL_DEFINITIONS = [
           description: "Also refresh GitHub data (issues, PRs, milestones). Default: false.",
         },
       },
+    },
+  },
+  {
+    name: "refresh_status",
+    description:
+      "Refresh only GitHub data (issues, PRs, milestones) without re-scanning the filesystem. Much faster than rescan_project. Call this after creating/closing issues to get fresh priority data.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
     },
   },
 ];
@@ -297,6 +341,7 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
 
       case "create_issue": {
         const result = await ghCreateIssue(root, args);
+        await invalidateManifest(root);
         return respond(req.id, {
           content: [{ type: "text", text: result }],
         });
@@ -304,6 +349,7 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
 
       case "close_issue": {
         const result = await ghCloseIssue(root, args);
+        await invalidateManifest(root);
         return respond(req.id, {
           content: [{ type: "text", text: result }],
         });
@@ -341,6 +387,73 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
               text: `Installed commands (${allFiles.length}): ${names}\n\nLoop: /simulate → /build → /launch`,
             },
           ],
+        });
+      }
+
+      case "list_skills": {
+        const skillsDir = join(homedir(), ".claude", "skills");
+
+        if (!existsSync(skillsDir)) {
+          return respond(req.id, {
+            content: [
+              {
+                type: "text",
+                text: "No skills directory found (~/.claude/skills/). Run: codebase setup",
+              },
+            ],
+          });
+        }
+
+        const skillFiles = readdirSync(skillsDir).filter((f) => f.endsWith(".skill"));
+
+        if (skillFiles.length === 0) {
+          return respond(req.id, {
+            content: [
+              {
+                type: "text",
+                text: "No skills installed in ~/.claude/skills/. Run: codebase setup",
+              },
+            ],
+          });
+        }
+
+        const skills: Array<{ name: string; description: string; file: string }> = [];
+
+        await Promise.all(
+          skillFiles.map(
+            (file) =>
+              new Promise<void>((resolveSkill) => {
+                const filePath = join(skillsDir, file);
+                execFile(
+                  "unzip",
+                  ["-p", filePath, "*/SKILL.md"],
+                  { timeout: 10_000 },
+                  (err, stdout) => {
+                    if (err || !stdout.trim()) {
+                      resolveSkill();
+                      return;
+                    }
+                    // Parse YAML frontmatter between --- markers
+                    const match = stdout.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+                    if (!match) {
+                      resolveSkill();
+                      return;
+                    }
+                    const frontmatter = match[1];
+                    const nameMatch = frontmatter.match(/^name:\s*(.+)$/m);
+                    const descMatch = frontmatter.match(/^description:\s*(.+)$/m);
+                    const name = nameMatch ? nameMatch[1].trim() : file.replace(/\.skill$/, "");
+                    const description = descMatch ? descMatch[1].trim() : "";
+                    skills.push({ name, description, file });
+                    resolveSkill();
+                  }
+                );
+              })
+          )
+        );
+
+        return respond(req.id, {
+          content: [{ type: "text", text: JSON.stringify(skills, null, 2) }],
         });
       }
 
@@ -383,6 +496,36 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
         });
       }
 
+      case "get_issue": {
+        const number = args.number as number;
+        const raw = await ghExecArgs(root, [
+          "issue",
+          "view",
+          String(number),
+          "--json",
+          "number,title,state,body,labels,assignees,milestone,comments,url",
+        ]);
+        const issue = JSON.parse(raw) as unknown;
+        return respond(req.id, {
+          content: [{ type: "text", text: JSON.stringify(issue, null, 2) }],
+        });
+      }
+
+      case "get_pr": {
+        const number = args.number as number;
+        const raw = await ghExecArgs(root, [
+          "pr",
+          "view",
+          String(number),
+          "--json",
+          "number,title,state,body,author,labels,reviewRequests,reviewDecision,statusCheckRollup,additions,deletions,comments,url",
+        ]);
+        const pr = JSON.parse(raw) as unknown;
+        return respond(req.id, {
+          content: [{ type: "text", text: JSON.stringify(pr, null, 2) }],
+        });
+      }
+
       case "rescan_project": {
         const syncGh = args.sync === true;
         const manifest = await scan(root, { quiet: true, sync: syncGh });
@@ -398,6 +541,24 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
               text: `Project rescanned. Manifest updated at ${manifest.generated_at}`,
             },
           ],
+        });
+      }
+
+      case "refresh_status": {
+        const manifestPath = join(root, ".codebase.json");
+        const ghData = await syncGitHub(root);
+        if (ghData) {
+          const content = await readFile(manifestPath, "utf-8");
+          const manifest = JSON.parse(content) as Manifest;
+          manifest.status = ghData.status;
+          manifest.roadmap = ghData.roadmap;
+          manifest.decisions = ghData.decisions;
+          const tmpPath = manifestPath + ".tmp";
+          await writeFile(tmpPath, JSON.stringify(manifest, null, 2), "utf-8");
+          await rename(tmpPath, manifestPath);
+        }
+        return respond(req.id, {
+          content: [{ type: "text", text: `GitHub data refreshed at ${new Date().toISOString()}` }],
         });
       }
 
@@ -497,6 +658,7 @@ function getNextTask(manifest: Manifest): Record<string, unknown> {
       assignee: top.assignee,
       mapped_files: top.mapped_files || [],
       url: top.url,
+      body: top.body || "",
     },
     queue,
     needs_verify: needsVerify,
@@ -591,6 +753,20 @@ async function ghCloseIssue(root: string, args: Record<string, unknown>): Promis
   }
   await ghExecArgs(root, ["issue", "close", String(number)]);
   return `Issue #${number} closed.`;
+}
+
+async function invalidateManifest(root: string): Promise<void> {
+  try {
+    const manifestPath = join(root, ".codebase.json");
+    const content = await readFile(manifestPath, "utf-8");
+    const manifest = JSON.parse(content) as Manifest;
+    manifest.generated_at = "1970-01-01T00:00:00.000Z";
+    const tmpPath = manifestPath + ".tmp";
+    await writeFile(tmpPath, JSON.stringify(manifest, null, 2), "utf-8");
+    await rename(tmpPath, manifestPath);
+  } catch {
+    // If manifest doesn't exist yet, nothing to invalidate
+  }
 }
 
 function respond(id: number | string, result: unknown): JsonRpcResponse {

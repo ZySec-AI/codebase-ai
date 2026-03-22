@@ -1,4 +1,5 @@
 import { resolve, join } from "node:path";
+import { homedir } from "node:os";
 import { existsSync, readFileSync, statSync, readdirSync } from "node:fs";
 import type { CLIOptions, Manifest } from "../types.js";
 import { checkGhDetailed } from "./init.js";
@@ -260,6 +261,32 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
       label: "Claude Commands",
       ok: false,
       detail: ".claude/commands/ missing — run `codebase setup`",
+    });
+  }
+
+  // ─── 10c-ii. Claude Skills ─────────────────────────────────
+  const skillsDir = join(homedir(), ".claude", "skills");
+  if (existsSync(skillsDir)) {
+    const skillFiles = readdirSync(skillsDir).filter((f) => f.endsWith(".skill"));
+    if (skillFiles.length > 0) {
+      const names = skillFiles.map((f) => f.replace(/\.skill$/, "")).join(", ");
+      results.push({
+        label: "Claude Skills",
+        ok: true,
+        detail: `${skillFiles.length} skill${skillFiles.length > 1 ? "s" : ""} installed: ${names}`,
+      });
+    } else {
+      results.push({
+        label: "Claude Skills",
+        ok: false,
+        detail: "No skills installed — run: codebase setup",
+      });
+    }
+  } else {
+    results.push({
+      label: "Claude Skills",
+      ok: false,
+      detail: "No skills installed — run: codebase setup",
     });
   }
 

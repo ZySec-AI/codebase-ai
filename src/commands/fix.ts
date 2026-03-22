@@ -1,5 +1,6 @@
 import { resolve, join } from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import type { CLIOptions } from "../types.js";
 import { scan } from "../scanner/engine.js";
@@ -149,6 +150,17 @@ export async function runFix(options: CLIOptions): Promise<void> {
     const { installClaudeCommandsForFix } = await import("./setup.js");
     installClaudeCommandsForFix(root);
     fixed("Installed Claude commands → .claude/commands/");
+    fixCount++;
+  }
+
+  // ─── 7b. Claude skills ────────────────────────────────────
+  const skillsDir = join(homedir(), ".claude", "skills");
+  const hasSkills =
+    existsSync(skillsDir) && readdirSync(skillsDir).some((f) => f.endsWith(".skill"));
+  if (!hasSkills) {
+    const { installClaudeSkillsForFix } = await import("./setup.js");
+    installClaudeSkillsForFix(root);
+    fixed("Installed Claude skills → ~/.claude/skills/");
     fixCount++;
   }
 

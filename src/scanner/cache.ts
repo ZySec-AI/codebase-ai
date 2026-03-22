@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
+import { writeFile, rename } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { join } from "node:path";
 import type { Manifest } from "../types.js";
@@ -73,7 +74,9 @@ export async function saveCache(
     manifest,
   };
   try {
-    writeFileSync(join(root, CACHE_FILE), JSON.stringify(data), "utf-8");
+    const tmpPath = join(root, CACHE_FILE + ".tmp");
+    await writeFile(tmpPath, JSON.stringify(data), "utf-8");
+    await rename(tmpPath, join(root, CACHE_FILE));
   } catch {
     // Non-critical — scanning still works without cache
   }

@@ -14,6 +14,7 @@ import { runDoctor } from "./commands/doctor.js";
 import { runFix } from "./commands/fix.js";
 import { runRelease } from "./commands/release.js";
 import { runPlan } from "./commands/plan.js";
+import { runSkills } from "./commands/skills.js";
 import type { CLIOptions } from "./types.js";
 
 const options = parseArgs(process.argv.slice(2));
@@ -43,6 +44,7 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
   fix: runFix,
   release: runRelease,
   plan: runPlan,
+  skills: runSkills,
   // Keep "scan-only" for hooks that just want manifest refresh
   "scan-only": runScan,
 };

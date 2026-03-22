@@ -130,6 +130,15 @@ const HELP: Record<string, CommandHelp> = {
     examples: [{ command: "codebase mcp", description: "Start stdio MCP server" }],
   },
 
+  skills: {
+    description: "List installed Claude skills",
+    usage: "codebase skills",
+    examples: [
+      { command: "codebase skills", description: "List all installed skills with descriptions" },
+    ],
+    seeAlso: ["setup"],
+  },
+
   doctor: {
     description: "Diagnose setup and configuration issues",
     usage: "codebase doctor",
@@ -182,6 +191,8 @@ ${bold("AUTONOMOUS LOOP")}
   ${command("/build")}                     Autonomous loop — build → test → simulate → repeat
   ${command("/launch")}                    Gate check → tag → release → merge to main
   ${command("/review")}                    Security, quality, deps, accessibility audit
+
+  ${command("codebase skills")}            List installed Claude skills
 
 ${bold("HUMAN COMMANDS")}
   ${command("codebase init")}              Full setup (scan + AI tools + hooks)

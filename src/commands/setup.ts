@@ -79,7 +79,7 @@ export async function runSetup(options: CLIOptions): Promise<void> {
 
   // ── Step 4b: Claude skills ──────────────────────────────────
   heading("Claude Skills");
-  installClaudeSkills();
+  installClaudeSkills(root);
 
   // ── Step 5: Gitignore ─────────────────────────────────────────
   updateGitignore(root);
@@ -217,7 +217,11 @@ function installClaudeCommands(root: string): void {
 
 // ─── Claude skills installation ──────────────────────────────────
 
-function installClaudeSkills(): void {
+export function installClaudeSkillsForFix(root: string): void {
+  installClaudeSkills(root);
+}
+
+function installClaudeSkills(root: string): void {
   // skills/ is always a sibling of dist/ in the npm package
   const skillsSource = join(dirname(new URL(import.meta.url).pathname), "..", "skills");
 
@@ -232,50 +236,69 @@ function installClaudeSkills(): void {
     return;
   }
 
-  const destDir = join(process.env["HOME"] ?? "~", ".claude", "skills");
-  mkdirSync(destDir, { recursive: true });
+  // Install to both project-local (.claude/skills/) and user-global (~/.claude/skills/)
+  const destinations: Array<{ dir: string; label: string }> = [
+    { dir: join(root, ".claude", "skills"), label: ".claude/skills/" },
+    { dir: join(process.env["HOME"] ?? "~", ".claude", "skills"), label: "~/.claude/skills/" },
+  ];
 
-  let installed = 0;
-  let updated = 0;
-  let skipped = 0;
+  let totalInstalled = 0;
+  let totalUpdated = 0;
 
-  for (const file of files) {
-    const src = join(skillsSource, file);
-    const dest = join(destDir, file);
-    if (existsSync(dest)) {
-      const srcBuf = readFileSync(src);
-      const destBuf = readFileSync(dest);
-      if (!srcBuf.equals(destBuf)) {
-        copyFileSync(src, dest);
-        updated++;
+  for (const { dir, label } of destinations) {
+    mkdirSync(dir, { recursive: true });
+
+    let installed = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const file of files) {
+      const src = join(skillsSource, file);
+      const dest = join(dir, file);
+      if (existsSync(dest)) {
+        const srcBuf = readFileSync(src);
+        const destBuf = readFileSync(dest);
+        if (!srcBuf.equals(destBuf)) {
+          copyFileSync(src, dest);
+          updated++;
+        } else {
+          skipped++;
+        }
       } else {
-        skipped++;
+        copyFileSync(src, dest);
+        installed++;
       }
-    } else {
-      copyFileSync(src, dest);
-      installed++;
     }
-  }
 
-  const parts: string[] = [];
-  if (installed > 0) {
-    parts.push(`${installed} new`);
-  }
-  if (updated > 0) {
-    parts.push(`${updated} updated`);
-  }
-  if (skipped > 0) {
-    parts.push(`${skipped} unchanged`);
+    const parts: string[] = [];
+    if (installed > 0) {
+      parts.push(`${installed} new`);
+    }
+    if (updated > 0) {
+      parts.push(`${updated} updated`);
+    }
+    if (skipped > 0) {
+      parts.push(`${skipped} unchanged`);
+    }
+
+    if (installed > 0 || updated > 0) {
+      success(`Skills → ${label} (${parts.join(", ")})`);
+    } else {
+      info(`Skills up to date → ${label}`);
+    }
+
+    totalInstalled += installed;
+    totalUpdated += updated;
   }
 
   const names = files.map((f) => f.replace(/\.skill$/, "")).join(", ");
 
-  if (installed > 0 || updated > 0) {
-    success(`Skills → ~/.claude/skills/ (${parts.join(", ")})`);
+  if (totalInstalled > 0 || totalUpdated > 0) {
+    info(`Available: ${names}`);
+    info("Tip: commit .claude/skills/ to share these with your team");
   } else {
-    info(`Skills up to date → ~/.claude/skills/`);
+    info(`Available: ${names}`);
   }
-  info(`Available: ${names}`);
 }
 
 // ─── Claude Code hooks ────────────────────────────────────────────
