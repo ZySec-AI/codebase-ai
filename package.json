@@ -1,6 +1,6 @@
 {
   "name": "codebase-ai",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "One command. Every AI tool understands your project instantly.",
   "type": "module",
   "homepage": "https://github.com/ZySec-AI/codebase",
