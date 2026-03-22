@@ -117,6 +117,7 @@ node dist/index.js setup
 |-------|-------------|--------------|
 | `py-declutter` | Python projects | AST call graph → dead code, unused functions, duplicate consolidation |
 | `nextjs-declutter` | Next.js projects | Import graph → unused files, dead exports, dead components, duplicates |
+| `arch-review` | Any project (manual) | 5-expert panel × 3 cycles → top 10 architectural changes, parallel implementation |
 
 ---
 
