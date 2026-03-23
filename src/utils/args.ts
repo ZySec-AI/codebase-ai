@@ -40,6 +40,7 @@ const COMMANDS = new Set([
   "release",
   "plan",
   "skills",
+  "serve",
 ]);
 
 export function parseArgs(argv: string[]): CLIOptions {

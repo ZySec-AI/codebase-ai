@@ -64,30 +64,66 @@ const HELP: Record<string, CommandHelp> = {
   },
 
   brief: {
-    description: "Get comprehensive project briefing (AI-facing)",
-    usage: "codebase brief",
+    description:
+      "Get comprehensive project briefing (AI-facing). (GitHub STATUS section requires gh CLI auth)",
+    usage: "codebase brief [options]",
     examples: [
       { command: "codebase brief", description: "Full project overview in one call" },
-      { command: "codebase brief | jq '.stack'", description: "Extract specific section" },
+      {
+        command: "codebase brief --format json | jq '.stack'",
+        description: "Extract specific section as JSON",
+      },
+      {
+        command: "codebase brief --categories stack,commands",
+        description: "Only include selected sections",
+      },
+    ],
+    options: [
+      {
+        flag: "--format <fmt>",
+        description: "Output format: text (default), json, markdown",
+      },
+      {
+        flag: "--categories <list>",
+        description:
+          "Comma-separated sections to include: stack,commands,status,git,roadmap,decisions",
+      },
     ],
     seeAlso: ["next", "status"],
   },
 
   next: {
-    description: "Show highest-priority task and what's in progress",
+    description: "Show highest-priority task, what's in progress, and what needs verification",
     usage: "codebase next",
-    examples: [{ command: "codebase next", description: "Show next task to work on" }],
+    examples: [
+      { command: "codebase next", description: "Show next task to work on" },
+      {
+        command: "# Output blocks: IN PROGRESS | NEXT TASK | NEEDS VERIFY | BLOCKERS",
+        description: "Four sections covering current state at a glance",
+      },
+      {
+        command:
+          "# Priority order: P0/critical/urgent → vibekit/P1/high/bug → P2/medium/arch → P3/low → feature → unlabeled",
+        description: "How issues are ranked",
+      },
+    ],
     seeAlso: ["brief", "status"],
   },
 
   status: {
-    description: "Show kanban board, priorities, and milestones",
-    usage: "codebase status",
+    description: "Show kanban board, priorities, milestones, and decisions",
+    usage: "codebase status [view]",
     examples: [
-      { command: "codebase status", description: "Full project status" },
+      { command: "codebase status", description: "Kanban board + priorities (default)" },
+      { command: "codebase status milestones", description: "Milestone progress bars" },
+      { command: "codebase status priorities", description: "Priority queue only" },
+      { command: "codebase status decisions", description: "Architecture decisions log" },
       { command: "codebase status --mine", description: "Show only my assigned tasks" },
     ],
-    options: [{ flag: "--mine", description: "Show only your assigned items" }],
+    options: [
+      { flag: "[view]", description: "One of: (none), milestones, priorities, decisions" },
+      { flag: "--mine", description: "Show only your assigned items" },
+    ],
     seeAlso: ["brief", "next"],
   },
 
@@ -126,9 +162,38 @@ const HELP: Record<string, CommandHelp> = {
   },
 
   mcp: {
-    description: "Start MCP server for AI tool integration",
+    description:
+      "Start MCP server for AI tool integration (Transport: stdio, Protocol: 2024-11-05). .mcp.json is written automatically by `codebase init`",
     usage: "codebase mcp",
-    examples: [{ command: "codebase mcp", description: "Start stdio MCP server" }],
+    examples: [
+      { command: "codebase mcp", description: "Start stdio MCP server" },
+      {
+        command:
+          "# Tools: project_brief, get_codebase, query_codebase, get_next_task, get_blockers,",
+        description: "",
+      },
+      {
+        command: "#         create_issue, close_issue, update_issue, get_issue, get_pr,",
+        description: "",
+      },
+      {
+        command:
+          "#         list_commands, list_skills, get_plan, update_plan, rescan_project, refresh_status",
+        description: "16 tools total",
+      },
+    ],
+    seeAlso: ["serve"],
+  },
+
+  serve: {
+    description: "Start HTTP server (REST alternative to MCP, default port 3000)",
+    usage: "codebase serve [--port N]",
+    examples: [
+      { command: "codebase serve", description: "Start HTTP server on port 3000" },
+      { command: "codebase serve --port 8080", description: "Start on custom port" },
+    ],
+    options: [{ flag: "--port <n>", description: "Port to listen on (default: 3000)" }],
+    seeAlso: ["mcp"],
   },
 
   skills: {
@@ -188,7 +253,7 @@ ${bold("AUTONOMOUS LOOP")}
   After ${command("codebase setup")}, these slash commands are available in Claude Code:
 
   ${command("/setup")}                     Bootstrap project — labels, milestone, PRODUCT.md
-  ${command("/simulate")}                  AI customer journeys (Playwright) + UX audit
+  ${command("/simulate")}                  AI customer journeys (agent-browser) + UX audit
   ${command("/build")}                     Autonomous loop — build → test → simulate → repeat
   ${command("/launch")}                    Gate check → tag → release → merge to main
   ${command("/review")}                    Security, quality, deps, accessibility audit

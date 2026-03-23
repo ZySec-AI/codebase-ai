@@ -1,8 +1,55 @@
 import { resolve, join } from "node:path";
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import type { CLIOptions, Manifest } from "../types.js";
 import { error, log, bold, info } from "../utils/output.js";
 import { rankIssues } from "../github/sync.js";
+
+function priorityReason(labels: string[]): string {
+  for (const label of labels) {
+    const l = label.toLowerCase();
+    if (l.startsWith("status:")) {
+      continue;
+    }
+    if (l.includes("p0") || l.includes("critical") || l.includes("urgent")) {
+      return "critical (P0)";
+    }
+  }
+  for (const label of labels) {
+    const l = label.toLowerCase();
+    if (l.startsWith("status:")) {
+      continue;
+    }
+    if (l === "vibekit" || l.includes("p1") || l.includes("high") || l.includes("bug")) {
+      return "high (P1)";
+    }
+  }
+  for (const label of labels) {
+    const l = label.toLowerCase();
+    if (l.startsWith("status:")) {
+      continue;
+    }
+    if (l.includes("p2") || l.includes("medium") || l === "arch") {
+      return "medium (P2)";
+    }
+  }
+  for (const label of labels) {
+    const l = label.toLowerCase();
+    if (l.startsWith("status:")) {
+      continue;
+    }
+    if (l.includes("p3") || l.includes("low")) {
+      return "low (P3)";
+    }
+  }
+  for (const label of labels) {
+    const l = label.toLowerCase();
+    if (l.includes("feature")) {
+      return "feature";
+    }
+  }
+  return "unlabeled (lowest)";
+}
 
 /**
  * `codebase next` — returns the highest-priority task to work on.
@@ -14,6 +61,11 @@ import { rankIssues } from "../github/sync.js";
  */
 export async function runNext(options: CLIOptions): Promise<void> {
   const root = resolve(options.path);
+
+  if (!existsSync(join(root, ".codebase.json"))) {
+    console.error("No manifest found. Run 'codebase init' to set up this project first.");
+    process.exit(1);
+  }
 
   let manifest: Manifest;
   try {
@@ -59,6 +111,7 @@ export async function runNext(options: CLIOptions): Promise<void> {
   if (next.labels.length) {
     log(`  Labels: ${next.labels.join(", ")}`);
   }
+  log(`  Priority: ${priorityReason(next.labels)}`);
   if (next.effort) {
     const effortLabel = { S: "Small (hours)", M: "Medium (days)", L: "Large (weeks)" }[next.effort];
     log(`  Effort: ${effortLabel}`);

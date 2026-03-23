@@ -1,5 +1,6 @@
 import { resolve, join } from "node:path";
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import type { CLIOptions } from "../types.js";
 import { queryPath } from "../utils/json-path.js";
 import { error } from "../utils/output.js";
@@ -7,6 +8,11 @@ import { error } from "../utils/output.js";
 export async function runQuery(options: CLIOptions): Promise<void> {
   const root = resolve(options.path);
   const manifestPath = join(root, ".codebase.json");
+
+  if (!existsSync(manifestPath)) {
+    console.error("No manifest found. Run 'codebase init' to set up this project first.");
+    process.exit(1);
+  }
 
   let manifest: Record<string, unknown>;
   try {

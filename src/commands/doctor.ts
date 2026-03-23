@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { existsSync, readFileSync, statSync, readdirSync } from "node:fs";
 import type { CLIOptions, Manifest } from "../types.js";
 import { checkGhDetailed } from "./init.js";
-import { setQuiet, log, heading } from "../utils/output.js";
+import { setQuiet, log, success, heading, dim, bold } from "../utils/output.js";
 
 const HOOK_MARKER = "# codebase-auto-update";
 
@@ -20,6 +20,7 @@ interface CheckResult {
  * Exit code 0 if all pass, 1 if any issues.
  */
 export async function runDoctor(options: CLIOptions): Promise<void> {
+  const _start = Date.now();
   setQuiet(options.quiet);
   const root = resolve(options.path);
   const results: CheckResult[] = [];
@@ -348,24 +349,53 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
   const red = NO_COLOR ? "" : "\x1b[31m";
   const reset = NO_COLOR ? "" : "\x1b[0m";
 
-  const issues = results.filter((r) => !r.ok);
+  const LABEL_WIDTH = 20;
+
+  type Section = "MANIFEST" | "GITHUB" | "AI TOOLS" | "GIT";
+
+  function sectionFor(label: string): Section {
+    if (["Manifest", "Freshness", "Detectors", "Detector Warning"].includes(label)) {
+      return "MANIFEST";
+    }
+    if (["GitHub CLI", "GitHub Sync"].includes(label)) {
+      return "GITHUB";
+    }
+    if (
+      ["Claude Code", "MCP", "Claude Commands", "Claude Skills", "Claude Hooks"].includes(label)
+    ) {
+      return "AI TOOLS";
+    }
+    return "GIT";
+  }
+
+  let lastSection: Section | null = null;
 
   for (const r of results) {
+    const section = sectionFor(r.label.trimStart());
+    if (section !== lastSection) {
+      log("");
+      dim(`  ${section}`);
+      lastSection = section;
+    }
     const icon = r.ok ? `${green}\u2713${reset}` : `${red}\u2717${reset}`;
-    const indent = r.label.startsWith("  ") ? "  " : "  ";
-    const labelWidth = r.label.startsWith("  ") ? 18 : 16;
-    log(`${indent}${r.label.trimStart().padEnd(labelWidth)} ${icon} ${r.detail}`);
+    log(`  ${r.label.trimStart().padEnd(LABEL_WIDTH)} ${icon} ${r.detail}`);
   }
+
+  const issues = results.filter((r) => !r.ok);
+  const total = results.length;
+  const passing = total - issues.length;
 
   log("");
   if (issues.length === 0) {
-    log("  All checks passed. Your project is healthy.");
+    log(`  ${bold(`Health: ${passing}/${total}`)}  — All checks passed.`);
   } else {
     log(
-      `  ${issues.length} issue${issues.length > 1 ? "s" : ""} found. Run \`codebase fix\` to repair.`
+      `  ${bold(`Health: ${passing}/${total}`)}  — ${issues.length} issue${issues.length > 1 ? "s" : ""} found. Run \`codebase fix\` to repair.`
     );
   }
   log("");
+  const elapsed = ((Date.now() - _start) / 1000).toFixed(1);
+  success(`Done  (${elapsed}s)`);
 
   if (issues.length > 0) {
     process.exit(1);

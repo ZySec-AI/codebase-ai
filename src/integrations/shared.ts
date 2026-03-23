@@ -48,7 +48,7 @@ Returns: project identity, tech stack, commands, structure, current status, next
 \`\`\`
 /simulate → /build → /launch
 \`\`\`
-- \`/simulate\` — Playwright customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
+- \`/simulate\` — agent-browser customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
 - \`/build\` — Implements architectural issues autonomously. Runs until all \`arch\`+\`vibekit\` issues are closed.
 - \`/launch\` — Gates on open bugs, generates GTM artifacts, creates GitHub release, merges to main.
 
@@ -174,7 +174,7 @@ Returns: project identity, tech stack, commands, structure, current status, next
 \`\`\`
 /simulate → /build → /launch
 \`\`\`
-- \`/simulate\` — Playwright customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
+- \`/simulate\` — agent-browser customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
 - \`/build\` — Implements architectural issues autonomously. Runs until all \`arch\`+\`vibekit\` issues are closed.
 - \`/launch\` — Gates on open bugs, generates GTM artifacts, creates GitHub release, merges to main.
 

@@ -53,6 +53,7 @@ function isAlreadyInitialized(root: string): boolean {
 }
 
 export async function runInit(options: CLIOptions): Promise<void> {
+  const _start = Date.now();
   setQuiet(options.quiet);
   const root = resolve(options.path);
 
@@ -209,7 +210,21 @@ export async function runInit(options: CLIOptions): Promise<void> {
     }
   }
 
+  // ─── Sparse project hint ───────────────────────────────────────
+  const langs = manifest.stack?.languages ?? [];
+  const hasCommands = Object.keys(manifest.commands ?? {}).length > 0;
+  const isSparse =
+    !hasCommands && langs.every((l) => l === "json" || l === "yaml" || l === "markdown");
+  if (isSparse) {
+    log("  Next steps for a new project:");
+    log("    1. Add your source files (e.g. src/index.ts, src/index.js)");
+    log("    2. Add scripts to package.json (build, test, dev, etc.)");
+    log("    3. Re-run `codebase` — the manifest will update automatically\n");
+  }
+
   log("\n  You don't need to run this again. Everything stays alive.\n");
+  const elapsed = ((Date.now() - _start) / 1000).toFixed(1);
+  success(`Done  (${elapsed}s)`);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────

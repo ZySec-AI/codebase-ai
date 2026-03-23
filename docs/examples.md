@@ -168,14 +168,14 @@ $ codebase query stack.languages
 ["typescript"]
 
 # How do I run tests?
-$ codebase query commands.test --raw
+$ codebase query commands.test --force
 pnpm vitest
 
 # Actually run them
-$ codebase query commands.test --raw | sh
+$ codebase query commands.test --force | sh
 
 # Feed into jq
-$ codebase --json | jq '.stack.frameworks'
+$ codebase query stack.frameworks
 ["next.js@14.1", "react@18.2"]
 ```
 

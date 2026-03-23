@@ -32,7 +32,8 @@ export async function createIssue(
 
   try {
     const url = await ghExec(root, args);
-    success(`Created issue: ${url}`);
+    const number = url.split("/").pop() ?? "";
+    success(`Created #${number} — ${url}`);
   } catch (e) {
     error(`Failed to create issue: ${(e as Error).message}`);
   }
@@ -45,7 +46,16 @@ export async function closeIssue(root: string, number: string, reason?: string):
       args.push("--comment", reason);
     }
     await ghExec(root, args);
-    success(`Closed issue #${number}`);
+
+    // Fetch issue title and URL for richer output
+    try {
+      const json = await ghExec(root, ["issue", "view", number, "--json", "title,url"]);
+      const { title, url } = JSON.parse(json) as { title: string; url: string };
+      success(`Closed #${number}: ${title}`);
+      log(`     ${url}`);
+    } catch {
+      success(`Closed issue #${number}`);
+    }
   } catch (e) {
     error(`Failed to close issue: ${(e as Error).message}`);
   }
@@ -71,8 +81,12 @@ export async function listIssues(root: string, filter?: string): Promise<void> {
 
 export async function commentIssue(root: string, number: string, body: string): Promise<void> {
   try {
-    await ghExec(root, ["issue", "comment", number, "--body", body]);
-    success(`Comment added to issue #${number}`);
+    const url = await ghExec(root, ["issue", "comment", number, "--body", body]);
+    if (url) {
+      success(`Comment added to #${number} — ${url}`);
+    } else {
+      success(`Comment added to #${number}`);
+    }
   } catch (e) {
     error(`Failed to comment on issue: ${(e as Error).message}`);
   }

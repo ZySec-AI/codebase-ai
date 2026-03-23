@@ -99,7 +99,7 @@ One command. Zero manual steps.
 
 ### Level 1 — Give Claude memory of your project
 
-Only requires Node.js 18+.
+Only requires Node.js 20+.
 
 ```bash
 cd your-project
@@ -241,8 +241,11 @@ codebase fix       # auto-repairs everything doctor flags
 
 ```bash
 # Setup
-npx codebase           # full setup — run once per project
-codebase setup         # re-run wiring (updates commands, hooks, tools)
+# Use `npx codebase` / `codebase init` the first time: scans your project AND wires AI tools + hooks.
+# Use `codebase setup` to re-wire AI tools and hooks only — it does NOT re-scan. Run it when you
+# add a new AI tool or need to reinstall hooks on an existing project.
+npx codebase           # full setup — scan + wire AI tools + hooks (run once per project)
+codebase setup         # re-wire AI tools and hooks only (no scan)
 
 # AI interface (what AI tools call)
 codebase brief         # full project briefing
@@ -300,7 +303,7 @@ npx codebase-ai               # try without installing
 pnpm add -g codebase-ai
 ```
 
-Zero runtime dependencies. Node.js 18+ only.
+Zero runtime dependencies. Node.js 20+ only.
 
 ---
 

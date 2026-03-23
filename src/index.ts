@@ -1,5 +1,5 @@
 import { parseArgs, showCommandHelp } from "./utils/args.js";
-import { setQuiet, setVerbose } from "./utils/output.js";
+import { setQuiet, setVerbose, error, info, bold } from "./utils/output.js";
 import { checkForUpdate } from "./utils/update-check.js";
 import { runScan } from "./commands/scan.js";
 import { runSetup } from "./commands/setup.js";
@@ -15,6 +15,7 @@ import { runFix } from "./commands/fix.js";
 import { runRelease } from "./commands/release.js";
 import { runPlan } from "./commands/plan.js";
 import { runSkills } from "./commands/skills.js";
+import { startServer } from "./server/index.js";
 import type { CLIOptions } from "./types.js";
 
 const options = parseArgs(process.argv.slice(2));
@@ -45,6 +46,10 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
   release: runRelease,
   plan: runPlan,
   skills: runSkills,
+  serve: (opts: CLIOptions) => {
+    startServer(opts.path, opts.port ?? 3000);
+    return Promise.resolve();
+  },
   // Keep "scan-only" for hooks that just want manifest refresh
   "scan-only": runScan,
 };
@@ -52,40 +57,42 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
 // Non-blocking update check — runs in background, shows prompt if outdated
 checkForUpdate().catch(() => {});
 
+// Node.js version check
+const [major] = process.versions.node.split(".").map(Number);
+if (major < 20) {
+  console.error(
+    `Error: Node.js 20 or higher is required. You are running v${process.versions.node}.`
+  );
+  console.error("Upgrade: https://nodejs.org");
+  process.exit(1);
+}
+
 const handler = commands[options.command];
 if (!handler) {
-  console.error(`\n  Unknown command: ${options.command}\n`);
-  console.log(`  Run ${bold("codebase --help")} to see all commands.\n`);
+  error(`Unknown command: ${options.command}`);
+  info(`Run ${bold("codebase --help")} to see all commands.`);
   process.exit(1);
 }
 
 handler(options).catch((err: Error) => {
-  console.error(`\n  ${red("✗")} Error: ${err.message}\n`);
+  error(`Error: ${err.message}`);
 
   // Show helpful suggestions based on error message
   const msg = err.message.toLowerCase();
   if (msg.includes("not a git repository")) {
-    console.log(`  ${cyan("→")} Initialize git first: ${bold("git init")}\n`);
+    info(`Initialize git first: ${bold("git init")}`);
   } else if (msg.includes("permission denied")) {
-    console.log(`  ${cyan("→")} Check file permissions or run with appropriate access\n`);
+    info("Check file permissions or run with appropriate access");
+  } else if (msg.includes("enoent") && msg.includes("gh")) {
+    info(
+      `GitHub CLI (gh) is not installed. Install it: ${bold("brew install gh && gh auth login")}`
+    );
   } else if (msg.includes("no such file")) {
-    console.log(`  ${cyan("→")} Check that the path is correct\n`);
+    info("Check that the path is correct");
   } else if (msg.includes("github")) {
-    console.log(`  ${cyan("→")} Ensure GitHub CLI is installed: ${bold("gh --version")}\n`);
-    console.log(`  ${cyan("→")} Authenticate: ${bold("gh auth login")}\n`);
+    info(`Ensure GitHub CLI is installed: ${bold("gh --version")}`);
+    info(`Authenticate: ${bold("gh auth login")}`);
   }
 
   process.exit(1);
 });
-
-function red(text: string): string {
-  return `\x1b[31m${text}\x1b[0m`;
-}
-
-function cyan(text: string): string {
-  return `\x1b[36m${text}\x1b[0m`;
-}
-
-function bold(text: string): string {
-  return `\x1b[1m${text}\x1b[0m`;
-}

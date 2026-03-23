@@ -1,5 +1,22 @@
 # Contributing
 
+## Local Development
+
+```bash
+npm install
+npm run build:dev   # fast rebuild, no minification, with sourcemaps
+npm link            # makes `codebase` available globally as local build
+```
+
+Or run without building:
+```bash
+npx tsx src/index.ts <command>
+```
+
+Use `npm run build:dev` during development (faster, debuggable). Use `npm run build` for production builds only.
+
+---
+
 ## Running Locally
 
 ```bash

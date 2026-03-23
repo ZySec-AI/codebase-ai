@@ -40,7 +40,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "get_codebase",
     description:
-      "Get structured project data. Use 'category' to get a specific section: repo, structure, stack, commands, dependencies, config, git, quality, patterns, status, roadmap, decisions. Use 'fields' for sparse selection within a category, e.g. fields: ['languages', 'frameworks']. Without category returns everything.",
+      "Get codebase data by category with optional sparse field selection. Use the 'fields' array to request only specific fields (e.g. fields: ['languages', 'frameworks'] from category: 'stack'). For single dot-path lookups use query_codebase instead.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -61,7 +61,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "query_codebase",
     description:
-      "Query a specific field using dot-path notation. Examples: 'stack.languages', 'commands.test', 'status.kanban.in_progress', 'roadmap.milestones'.",
+      "Query a specific field using dot-path notation. Handles both targeted dot-path queries (e.g. 'stack.languages') and full category reads (e.g. 'stack'). Examples: 'stack.languages', 'commands.test', 'status.kanban.in_progress', 'roadmap.milestones'.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -69,6 +69,11 @@ const TOOL_DEFINITIONS = [
           type: "string" as const,
           description:
             "Dot-path query, e.g. 'stack.languages', 'commands.test', 'status.priorities'",
+        },
+        fields: {
+          type: "array" as const,
+          items: { type: "string" as const },
+          description: "Optional: return only these fields from the result object",
         },
       },
       required: ["path"],
@@ -284,7 +289,7 @@ async function handleRequest(req: JsonRpcRequest, root: string): Promise<JsonRpc
     case "initialize":
       return respond(req.id, {
         protocolVersion: "2024-11-05",
-        serverInfo: { name: "codebase", version: "0.1.0" },
+        serverInfo: { name: "codebase", version: __VERSION__ },
         capabilities: { tools: {} },
       });
 
@@ -348,7 +353,21 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
       case "query_codebase": {
         const manifest = await loadOrScanManifest(root);
         const path = args.path as string;
-        const value = queryPath(manifest as unknown as Record<string, unknown>, path);
+        const fields = args.fields as string[] | undefined;
+        let value = queryPath(manifest as unknown as Record<string, unknown>, path);
+        if (
+          fields?.length &&
+          value !== null &&
+          value !== undefined &&
+          typeof value === "object" &&
+          !Array.isArray(value)
+        ) {
+          const sparse: Record<string, unknown> = {};
+          for (const f of fields) {
+            sparse[f] = (value as Record<string, unknown>)[f];
+          }
+          value = sparse;
+        }
         return respond(req.id, {
           content: [{ type: "text", text: JSON.stringify(value ?? null, null, 2) }],
         });

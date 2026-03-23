@@ -7,7 +7,7 @@ import { scan } from "../scanner/engine.js";
 import { checkGhDetailed, autoConfigureMcp } from "./init.js";
 import { installHooks } from "../integrations/githook.js";
 import { updateGitignore } from "../integrations/gitignore.js";
-import { setQuiet, log, heading, info } from "../utils/output.js";
+import { setQuiet, log, success, heading, info } from "../utils/output.js";
 
 const HOOK_MARKER = "# codebase-auto-update";
 
@@ -26,6 +26,7 @@ function fixed(msg: string): void {
  * Shows what it fixed.
  */
 export async function runFix(options: CLIOptions): Promise<void> {
+  const _start = Date.now();
   setQuiet(options.quiet);
   const root = resolve(options.path);
   let fixCount = 0;
@@ -197,6 +198,8 @@ export async function runFix(options: CLIOptions): Promise<void> {
     log(`  Fixed ${fixCount} issue${fixCount > 1 ? "s" : ""}. Run \`codebase doctor\` to verify.`);
   }
   log("");
+  const elapsed = ((Date.now() - _start) / 1000).toFixed(1);
+  success(`Done  (${elapsed}s)`);
 }
 
 // ─── Check helpers (duplicated from doctor for independence) ──

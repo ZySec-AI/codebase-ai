@@ -12,6 +12,7 @@ export default defineConfig({
   minify: true,
   dts: false,
   splitting: false,
+  sourcemap: true,
   banner: { js: "#!/usr/bin/env node" },
   define: { __VERSION__: JSON.stringify(version) },
 });

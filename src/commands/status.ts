@@ -1,11 +1,17 @@
 import { resolve, join } from "node:path";
 import { readFile, writeFile, rename } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import type { CLIOptions, Manifest } from "../types.js";
 import { syncGitHub } from "../github/sync.js";
-import { log, heading, error, info, bold } from "../utils/output.js";
+import { log, heading, error, info, bold, dim } from "../utils/output.js";
 
 export async function runStatus(options: CLIOptions): Promise<void> {
   const root = resolve(options.path);
+
+  if (!existsSync(join(root, ".codebase.json"))) {
+    console.error("No manifest found. Run 'codebase init' to set up this project first.");
+    process.exit(1);
+  }
 
   // Try to read existing manifest first
   let manifest: Manifest | null = null;
@@ -69,6 +75,12 @@ export async function runStatus(options: CLIOptions): Promise<void> {
   if (view === "decisions" && manifest?.decisions) {
     printDecisions(manifest.decisions);
   }
+
+  if (!view) {
+    dim(
+      "\n  Also try: codebase status milestones | codebase status priorities | codebase status decisions"
+    );
+  }
 }
 
 function printKanban(status: NonNullable<Manifest["status"]>): void {
@@ -80,11 +92,17 @@ function printKanban(status: NonNullable<Manifest["status"]>): void {
   for (const i of kanban.backlog.slice(0, 10)) {
     log(`  #${i.number} ${i.title}`);
   }
+  if (kanban.backlog.length > 10) {
+    dim(`  … and ${kanban.backlog.length - 10} more`);
+  }
 
   log(`\n${bold("IN PROGRESS")} (${kanban.in_progress.length})`);
   for (const i of kanban.in_progress.slice(0, 10)) {
     const assignee = i.assignee ? ` @${i.assignee}` : "";
     log(`  #${i.number} ${i.title}${assignee}`);
+  }
+  if (kanban.in_progress.length > 10) {
+    dim(`  … and ${kanban.in_progress.length - 10} more`);
   }
 
   const needsVerify = kanban.needs_verify ?? [];
@@ -93,11 +111,17 @@ function printKanban(status: NonNullable<Manifest["status"]>): void {
     for (const i of needsVerify.slice(0, 10)) {
       log(`  #${i.number} ${i.title}`);
     }
+    if (needsVerify.length > 10) {
+      dim(`  … and ${needsVerify.length - 10} more`);
+    }
   }
 
   log(`\n${bold("DONE")} (${kanban.done.length} recent)`);
   for (const i of kanban.done.slice(0, 5)) {
     log(`  #${i.number} ${i.title}`);
+  }
+  if (kanban.done.length > 5) {
+    dim(`  … and ${kanban.done.length - 5} more`);
   }
 }
 

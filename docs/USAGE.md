@@ -49,6 +49,10 @@ codebase release                            # gate check → tag → merge devel
 
 ## Commands
 
+> **Which command do I use?**
+> - `npx codebase-ai` / `codebase init` — first-time setup. Scans your project AND wires AI tools and hooks. Run once per project.
+> - `codebase setup` — re-wire only. Reinstalls AI tool configs, slash commands, and hooks without re-scanning the project. Use this when adding a new AI tool or restoring hooks on an already-scanned project.
+
 ### `npx codebase-ai` / `codebase init`
 
 Full one-time setup. Scans project, configures AI tools, installs hooks.

@@ -1,5 +1,6 @@
 import { resolve, join } from "node:path";
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import type { CLIOptions, Manifest } from "../types.js";
 import { generateBrief } from "../mcp/brief.js";
 import { error, warn } from "../utils/output.js";
@@ -20,6 +21,11 @@ import { error, warn } from "../utils/output.js";
 export async function runBrief(options: CLIOptions): Promise<void> {
   const root = resolve(options.path);
   const manifestPath = join(root, ".codebase.json");
+
+  if (!existsSync(manifestPath)) {
+    console.error("No manifest found. Run 'codebase init' to set up this project first.");
+    process.exit(1);
+  }
 
   let manifest: Manifest;
   try {
