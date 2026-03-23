@@ -73,6 +73,120 @@ Print: `codebase manifest: generated`
 
 ---
 
+## Step 2b — Project Structure Standardisation
+
+Scaffold the standard project structure. **Never overwrite existing files or directories.**
+
+For each path, only create if it does not already exist:
+
+```bash
+# Directories
+mkdir -p docs src/core src/modules src/interfaces tests scripts
+
+# README.md — only if missing
+[ -f README.md ] || cat > README.md << 'EOF'
+# [Project Name]
+
+[What this project does — 1-2 sentences.]
+
+## Getting Started
+
+```bash
+# install dependencies
+# run the project
+```
+
+## Development
+
+```bash
+# build
+# test
+# lint
+```
+EOF
+
+# .env.example — only if missing and no .env exists
+[ -f .env.example ] || [ -f .env ] || cat > .env.example << 'EOF'
+# Required environment variables
+# Copy to .env and fill in values
+
+# APP_PORT=3000
+# DATABASE_URL=
+# SECRET_KEY=
+EOF
+
+# docs/ARCHITECTURE.md — only if missing
+[ -f docs/ARCHITECTURE.md ] || cat > docs/ARCHITECTURE.md << 'EOF'
+# Architecture
+
+## System Overview
+
+[High-level description of how the system works.]
+
+## Key Components
+
+| Component | Purpose |
+|---|---|
+| `src/core/` | Business logic |
+| `src/modules/` | Feature modules |
+| `src/interfaces/` | Contracts, APIs, types |
+
+## Data Flow
+
+[Describe the main request/data flow through the system.]
+
+## Key Design Decisions
+
+[Document architectural decisions and their rationale here.]
+EOF
+
+# docs/IMPLEMENTATION.md — only if missing
+[ -f docs/IMPLEMENTATION.md ] || cat > docs/IMPLEMENTATION.md << 'EOF'
+# Implementation Guide
+
+## Code Organisation
+
+[How the source code is structured and why.]
+
+## Patterns & Conventions
+
+[Coding patterns, naming conventions, module rules.]
+
+## Adding Features
+
+[Step-by-step guide for contributing new functionality.]
+
+## Common Tasks
+
+[Runbook for frequent development tasks.]
+EOF
+```
+
+Print a structure report:
+```
+PROJECT STRUCTURE
+══════════════════════════════════════
+docs/                [created | exists]
+  ARCHITECTURE.md    [created | exists]
+  IMPLEMENTATION.md  [created | exists]
+  PRODUCT.md         [pending — Step 6]
+src/core/            [created | exists]
+src/modules/         [created | exists]
+src/interfaces/      [created | exists]
+tests/               [created | exists]
+scripts/             [created | exists]
+README.md            [created | exists]
+.env.example         [created | exists | skipped — .env present]
+══════════════════════════════════════
+```
+
+**Rules:**
+- Never delete or overwrite anything that already exists
+- If the project has a non-standard structure (e.g. `app/` instead of `src/`), adapt the report but do not force-rename existing dirs
+- Add any newly created paths to the Step 8 commit
+
+---
+
 ## Step 3 — GitHub labels
 
 ```bash
@@ -150,7 +264,7 @@ fi
 
 ---
 
-## Step 6 — PRODUCT.md
+## Step 6 — Docs (PRODUCT.md, ARCHITECTURE.md, IMPLEMENTATION.md)
 
 Use `codebase brief` as the primary source of project intelligence:
 
@@ -160,7 +274,7 @@ npx codebase brief 2>/dev/null > /tmp/cb-brief.json || true
 
 Read the brief. If `docs/PRODUCT.md` exists and `--refresh` not passed: show diff of stale sections, ask user to confirm updates.
 
-Otherwise generate `docs/PRODUCT.md` from:
+Otherwise generate `docs/PRODUCT.md` from (note: filename is all-caps `PRODUCT.md`):
 - `project.name`, `project.description` → Summary
 - `stack.languages`, `stack.frameworks`, `commands.*` → Tech Stack (auto-filled)
 - `patterns.architecture`, `patterns.api_style` → Context
@@ -173,9 +287,9 @@ Mark genuinely unknown sections with `[INFERRED: ...]`.
 
 ---
 
-## Step 7 — CLAUDE.md
+## Step 7 — CLAUDE.md (last — reads everything set up above)
 
-Write (or update) `CLAUDE.md` for this specific project. Read `.codebase.json` and the codebase structure to produce a file that is genuinely useful to an AI starting a fresh session on this project.
+Write (or update) `CLAUDE.md` for this specific project. At this point all other setup steps are complete — read `.codebase.json`, `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/IMPLEMENTATION.md`, and the full project structure before writing, so CLAUDE.md accurately reflects the final state of the project.
 
 **If `CLAUDE.md` already exists:** read it first. Preserve any existing sections. Only update the `<!-- codebase:start -->...<!-- codebase:end -->` block and add missing sections without removing human-authored content.
 
@@ -190,7 +304,7 @@ One paragraph describing what the project does, who it's for, and its current st
 Exact commands from `.codebase.json` → `commands.*`. Include build, dev, test, lint, typecheck.
 
 ### Architecture
-How the codebase is structured — key directories, entry points, data flow. Infer from `structure`, `patterns`, and file scanning. Be specific, not generic.
+How the codebase is structured — key directories, entry points, data flow. Pull from `docs/ARCHITECTURE.md` if it was populated, otherwise infer from `structure`, `patterns`, and file scanning. Be specific, not generic.
 
 ### Key Conventions
 Language/framework conventions detected. Coding patterns observed. Things an AI must know to not break the codebase (e.g. "zero runtime dependencies", "no cross-module state", "all DB calls go through /lib/db").
@@ -229,7 +343,7 @@ npx codebase init --quiet 2>/dev/null || true
 
 ```bash
 git checkout develop 2>/dev/null || git checkout -b develop
-git add docs/PRODUCT.md CLAUDE.md .vibekit/ .gitignore 2>/dev/null || true
+git add docs/PRODUCT.md docs/ARCHITECTURE.md docs/IMPLEMENTATION.md CLAUDE.md README.md .env.example .vibekit/ .gitignore src/ tests/ scripts/ 2>/dev/null || true
 git diff --cached --quiet || git commit -m "chore: bootstrap codebase + vibekit setup
 
 Initialized by /setup"
