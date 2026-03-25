@@ -3,11 +3,13 @@ name: CodeQL Security Analysis
 on:
   push:
     branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
   schedule:
     # Run every Monday at 06:00 UTC
     - cron: "0 6 * * 1"
+  # pull_request trigger removed — CodeQL SARIF upload requires the repo to be
+  # public or have GitHub Advanced Security (GHAS). Re-add once repo is public:
+  # pull_request:
+  #   branches: [main, develop]
 
 permissions:
   actions: read
