@@ -5,6 +5,8 @@
   <img src="https://img.shields.io/npm/dm/codebase-ai" alt="npm downloads" />
   <img src="https://img.shields.io/github/license/ZySec-AI/codebase" alt="license" />
   <a href="https://github.com/ZySec-AI/codebase/stargazers"><img src="https://img.shields.io/github/stars/ZySec-AI/codebase?style=social" alt="GitHub stars"></a>
+  <a href="https://github.com/ZySec-AI/codebase/actions/workflows/ci.yml"><img src="https://github.com/ZySec-AI/codebase/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://securityscorecards.dev/viewer/?uri=github.com/ZySec-AI/codebase"><img src="https://api.securityscorecards.dev/projects/github.com/ZySec-AI/codebase/badge" alt="OpenSSF Scorecard" /></a>
 </p>
 
 <p align="center">
@@ -307,6 +309,22 @@ Zero runtime dependencies. Node.js 20+ only.
 
 ---
 
+## Contributing
+
+We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for
+guidelines on how to get started, our commit conventions, and the PR process.
+
+Found a security issue? See [SECURITY.md](SECURITY.md) — do not open a public issue.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a full version history.
+
+## Code of Conduct
+
+This project follows a [Code of Conduct](CODE_OF_CONDUCT.md).
+By participating, you agree to uphold it.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE) for details.

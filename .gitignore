@@ -99,3 +99,7 @@ coverage/
 # pnpm-lock.yaml
 .vibekit/
 .mcp.json
+.vibekit/daemon.lock
+.vibekit/daemon.log
+.vibekit/build.lock
+.vibekit/milestone.env

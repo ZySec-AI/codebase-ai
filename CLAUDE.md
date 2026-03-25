@@ -137,19 +137,30 @@ Returns: project identity, tech stack, commands, structure, current status, next
 | `npx codebase issue create "title"` | Track a bug, feature, or TODO |
 | `npx codebase issue close <n> --reason "why"` | Close an issue after fixing it |
 
+### Maintenance
+| Command | What it does |
+|---|---|
+| `codebase doctor` | Health check — diagnose broken setup |
+| `codebase fix` | Auto-repair issues found by doctor |
+| `codebase skills` | List installed skills and their capabilities |
+
 ### Rules
 - **Never explore the codebase to discover stack/commands/structure** — it's already in `brief`
 - **Check `next` before starting work** — don't duplicate in-progress tasks
 - **Create issues for bugs/TODOs you find** — keep the project brain alive
 - **Close issues when you fix them** — with a reason so the team knows why
+- **If any command fails, run `codebase doctor` then `codebase fix`** — self-heal before asking for help
 
 ### Vibekit Workflow
 ```
 /simulate → /build → /launch
 ```
-- `/simulate` — Playwright customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
+- `/simulate` — agent-browser customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
 - `/build` — Implements architectural issues autonomously. Runs until all `arch`+`vibekit` issues are closed.
 - `/launch` — Gates on open bugs, generates GTM artifacts, creates GitHub release, merges to main.
+
+### MCP Tools (for IDE/agent integrations)
+If using MCP instead of CLI: call `project_brief` (not `npx codebase brief`), `get_next_task`, `refresh_status`, `list_skills`. Full tool list via `list_commands` and `list_skills`.
 
 ### Browser Automation (agent-browser)
 Commands: `open <url>`, `snapshot -i` (→ `@e1`/`@e2` refs), `click @e1`, `fill @e2 "text"`, `screenshot`, `auth save/login <profile>`, `state save/load <name>`.

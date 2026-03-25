@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a Security Vulnerability
+    url: https://github.com/ZySec-AI/codebase/security/advisories/new
+    about: Please report security issues privately — do not open a public issue.
+  - name: Questions & Discussions
+    url: https://github.com/ZySec-AI/codebase/discussions
+    about: Use Discussions for questions, ideas, and general conversation.

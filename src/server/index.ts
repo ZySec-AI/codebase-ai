@@ -3,7 +3,8 @@ import { handleRoute } from "./routes.js";
 
 export function startServer(root: string, port: number): void {
   const server = createServer(async (req, res) => {
-    // CORS
+    // CORS — this server is local-only (localhost). Do not expose its port
+    // to the internet. The wildcard origin is intentional for local dev tooling.
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
