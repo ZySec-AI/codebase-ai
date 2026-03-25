@@ -5,6 +5,8 @@
   <img src="https://img.shields.io/npm/dm/codebase-ai" alt="npm downloads" />
   <img src="https://img.shields.io/github/license/ZySec-AI/codebase" alt="license" />
   <a href="https://github.com/ZySec-AI/codebase/stargazers"><img src="https://img.shields.io/github/stars/ZySec-AI/codebase?style=social" alt="GitHub stars"></a>
+  <a href="https://github.com/ZySec-AI/codebase/actions/workflows/ci.yml"><img src="https://github.com/ZySec-AI/codebase/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://securityscorecards.dev/viewer/?uri=github.com/ZySec-AI/codebase"><img src="https://api.securityscorecards.dev/projects/github.com/ZySec-AI/codebase/badge" alt="OpenSSF Scorecard" /></a>
 </p>
 
 <p align="center">
@@ -31,7 +33,7 @@ Seven slash commands give AI a complete workflow: simulate real users in a brows
 
 ---
 
-## The three commands that matter
+## The loop
 
 Once set up, your entire development loop is:
 
@@ -39,7 +41,13 @@ Once set up, your entire development loop is:
 /simulate  →  /build  →  /launch
 ```
 
-That's it. Here's what each one actually does:
+Or if you want zero intervention — one command that runs the entire loop automatically:
+
+```
+/vibeloop
+```
+
+Here's what each step does:
 
 ---
 
@@ -155,7 +163,7 @@ The autonomous commands (`/simulate`, `/build`, `/launch`) all read the same man
 
 ---
 
-## All seven slash commands
+## All slash commands
 
 These live in `.claude/commands/` in your project. Commit this folder to share them with your team.
 
@@ -166,6 +174,22 @@ These live in `.claude/commands/` in your project. Commit this folder to share t
 | `/build` | Reads your open GitHub Issues. Picks the most important one. Implements the fix. Tests it. Commits it. Closes the issue. Moves to the next. Repeats. |
 | `/launch` | Checks quality gates (bugs, tests, UX score). If everything passes: bumps version, tags release, merges to main, publishes GitHub Release. |
 | `/review` | Deep code audit. Checks for security vulnerabilities, code quality problems, outdated/vulnerable dependencies, and accessibility issues. Everything goes to GitHub Issues. |
+| `/vibeloop` | **The single command that does everything.** Runs `/simulate → /build → /launch` in a fully autonomous loop until your project is shipped. Zero human intervention required. |
+
+### `/vibeloop` — the one command to rule them all
+
+If you only remember one command, make it this one:
+
+```
+/vibeloop                    # full autonomous run: simulate → build → launch
+/vibeloop --skip-launch      # simulate → build only, stop before release
+/vibeloop --dry-run          # full run without committing to main or publishing
+/vibeloop --max-rounds 5     # cap the build loop at 5 rounds (default: 20)
+/vibeloop --sim-count 5      # number of simulated users per cycle (default: 3)
+/vibeloop --version 1.2.0    # pin the release version tag
+```
+
+`/vibeloop` runs the full loop repeatedly — simulate real users, fix what breaks, clear the issue backlog, ship the release — without you touching the keyboard. You invoke it once and come back to a shipped, tested, tagged release.
 
 ---
 
@@ -307,6 +331,22 @@ Zero runtime dependencies. Node.js 20+ only.
 
 ---
 
+## Contributing
+
+We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for
+guidelines on how to get started, our commit conventions, and the PR process.
+
+Found a security issue? See [SECURITY.md](SECURITY.md) — do not open a public issue.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a full version history.
+
+## Code of Conduct
+
+This project follows a [Code of Conduct](CODE_OF_CONDUCT.md).
+By participating, you agree to uphold it.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE) for details.

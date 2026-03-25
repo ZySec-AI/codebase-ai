@@ -1,0 +1,22 @@
+# CODEOWNERS
+# GitHub will automatically request reviews from these owners when a PR
+# modifies matching files. Owners must have write access to the repository.
+#
+# Format: <pattern>  @<owner> [<owner2> ...]
+# Last matching rule wins.
+
+# Default: all files require review from the maintainer
+*                           @venkycs
+
+# Core architecture
+src/types.ts                @venkycs
+src/scanner/                @venkycs
+src/detectors/              @venkycs
+
+# Security-sensitive paths
+src/server/                 @venkycs
+src/github/                 @venkycs
+
+# Documentation
+*.md                        @venkycs
+docs/                       @venkycs

@@ -706,7 +706,7 @@ ${description}
 
 ## Dev Credentials
 
-- **Default seed creds:** \`{role}@dev.local\` / \`dev123456\`
+- **Default seed creds:** \`{role}@dev.local\` / \`<your-seed-password>\`
 - **Dev login path:** [INFERRED: e.g. /dev-login or /auth/login]
 
 ## Known Constraints
