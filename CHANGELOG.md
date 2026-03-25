@@ -7,17 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-25
+
 ### Added
-- Open source preparation: LICENSE, SECURITY.md, CODE_OF_CONDUCT.md, CONTRIBUTING.md
-- GitHub issue templates (bug report, feature request)
-- PR template
-- Dependabot configuration for automated dependency updates
-- CodeQL security analysis workflow
-- OpenSSF Scorecard workflow
+- `LICENSE` file (MIT) — was declared in `package.json` but missing from the repo
+- `CONTRIBUTING.md` — dev setup, PR process, commit conventions, architecture rules
+- `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1
+- `SECURITY.md` — vulnerability disclosure policy, response SLA, safe harbor
+- `CHANGELOG.md` — full version history in Keep a Changelog format
+- `.github/ISSUE_TEMPLATE/bug_report.yml` — structured bug report form
+- `.github/ISSUE_TEMPLATE/feature_request.yml` — structured feature request form
+- `.github/ISSUE_TEMPLATE/config.yml` — disable blank issues, route security to private advisory
+- `.github/PULL_REQUEST_TEMPLATE.md` — checklist-driven PR template
+- `.github/CODEOWNERS` — auto-assign reviewers to all PRs
+- `.github/dependabot.yml` — weekly automated updates for npm deps and GitHub Actions
+- `.github/workflows/codeql.yml` — CodeQL security analysis on push/PR/weekly schedule
+- `.github/workflows/scorecard.yml` — OpenSSF Scorecard weekly scan
+- CI status badge and OpenSSF Scorecard badge in README
+- Contributing, Changelog, Code of Conduct sections in README
 
 ### Security
-- Removed IDE config files (`.mcp.json`, `.cursorrules`, `.windsurfrules`) from git tracking
-- Replaced hardcoded example password placeholder in `setup.ts` template
+- Removed `.mcp.json`, `.windsurf/mcp.json`, `.cursorrules`, `.windsurfrules` from
+  git tracking — files contained local machine paths and were already in `.gitignore`
+- Replaced hardcoded example password `dev123456` in `setup.ts` template with
+  `<your-seed-password>` placeholder
+- Documented `codebase server` CORS wildcard as intentional local-only design
 
 ## [0.3.2] - 2025-03-01
 
@@ -68,7 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `codebase brief`, `next`, `status`, `query` commands
 - GitHub Actions CI and release workflows
 
-[Unreleased]: https://github.com/ZySec-AI/codebase/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/ZySec-AI/codebase/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ZySec-AI/codebase/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/ZySec-AI/codebase/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/ZySec-AI/codebase/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ZySec-AI/codebase/compare/v0.2.0...v0.3.0
