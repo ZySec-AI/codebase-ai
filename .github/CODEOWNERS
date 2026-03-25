@@ -5,18 +5,18 @@
 # Format: <pattern>  @<owner> [<owner2> ...]
 # Last matching rule wins.
 
-# Default: all files require review from the org maintainers
-*                           @ZySec-AI
+# Default: all files require review from the maintainer
+*                           @venkycs
 
 # Core architecture
-src/types.ts                @ZySec-AI
-src/scanner/                @ZySec-AI
-src/detectors/              @ZySec-AI
+src/types.ts                @venkycs
+src/scanner/                @venkycs
+src/detectors/              @venkycs
 
 # Security-sensitive paths
-src/server/                 @ZySec-AI
-src/github/                 @ZySec-AI
+src/server/                 @venkycs
+src/github/                 @venkycs
 
 # Documentation
-*.md                        @ZySec-AI
-docs/                       @ZySec-AI
+*.md                        @venkycs
+docs/                       @venkycs
