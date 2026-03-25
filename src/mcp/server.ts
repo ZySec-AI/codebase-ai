@@ -163,7 +163,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "list_commands",
     description:
-      "List installed Claude Code slash commands in this project. Returns names of available commands (e.g. /setup, /simulate, /build, /launch, /review).",
+      "List installed Claude Code slash commands in this project. Returns names of available commands (e.g. /vibeloop, /setup, /simulate, /build, /launch, /review).",
     inputSchema: {
       type: "object" as const,
       properties: {},

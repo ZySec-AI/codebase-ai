@@ -69,13 +69,7 @@ export async function runSetup(options: CLIOptions): Promise<void> {
 
   // ── Step 4: Claude commands ───────────────────────────────────
   heading("Claude Commands");
-  const claudeAvailable = await checkClaude();
-  if (!claudeAvailable) {
-    warn("Claude Code CLI not detected — skipping slash commands");
-    warn("Install Claude Code then re-run: codebase setup");
-  } else {
-    installClaudeCommands(root);
-  }
+  installClaudeCommands(root);
 
   // ── Step 4b: Claude skills ──────────────────────────────────
   heading("Claude Skills");
@@ -554,12 +548,6 @@ async function installAgentBrowser(): Promise<void> {
       "agent-browser validation failed — it may not be on PATH. Try: npm install -g agent-browser"
     );
   }
-}
-
-async function checkClaude(): Promise<boolean> {
-  return new Promise((resolve) => {
-    execFile("claude", ["--version"], { timeout: 5_000 }, (err) => resolve(!err));
-  });
 }
 
 async function checkGh(): Promise<boolean> {

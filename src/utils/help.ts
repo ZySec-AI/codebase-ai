@@ -252,6 +252,7 @@ ${bold("AI INTERFACE")}
 ${bold("AUTONOMOUS LOOP")}
   After ${command("codebase setup")}, these slash commands are available in Claude Code:
 
+  ${command("/vibeloop")}                  Full autonomous run — simulate → build → launch (zero intervention)
   ${command("/setup")}                     Bootstrap project — labels, milestone, PRODUCT.md
   ${command("/simulate")}                  AI customer journeys (agent-browser) + UX audit
   ${command("/build")}                     Autonomous loop — build → test → simulate → repeat
