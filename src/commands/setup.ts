@@ -217,8 +217,8 @@ export function installClaudeSkillsForFix(root: string): void {
 }
 
 function installClaudeSkills(root: string): void {
-  // skills/ is always a sibling of dist/ in the npm package
-  const skillsSource = join(dirname(new URL(import.meta.url).pathname), "..", "skills");
+  // skills/ is always a sibling of dist/ in the npm package (dist/commands/ → dist/ → package root → skills/)
+  const skillsSource = join(dirname(new URL(import.meta.url).pathname), "../..", "skills");
 
   if (!existsSync(skillsSource)) {
     warn("Skills not found in package — skipping");
