@@ -49,9 +49,9 @@ Multiple developers can jump into the same loop. Commit `.codebase.json` and `.c
 
 ## The loop
 
-```
-/simulate  ──▶  /build  ──▶  /launch
-```
+<p align="center">
+  <img src="assets/loop.svg" alt="codebase loop animation" width="800"/>
+</p>
 
 Or run the entire loop hands-free with one command:
 

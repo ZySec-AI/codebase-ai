@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 140" width="800" height="140">
+  <defs>
+    <style>
+      .bg { fill: #0d1117; }
+      text { font-family: 'Courier New', monospace; }
+
+      /* ── labels ── */
+      .lbl  { font-size: 13px; fill: #8b949e; }
+      .step { font-size: 15px; font-weight: bold; }
+      .s1   { fill: #3fb950; }
+      .s2   { fill: #58a6ff; }
+      .s3   { fill: #d2a8ff; }
+      .s4   { fill: #f0883e; }
+
+      /* ── arrows ── */
+      .arr  { font-size: 14px; fill: #30363d; }
+
+      /* ── active node glow ── */
+      @keyframes glow1 {
+        0%,100% { opacity:0.15; r:22; }
+        12.5%   { opacity:1;    r:28; }
+        25%     { opacity:0.15; r:22; }
+      }
+      @keyframes glow2 {
+        0%,100% { opacity:0.15; r:22; }
+        37.5%   { opacity:1;    r:28; }
+        50%     { opacity:0.15; r:22; }
+      }
+      @keyframes glow3 {
+        0%,100% { opacity:0.15; r:22; }
+        62.5%   { opacity:1;    r:28; }
+        75%     { opacity:0.15; r:22; }
+      }
+      @keyframes glow4 {
+        0%,100% { opacity:0.15; r:22; }
+        87.5%   { opacity:1;    r:28; }
+        100%    { opacity:0.15; r:22; }
+      }
+      .g1 { animation: glow1 4s ease-in-out infinite; }
+      .g2 { animation: glow2 4s ease-in-out infinite; }
+      .g3 { animation: glow3 4s ease-in-out infinite; }
+      .g4 { animation: glow4 4s ease-in-out infinite; }
+
+      /* ── pulse dot on active step ── */
+      @keyframes pulse1 {
+        0%,100% { opacity:0; r:6; }
+        6.25%   { opacity:1; r:9; }
+        18.75%  { opacity:0; r:6; }
+      }
+      @keyframes pulse2 {
+        0%,100% { opacity:0; r:6; }
+        31.25%  { opacity:1; r:9; }
+        43.75%  { opacity:0; r:6; }
+      }
+      @keyframes pulse3 {
+        0%,100% { opacity:0; r:6; }
+        56.25%  { opacity:1; r:9; }
+        68.75%  { opacity:0; r:6; }
+      }
+      @keyframes pulse4 {
+        0%,100% { opacity:0; r:6; }
+        81.25%  { opacity:1; r:9; }
+        93.75%  { opacity:0; r:6; }
+      }
+      .p1 { animation: pulse1 4s ease-in-out infinite; }
+      .p2 { animation: pulse2 4s ease-in-out infinite; }
+      .p3 { animation: pulse3 4s ease-in-out infinite; }
+      .p4 { animation: pulse4 4s ease-in-out infinite; }
+
+      /* ── arrow travel ── */
+      @keyframes travel1 {
+        0%,12%  { stroke-dashoffset: 100; opacity:0; }
+        18%,24% { stroke-dashoffset: 0;   opacity:1; }
+        30%     { opacity:0; }
+        100%    { opacity:0; }
+      }
+      @keyframes travel2 {
+        0%,37%  { stroke-dashoffset: 100; opacity:0; }
+        43%,49% { stroke-dashoffset: 0;   opacity:1; }
+        55%     { opacity:0; }
+        100%    { opacity:0; }
+      }
+      @keyframes travel3 {
+        0%,62%  { stroke-dashoffset: 100; opacity:0; }
+        68%,74% { stroke-dashoffset: 0;   opacity:1; }
+        80%     { opacity:0; }
+        100%    { opacity:0; }
+      }
+      /* loop-back arrow */
+      @keyframes travel4 {
+        0%,87%  { stroke-dashoffset: 100; opacity:0; }
+        93%,99% { stroke-dashoffset: 0;   opacity:1; }
+        100%    { opacity:0; }
+      }
+      .ta1 { stroke-dasharray:100; animation: travel1 4s linear infinite; }
+      .ta2 { stroke-dasharray:100; animation: travel2 4s linear infinite; }
+      .ta3 { stroke-dasharray:100; animation: travel3 4s linear infinite; }
+      .ta4 { stroke-dasharray:100; animation: travel4 4s linear infinite; }
+    </style>
+  </defs>
+
+  <!-- background -->
+  <rect width="800" height="140" rx="10" class="bg"/>
+  <rect x="1" y="1" width="798" height="138" rx="9" fill="none" stroke="#21262d" stroke-width="1"/>
+
+  <!-- ── glow circles (behind nodes) ── -->
+  <circle cx="120" cy="62" r="22" fill="#3fb950" class="g1"/>
+  <circle cx="320" cy="62" r="22" fill="#58a6ff" class="g2"/>
+  <circle cx="520" cy="62" r="22" fill="#d2a8ff" class="g3"/>
+  <circle cx="680" cy="62" r="22" fill="#f0883e" class="g4"/>
+
+  <!-- ── travelling arrows ── -->
+  <line x1="175" y1="62" x2="260" y2="62" stroke="#3fb950" stroke-width="2" class="ta1"/>
+  <line x1="375" y1="62" x2="460" y2="62" stroke="#58a6ff" stroke-width="2" class="ta2"/>
+  <line x1="575" y1="62" x2="635" y2="62" stroke="#d2a8ff" stroke-width="2" class="ta3"/>
+  <!-- loop-back curved line -->
+  <path d="M 700 80 Q 760 115 400 115 Q 40 115 100 80"
+        fill="none" stroke="#f0883e" stroke-width="2"
+        stroke-dasharray="100" class="ta4"/>
+
+  <!-- ── static arrow heads ── -->
+  <text x="263" y="67" class="arr">▶</text>
+  <text x="463" y="67" class="arr">▶</text>
+  <text x="638" y="67" class="arr">▶</text>
+
+  <!-- ── node backgrounds ── -->
+  <rect x="60"  y="38" width="120" height="48" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+  <rect x="260" y="38" width="120" height="48" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+  <rect x="460" y="38" width="120" height="48" rx="8" fill="#161b22" stroke="#d2a8ff" stroke-width="1.5"/>
+  <rect x="620" y="38" width="120" height="48" rx="8" fill="#161b22" stroke="#f0883e" stroke-width="1.5"/>
+
+  <!-- ── command labels ── -->
+  <text x="120" y="57" text-anchor="middle" class="step s1">/simulate</text>
+  <text x="320" y="57" text-anchor="middle" class="step s2">/build</text>
+  <text x="520" y="57" text-anchor="middle" class="step s3">/launch</text>
+  <text x="680" y="57" text-anchor="middle" class="step s4">/vibeloop</text>
+
+  <!-- ── sub-labels ── -->
+  <text x="120" y="74" text-anchor="middle" class="lbl">find &amp; fix bugs</text>
+  <text x="320" y="74" text-anchor="middle" class="lbl">clear backlog</text>
+  <text x="520" y="74" text-anchor="middle" class="lbl">ship release</text>
+  <text x="680" y="74" text-anchor="middle" class="lbl">all of the above</text>
+
+  <!-- ── pulse dots ── -->
+  <circle cx="120" cy="62" r="6" fill="#3fb950" class="p1"/>
+  <circle cx="320" cy="62" r="6" fill="#58a6ff" class="p2"/>
+  <circle cx="520" cy="62" r="6" fill="#d2a8ff" class="p3"/>
+  <circle cx="680" cy="62" r="6" fill="#f0883e" class="p4"/>
+</svg>
