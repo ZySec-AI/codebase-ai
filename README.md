@@ -1,4 +1,6 @@
-# CodeBase
+<p align="center">
+  <img src="assets/logo.svg" alt="codebase" width="800"/>
+</p>
 
 <p align="center">
   <img src="https://img.shields.io/npm/v/codebase-ai" alt="npm version" />
@@ -7,10 +9,6 @@
   <a href="https://github.com/ZySec-AI/codebase/stargazers"><img src="https://img.shields.io/github/stars/ZySec-AI/codebase?style=social" alt="GitHub stars"></a>
   <a href="https://github.com/ZySec-AI/codebase/actions/workflows/ci.yml"><img src="https://github.com/ZySec-AI/codebase/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://securityscorecards.dev/viewer/?uri=github.com/ZySec-AI/codebase"><img src="https://api.securityscorecards.dev/projects/github.com/ZySec-AI/codebase/badge" alt="OpenSSF Scorecard" /></a>
-</p>
-
-<p align="center">
-  <b>Automated vibecoding loop. AI finds bugs, fixes them, and ships — using GitHub as shared memory.</b>
 </p>
 
 ---
@@ -48,17 +46,7 @@ Multiple developers can jump into the same loop. Commit `.codebase.json` and `.c
 ## The loop
 
 ```
-╔═══════════════════════════════════════════════════════════╗
-║                                                           ║
-║   /simulate  ──▶  /build  ──▶  /launch                   ║
-║       │              │             │                      ║
-║   Real browser    Fix issues    Ship it                   ║
-║   finds bugs      one by one    to main                   ║
-║       │              │             │                      ║
-║       └──────── GitHub Issues ─────┘                      ║
-║                  (shared memory)                          ║
-║                                                           ║
-╚═══════════════════════════════════════════════════════════╝
+/simulate  ──▶  /build  ──▶  /launch
 ```
 
 Or run the entire loop hands-free with one command:

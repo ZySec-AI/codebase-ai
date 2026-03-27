@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200">
+  <defs>
+    <style>
+      .bg { fill: #0d1117; }
+      .border { fill: none; stroke: #30363d; stroke-width: 1; rx: 8; }
+      .brand { font-family: 'Courier New', monospace; font-weight: bold; font-size: 42px; fill: #e6edf3; }
+      .tagline { font-family: 'Courier New', monospace; font-size: 14px; fill: #8b949e; }
+      .cursor { fill: #58a6ff; }
+      .cmd { font-family: 'Courier New', monospace; font-size: 13px; }
+      .cmd-sim  { fill: #3fb950; }
+      .cmd-bld  { fill: #58a6ff; }
+      .cmd-lnch { fill: #d2a8ff; }
+      .arrow    { fill: #8b949e; }
+      .dot      { fill: #58a6ff; }
+
+      /* cursor blink */
+      @keyframes blink {
+        0%, 49% { opacity: 1; }
+        50%, 100% { opacity: 0; }
+      }
+      .cursor { animation: blink 1s step-end infinite; }
+
+      /* commands fade in sequentially */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .cmd-sim  { opacity: 0; animation: fadeIn 0.4s ease 0.6s forwards; }
+      .cmd-arr1 { opacity: 0; animation: fadeIn 0.3s ease 1.0s forwards; }
+      .cmd-bld  { opacity: 0; animation: fadeIn 0.4s ease 1.3s forwards; }
+      .cmd-arr2 { opacity: 0; animation: fadeIn 0.3s ease 1.7s forwards; }
+      .cmd-lnch { opacity: 0; animation: fadeIn 0.4s ease 2.0s forwards; }
+
+      /* dot pulse */
+      @keyframes pulse {
+        0%, 100% { r: 4; opacity: 0.6; }
+        50% { r: 6; opacity: 1; }
+      }
+      .dot1 { animation: pulse 2s ease-in-out 0.0s infinite; }
+      .dot2 { animation: pulse 2s ease-in-out 0.6s infinite; }
+      .dot3 { animation: pulse 2s ease-in-out 1.2s infinite; }
+
+      /* subtitle slide up */
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .tagline { opacity: 0; animation: slideUp 0.5s ease 0.2s forwards; }
+    </style>
+  </defs>
+
+  <!-- background -->
+  <rect width="800" height="200" rx="12" class="bg"/>
+  <rect x="1" y="1" width="798" height="198" rx="11" fill="none" stroke="#30363d" stroke-width="1"/>
+
+  <!-- window dots -->
+  <circle cx="28" cy="28" r="6" fill="#ff5f56"/>
+  <circle cx="48" cy="28" r="6" fill="#ffbd2e"/>
+  <circle cx="68" cy="28" r="6" fill="#27c93f"/>
+
+  <!-- brand name -->
+  <text x="400" y="82" text-anchor="middle" class="brand">codebase</text>
+
+  <!-- blinking cursor after brand -->
+  <rect x="567" y="55" width="3" height="32" rx="1" class="cursor"/>
+
+  <!-- tagline -->
+  <text x="400" y="110" text-anchor="middle" class="tagline">
+    one command · your AI understands your project · finds bugs · fixes them · ships
+  </text>
+
+  <!-- loop commands -->
+  <text x="196" y="158" text-anchor="middle" class="cmd cmd-sim">/simulate</text>
+  <text x="284" y="158" text-anchor="middle" class="cmd arrow cmd-arr1">──▶</text>
+  <text x="370" y="158" text-anchor="middle" class="cmd cmd-bld">/build</text>
+  <text x="450" y="158" text-anchor="middle" class="cmd arrow cmd-arr2">──▶</text>
+  <text x="546" y="158" text-anchor="middle" class="cmd cmd-lnch">/launch</text>
+
+  <!-- pulsing dots below -->
+  <circle cx="196" cy="178" r="4" class="dot dot1"/>
+  <circle cx="370" cy="178" r="4" class="dot dot2"/>
+  <circle cx="546" cy="178" r="4" class="dot dot3"/>
+</svg>
