@@ -13,6 +13,10 @@
 
 ---
 
+> **~95% fewer tokens.** Claude reads one 500-token snapshot instead of exploring thousands of files. Instant context, every session.
+
+---
+
 ## Install
 
 ```bash
