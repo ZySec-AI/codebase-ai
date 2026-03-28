@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`codebase` gives AI tools permanent memory of any software project. One command scans a project and writes a compact snapshot (`.codebase.json`) — stack, commands, structure, open issues, recent decisions. AI tools read this instead of exploring files, saving ~95% of tokens and enabling fully autonomous workflows. Auto-wires into 7 AI tools (Claude, Cursor, Windsurf, Copilot, Aider, Cline, Continue) and exposes an MCP server so Claude can query project context, manage GitHub issues, and drive the `/simulate → /build → /launch` loop without human guidance.
+`codebase` gives AI tools permanent memory of any software project. One command scans a project and writes a compact snapshot (`.codebase.json`) — stack, commands, structure, open issues, recent decisions. AI tools read this instead of exploring files, saving ~95% of tokens and enabling fully autonomous workflows. Auto-wires into Claude Code and exposes an MCP server so Claude can query project context, manage GitHub issues, and drive the `/simulate → /build → /launch` loop without human guidance.
 
 ## Build & Development Commands
 
@@ -40,7 +40,7 @@ Registered detectors: `project`, `repo`, `structure`, `stack`, `commands`, `depe
 
 ### Integrations (`src/integrations/`)
 
-7 integrations implement the `Integration` interface (`src/types.ts`). Each can `detect` if its AI tool config exists, `inject` a reference to `.codebase.json` into the config (between `<!-- codebase:start/end -->` or `# codebase:start/end` markers), and `remove` it. Shared injection logic is in `shared.ts`. Git hooks (`githook.ts`) and `.gitignore` updates (`gitignore.ts`) live here too.
+1 integration (Claude Code) implements the `Integration` interface (`src/types.ts`). It can `detect` if its config exists, `inject` a reference to `.codebase.json` into CLAUDE.md (between `<!-- codebase:start/end -->` markers), and `remove` it. Shared injection logic is in `shared.ts`. Git hooks (`githook.ts`) and `.gitignore` updates (`gitignore.ts`) live here too.
 
 ### MCP Server (`src/mcp/`)
 

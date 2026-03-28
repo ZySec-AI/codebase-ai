@@ -91,10 +91,11 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
       "git",
       "quality",
       "patterns",
+      "api_docs",
     ];
     const presentCategories = expectedCategories.filter((c) => c in manifest!);
     if (presentCategories.length === expectedCategories.length) {
-      results.push({ label: "Detectors", ok: true, detail: "10/10 categories present" });
+      results.push({ label: "Detectors", ok: true, detail: "11/11 categories present" });
     } else {
       const missing = expectedCategories.filter((c) => !presentCategories.includes(c));
       results.push({ label: "Detectors", ok: false, detail: `Missing: ${missing.join(", ")}` });

@@ -7,8 +7,9 @@ import {
   chmodSync,
   readdirSync,
   copyFileSync,
+  rmSync,
 } from "node:fs";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
 import { runScan } from "./scan.js";
 import { claudeIntegration } from "../integrations/claude.js";
@@ -216,6 +217,24 @@ export function installClaudeSkillsForFix(root: string): void {
   installClaudeSkills(root);
 }
 
+function unzipSkill(skillPath: string, targetDir: string): boolean {
+  const name = skillPath
+    .split("/")
+    .pop()!
+    .replace(/\.skill$/, "");
+  const unzipDir = join(targetDir, name);
+  try {
+    // Remove old unzipped dir if it exists so we get a clean extraction
+    if (existsSync(unzipDir)) {
+      rmSync(unzipDir, { recursive: true, force: true });
+    }
+    execFileSync("unzip", ["-o", "-q", skillPath, "-d", targetDir], { timeout: 30_000 });
+    return existsSync(unzipDir);
+  } catch {
+    return false;
+  }
+}
+
 function installClaudeSkills(root: string): void {
   // skills/ is always a sibling of dist/ in the npm package (dist/commands/ → dist/ → package root → skills/)
   const skillsSource = join(dirname(new URL(import.meta.url).pathname), "../..", "skills");
@@ -250,18 +269,34 @@ function installClaudeSkills(root: string): void {
     for (const file of files) {
       const src = join(skillsSource, file);
       const dest = join(dir, file);
+      let needsUnzip = false;
       if (existsSync(dest)) {
         const srcBuf = readFileSync(src);
         const destBuf = readFileSync(dest);
         if (!srcBuf.equals(destBuf)) {
           copyFileSync(src, dest);
+          needsUnzip = true;
           updated++;
         } else {
-          skipped++;
+          // Check if unzipped dir exists — if not, we need to unzip even if .skill unchanged
+          const name = file.replace(/\.skill$/, "");
+          if (!existsSync(join(dir, name, "SKILL.md"))) {
+            needsUnzip = true;
+          } else {
+            skipped++;
+          }
         }
       } else {
         copyFileSync(src, dest);
+        needsUnzip = true;
         installed++;
+      }
+
+      if (needsUnzip) {
+        const ok = unzipSkill(dest, dir);
+        if (!ok) {
+          warn(`Failed to unzip ${file} — skill may not work until manually extracted`);
+        }
       }
     }
 
