@@ -7,8 +7,9 @@ import {
   chmodSync,
   readdirSync,
   copyFileSync,
+  rmSync,
 } from "node:fs";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
 import { runScan } from "./scan.js";
 import { claudeIntegration } from "../integrations/claude.js";
@@ -62,6 +63,7 @@ export async function runSetup(options: CLIOptions): Promise<void> {
   // ── Step 3b: Claude Code hooks ────────────────────────────────
   heading("Claude Code Hooks");
   installClaudeHooks(root);
+  installSessionStartHook(root);
 
   // ── Step 3c: agent-browser ────────────────────────────────────
   heading("Browser Automation");
@@ -216,9 +218,27 @@ export function installClaudeSkillsForFix(root: string): void {
   installClaudeSkills(root);
 }
 
+function unzipSkill(skillPath: string, targetDir: string): boolean {
+  const name = skillPath
+    .split("/")
+    .pop()!
+    .replace(/\.skill$/, "");
+  const unzipDir = join(targetDir, name);
+  try {
+    // Remove old unzipped dir if it exists so we get a clean extraction
+    if (existsSync(unzipDir)) {
+      rmSync(unzipDir, { recursive: true, force: true });
+    }
+    execFileSync("unzip", ["-o", "-q", skillPath, "-d", targetDir], { timeout: 30_000 });
+    return existsSync(unzipDir);
+  } catch {
+    return false;
+  }
+}
+
 function installClaudeSkills(root: string): void {
-  // skills/ is always a sibling of dist/ in the npm package
-  const skillsSource = join(dirname(new URL(import.meta.url).pathname), "..", "skills");
+  // skills/ is always a sibling of dist/ in the npm package (dist/commands/ → dist/ → package root → skills/)
+  const skillsSource = join(dirname(new URL(import.meta.url).pathname), "../..", "skills");
 
   if (!existsSync(skillsSource)) {
     warn("Skills not found in package — skipping");
@@ -250,18 +270,34 @@ function installClaudeSkills(root: string): void {
     for (const file of files) {
       const src = join(skillsSource, file);
       const dest = join(dir, file);
+      let needsUnzip = false;
       if (existsSync(dest)) {
         const srcBuf = readFileSync(src);
         const destBuf = readFileSync(dest);
         if (!srcBuf.equals(destBuf)) {
           copyFileSync(src, dest);
+          needsUnzip = true;
           updated++;
         } else {
-          skipped++;
+          // Check if unzipped dir exists — if not, we need to unzip even if .skill unchanged
+          const name = file.replace(/\.skill$/, "");
+          if (!existsSync(join(dir, name, "SKILL.md"))) {
+            needsUnzip = true;
+          } else {
+            skipped++;
+          }
         }
       } else {
         copyFileSync(src, dest);
+        needsUnzip = true;
         installed++;
+      }
+
+      if (needsUnzip) {
+        const ok = unzipSkill(dest, dir);
+        if (!ok) {
+          warn(`Failed to unzip ${file} — skill may not work until manually extracted`);
+        }
       }
     }
 
@@ -300,6 +336,10 @@ function installClaudeSkills(root: string): void {
 
 export function installClaudeHooksForFix(root: string): void {
   installClaudeHooks(root);
+}
+
+export function installSessionStartHookForFix(root: string): void {
+  installSessionStartHook(root);
 }
 
 function installClaudeHooks(root: string): void {
@@ -456,6 +496,48 @@ exit 0
   settings.hooks = hooks;
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
   success(".claude/settings.json (PreToolUse + PostToolUse hooks registered)");
+}
+
+// ─── Session-start hook ───────────────────────────────────────────
+
+function installSessionStartHook(root: string): void {
+  const hooksDir = join(root, ".claude", "hooks");
+  mkdirSync(hooksDir, { recursive: true });
+
+  const hookPath = join(hooksDir, "session-start.sh");
+  const hookScript = `#!/bin/bash
+# codebase session-start — fires once per Claude Code session
+# Keeps .codebase.json fresh without blocking Claude startup.
+npx --yes codebase scan-only --quiet 2>/dev/null || true
+`;
+  writeFileSync(hookPath, hookScript, "utf-8");
+  chmodSync(hookPath, 0o755);
+
+  // Wire into .claude/settings.json as a PreToolUse hook on the first Bash call,
+  // using a sentinel file so it only fires once per session.
+  const settingsPath = join(root, ".claude", "settings.json");
+  let settings: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
+  const preHooks = (hooks["PreToolUse"] as unknown[]) ?? [];
+  const hasSessionHook = JSON.stringify(preHooks).includes("session-start");
+  if (!hasSessionHook) {
+    preHooks.push({
+      matcher: "Bash",
+      hooks: [{ type: "command", command: `bash .claude/hooks/session-start.sh` }],
+    });
+  }
+  hooks["PreToolUse"] = preHooks;
+  settings.hooks = hooks;
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+  success(".claude/hooks/session-start.sh (PreToolUse — auto-refresh manifest on session start)");
 }
 
 // ─── commit-msg hook: block commits directly to main/master ─────
@@ -706,7 +788,7 @@ ${description}
 
 ## Dev Credentials
 
-- **Default seed creds:** \`{role}@dev.local\` / \`dev123456\`
+- **Default seed creds:** \`{role}@dev.local\` / \`<your-seed-password>\`
 - **Dev login path:** [INFERRED: e.g. /dev-login or /auth/login]
 
 ## Known Constraints

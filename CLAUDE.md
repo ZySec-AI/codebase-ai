@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`codebase` gives AI tools permanent memory of any software project. One command scans a project and writes a compact snapshot (`.codebase.json`) — stack, commands, structure, open issues, recent decisions. AI tools read this instead of exploring files, saving ~95% of tokens and enabling fully autonomous workflows. Auto-wires into 7 AI tools (Claude, Cursor, Windsurf, Copilot, Aider, Cline, Continue) and exposes an MCP server so Claude can query project context, manage GitHub issues, and drive the `/simulate → /build → /launch` loop without human guidance.
+`codebase` gives AI tools permanent memory of any software project. One command scans a project and writes a compact snapshot (`.codebase.json`) — stack, commands, structure, open issues, recent decisions. AI tools read this instead of exploring files, saving ~95% of tokens and enabling fully autonomous workflows. Auto-wires into Claude Code and exposes an MCP server so Claude can query project context, manage GitHub issues, and drive the `/simulate → /build → /launch` loop without human guidance.
 
 ## Build & Development Commands
 
@@ -40,11 +40,11 @@ Registered detectors: `project`, `repo`, `structure`, `stack`, `commands`, `depe
 
 ### Integrations (`src/integrations/`)
 
-7 integrations implement the `Integration` interface (`src/types.ts`). Each can `detect` if its AI tool config exists, `inject` a reference to `.codebase.json` into the config (between `<!-- codebase:start/end -->` or `# codebase:start/end` markers), and `remove` it. Shared injection logic is in `shared.ts`. Git hooks (`githook.ts`) and `.gitignore` updates (`gitignore.ts`) live here too.
+1 integration (Claude Code) implements the `Integration` interface (`src/types.ts`). It can `detect` if its config exists, `inject` a reference to `.codebase.json` into CLAUDE.md (between `<!-- codebase:start/end -->` markers), and `remove` it. Shared injection logic is in `shared.ts`. Git hooks (`githook.ts`) and `.gitignore` updates (`gitignore.ts`) live here too.
 
 ### MCP Server (`src/mcp/`)
 
-JSON-RPC 2.0 over stdio. Exposes 16 tools including `project_brief`, `get_next_task`, `create_issue`, `update_issue`, `get_issue`, `get_pr`, `list_skills`, `refresh_status`. Entry: `src/mcp/server.ts`.
+JSON-RPC 2.0 over stdio. Exposes 17 tools including `project_brief` (supports `slim: true`), `get_next_task`, `create_issue`, `update_issue`, `get_issue`, `get_pr`, `list_skills`, `refresh_status`, `generate_handoff`. Entry: `src/mcp/server.ts`.
 
 ### GitHub Integration (`src/github/`)
 
@@ -52,7 +52,7 @@ Optional — requires `gh` CLI. Fetches issues, PRs, milestones via GitHub Graph
 
 ### Utilities (`src/utils/`)
 
-CLI arg parser (`args.ts`), console output formatting with colors (`output.ts`), glob matching (`glob.ts`), dot-path JSON queries (`json-path.ts`). All zero-dependency.
+CLI arg parser (`args.ts`), console output formatting with colors (`output.ts`), glob matching (`glob.ts`), dot-path JSON queries (`json-path.ts`), token estimation (`tokens.ts`). All zero-dependency.
 
 ## Key Conventions
 
@@ -71,7 +71,7 @@ Commands: `open <url>`, `snapshot -i` (accessibility tree → `@e1`/`@e2` refs),
 
 ### Doctor & Fix (`src/commands/doctor.ts`, `src/commands/fix.ts`)
 
-`doctor` runs read-only health checks against the project setup: manifest presence/freshness, detector coverage, GitHub CLI status, AI tool injection markers, MCP configs, git hooks, and `.gitignore`. `fix` auto-repairs anything `doctor` flags by re-scanning, re-injecting, reconfiguring MCP, and reinstalling hooks. Both reuse helpers exported from `init.ts` (`checkGhDetailed`, `detectGlobalTools`, `autoConfigureMcp`, `configureMcpFile`).
+`doctor` runs read-only health checks against the project setup: manifest presence/freshness, detector coverage, GitHub CLI status, AI tool injection markers, MCP configs, git hooks, Claude Code hooks (including session-start), and `.gitignore`. Includes a TOKEN HEALTH section (CLAUDE.md size, injection block size, MCP server count, session hook presence). `fix` auto-repairs anything `doctor` flags by re-scanning, re-injecting, reconfiguring MCP, reinstalling hooks, and restoring the session-start hook. Both reuse helpers exported from `init.ts` (`checkGhDetailed`, `detectGlobalTools`, `autoConfigureMcp`, `configureMcpFile`).
 
 ## Adding a Command
 
@@ -137,19 +137,30 @@ Returns: project identity, tech stack, commands, structure, current status, next
 | `npx codebase issue create "title"` | Track a bug, feature, or TODO |
 | `npx codebase issue close <n> --reason "why"` | Close an issue after fixing it |
 
+### Maintenance
+| Command | What it does |
+|---|---|
+| `codebase doctor` | Health check — diagnose broken setup |
+| `codebase fix` | Auto-repair issues found by doctor |
+| `codebase skills` | List installed skills and their capabilities |
+
 ### Rules
 - **Never explore the codebase to discover stack/commands/structure** — it's already in `brief`
 - **Check `next` before starting work** — don't duplicate in-progress tasks
 - **Create issues for bugs/TODOs you find** — keep the project brain alive
 - **Close issues when you fix them** — with a reason so the team knows why
+- **If any command fails, run `codebase doctor` then `codebase fix`** — self-heal before asking for help
 
 ### Vibekit Workflow
 ```
 /simulate → /build → /launch
 ```
-- `/simulate` — Playwright customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
+- `/simulate` — agent-browser customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
 - `/build` — Implements architectural issues autonomously. Runs until all `arch`+`vibekit` issues are closed.
 - `/launch` — Gates on open bugs, generates GTM artifacts, creates GitHub release, merges to main.
+
+### MCP Tools (for IDE/agent integrations)
+If using MCP instead of CLI: call `project_brief` (not `npx codebase brief`), `get_next_task`, `refresh_status`, `list_skills`. Full tool list via `list_commands` and `list_skills`.
 
 ### Browser Automation (agent-browser)
 Commands: `open <url>`, `snapshot -i` (→ `@e1`/`@e2` refs), `click @e1`, `fill @e2 "text"`, `screenshot`, `auth save/login <profile>`, `state save/load <name>`.

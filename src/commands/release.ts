@@ -255,7 +255,7 @@ function detectTestCmd(root: string): string | null {
 function runTestSuite(root: string, cmd: string): Promise<{ ok: boolean; output: string }> {
   const [bin, ...args] = cmd.split(" ");
   return new Promise((resolve) => {
-    execFile(bin, args, { cwd: root, timeout: 120_000 }, (err, stdout, stderr) => {
+    execFile(bin, args, { cwd: root, timeout: 300_000 }, (err, stdout, stderr) => {
       resolve({ ok: !err, output: stdout + stderr });
     });
   });

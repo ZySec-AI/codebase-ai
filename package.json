@@ -1,6 +1,6 @@
 {
   "name": "codebase-ai",
-  "version": "0.3.2",
+  "version": "0.3.5",
   "description": "One command. Every AI tool understands your project instantly.",
   "type": "module",
   "homepage": "https://github.com/ZySec-AI/codebase",
@@ -57,6 +57,6 @@
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
     "typescript-eslint": "^8.57.1",
-    "vitest": "^1.6.0"
+    "vitest": "^4.1.1"
   }
 }

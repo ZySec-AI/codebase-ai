@@ -22,6 +22,7 @@ const DEFAULTS: CLIOptions = {
   reason: "",
   examples: false,
   helpCommand: false,
+  slim: false,
 };
 
 const COMMANDS = new Set([
@@ -41,6 +42,8 @@ const COMMANDS = new Set([
   "plan",
   "skills",
   "serve",
+  "handoff",
+  "tokens",
 ]);
 
 export function parseArgs(argv: string[]): CLIOptions {
@@ -109,6 +112,10 @@ export function parseArgs(argv: string[]): CLIOptions {
       }
       if (key === "examples") {
         opts.examples = true;
+        continue;
+      }
+      if (key === "slim") {
+        opts.slim = true;
         continue;
       }
       if (key === "mine") {

@@ -2,7 +2,7 @@ import { get } from "https";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import { execSync, spawnSync } from "child_process";
+import { execSync } from "child_process";
 
 const CACHE_DIR = join(homedir(), ".codebase");
 const CACHE_FILE = join(CACHE_DIR, "update-check.json");
@@ -119,53 +119,12 @@ function detectInstallCommand(): string {
   return `npm install -g ${NPM_PACKAGE}@latest`;
 }
 
-function runUpgrade(cmd: string): boolean {
-  const [bin, ...args] = cmd.split(" ");
-  const result = spawnSync(bin, args, { stdio: "inherit" });
-  return result.status === 0;
-}
-
-/** Read a single keypress from stdin without requiring Enter. */
-function readKey(): Promise<string> {
-  return new Promise((resolve) => {
-    const stdin = process.stdin;
-    const wasTTY = stdin.isTTY;
-
-    if (wasTTY) {
-      stdin.setRawMode(true);
-    }
-    stdin.resume();
-    stdin.setEncoding("utf8");
-
-    const onData = (key: string) => {
-      if (wasTTY) {
-        stdin.setRawMode(false);
-      }
-      stdin.pause();
-      stdin.removeListener("data", onData);
-      resolve(key);
-    };
-
-    stdin.on("data", onData);
-
-    // Timeout after 10s — treat as skip
-    setTimeout(() => {
-      if (wasTTY) {
-        stdin.setRawMode(false);
-      }
-      stdin.pause();
-      stdin.removeListener("data", onData);
-      resolve("n");
-    }, 10_000);
-  });
-}
-
 export async function checkForUpdate(): Promise<void> {
   // Skip in CI, piped output, or explicitly disabled
   if (process.env.CI || process.env.NO_UPDATE_CHECK || process.env.CODEBASE_NO_UPDATE_CHECK) {
     return;
   }
-  if (!process.stdout.isTTY || !process.stdin.isTTY) {
+  if (!process.stdout.isTTY) {
     return;
   }
 
@@ -191,40 +150,12 @@ export async function checkForUpdate(): Promise<void> {
 
   const installCmd = detectInstallCommand();
 
-  // Banner
-  console.log(`\n  ${c.yellow}┌─────────────────────────────────────────────────┐${c.reset}`);
-  console.log(
+  // Non-blocking banner — just inform, never block stdin
+  console.error(`\n  ${c.yellow}┌─────────────────────────────────────────────────┐${c.reset}`);
+  console.error(
     `  ${c.yellow}│${c.reset}  ${c.bold}Update available${c.reset}  ` +
       `${c.dim}${current}${c.reset} ${c.yellow}→${c.reset} ${c.bold}${c.cyan}${latest}${c.reset}`
   );
-  console.log(
-    `  ${c.yellow}│${c.reset}  Press ${c.bold}Y${c.reset} to update now, any other key to skip`
-  );
-  console.log(`  ${c.yellow}└─────────────────────────────────────────────────┘${c.reset}`);
-  process.stdout.write(`\n  > `);
-
-  const key = await readKey();
-  const accepted = key.toLowerCase() === "y";
-
-  console.log(accepted ? "Updating…" : "Skipped.\n");
-
-  if (!accepted) {
-    return;
-  }
-
-  console.log(`\n  ${c.dim}$ ${installCmd}${c.reset}\n`);
-  const ok = runUpgrade(installCmd);
-
-  if (ok) {
-    console.log(
-      `\n  ${c.green}✓${c.reset} ${c.bold}Updated to ${latest}!${c.reset} Restart codebase to use the new version.\n`
-    );
-  } else {
-    console.log(
-      `\n  ${c.yellow}!${c.reset} Update failed. Run manually: ${c.bold}${installCmd}${c.reset}\n`
-    );
-  }
-
-  // Exit so the old binary doesn't continue running after upgrade
-  process.exit(0);
+  console.error(`  ${c.yellow}│${c.reset}  Run: ${c.bold}${installCmd}${c.reset}`);
+  console.error(`  ${c.yellow}└─────────────────────────────────────────────────┘${c.reset}\n`);
 }

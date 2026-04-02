@@ -213,3 +213,68 @@ export function generateBrief(m: Manifest): string {
 
   return sections.join("\n");
 }
+
+/**
+ * Generates a compact session-start briefing (~20 lines).
+ * Focused on: what changed, what's in flight, what's next, any blockers.
+ * Use with `codebase brief --slim` or `project_brief(slim: true)`.
+ */
+export function generateSlimBrief(m: Manifest): string {
+  const sections: string[] = [];
+  const name = m.project?.name || "Unknown Project";
+
+  // Header with freshness
+  const ageMs = m.generated_at ? Date.now() - new Date(m.generated_at).getTime() : -1;
+  const ageMin = ageMs >= 0 ? Math.round(ageMs / 60000) : -1;
+  const ageStr =
+    ageMin < 0 ? "unknown age" : ageMin < 60 ? `${ageMin}m ago` : `${Math.round(ageMin / 60)}h ago`;
+  sections.push(`# ${name} — Session Start (manifest: ${ageStr})`);
+
+  // Uncommitted changes warning
+  if (m.git?.uncommitted_changes) {
+    sections.push("\nWARNING: Uncommitted changes in working directory.");
+  }
+
+  // In progress
+  const inProgress = m.status?.kanban?.in_progress || [];
+  if (inProgress.length) {
+    sections.push("\n## In Progress");
+    for (const i of inProgress) {
+      sections.push(`- #${i.number}: ${i.title}`);
+    }
+  }
+
+  // Next task (top priority)
+  const priorities = m.status?.priorities || [];
+  if (priorities[0]) {
+    const t = priorities[0];
+    const labels = t.labels.length ? ` [${t.labels.join(", ")}]` : "";
+    sections.push(`\n## Next Task\n#${t.number}: ${t.title}${labels}`);
+  }
+
+  // Blockers
+  const blocked = (m.status?.issues || []).filter(
+    (i) =>
+      i.state === "open" &&
+      i.labels.some(
+        (l) => l.toLowerCase().includes("blocked") || l.toLowerCase().includes("blocker")
+      )
+  );
+  if (blocked.length) {
+    sections.push("\n## Blockers");
+    for (const i of blocked) {
+      sections.push(`- #${i.number}: ${i.title}`);
+    }
+  }
+
+  // Recent commits (last 3)
+  if (m.git?.recent_commits?.length) {
+    sections.push("\n## Recent Commits");
+    for (const c of m.git.recent_commits.slice(0, 3)) {
+      sections.push(`- ${c}`);
+    }
+  }
+
+  sections.push("\nFor full context: `codebase brief`");
+  return sections.join("\n");
+}

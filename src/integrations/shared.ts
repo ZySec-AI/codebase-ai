@@ -29,6 +29,8 @@ Returns: project identity, tech stack, commands, structure, current status, next
 | \`npx codebase query <path>\` | Any data point (e.g. \`stack.languages\`, \`commands.test\`) |
 | \`npx codebase issue create "title"\` | Track a bug, feature, or TODO |
 | \`npx codebase issue close <n> --reason "why"\` | Close an issue after fixing it |
+| \`npx codebase handoff\` | Generate HANDOFF.md — session transfer for next agent |
+| \`npx codebase tokens\` | Show token budget report for this project |
 
 ### Maintenance
 | Command | What it does |
@@ -44,19 +46,18 @@ Returns: project identity, tech stack, commands, structure, current status, next
 - **Close issues when you fix them** — with a reason so the team knows why
 - **If any command fails, run \`codebase doctor\` then \`codebase fix\`** — self-heal before asking for help
 
-### Vibekit Workflow
-\`\`\`
-/simulate → /build → /launch
-\`\`\`
-- \`/simulate\` — agent-browser customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
-- \`/build\` — Implements architectural issues autonomously. Runs until all \`arch\`+\`vibekit\` issues are closed.
-- \`/launch\` — Gates on open bugs, generates GTM artifacts, creates GitHub release, merges to main.
+### Workflow Tips
+- **Subagents for isolation**: use Task tool for large refactors — keeps main session clean
+- **Session hygiene**: keep sessions focused; start fresh rather than pushing through context limits
+- **Commit often**: detailed commit messages serve as memory between sessions
+- **End of session**: run \`codebase handoff\` before closing to save state for the next agent
+- **Model selection**: Opus for architecture/security decisions; Sonnet for implementation/iteration
+- **Rewind mistakes**: ESC ESC after a bad edit — reverts and lets you try a different approach
 
-### MCP Tools (for IDE/agent integrations)
-If using MCP instead of CLI: call \`project_brief\` (not \`npx codebase brief\`), \`get_next_task\`, \`refresh_status\`, \`list_skills\`. Full tool list via \`list_commands\` and \`list_skills\`.
-
-### Browser Automation (agent-browser)
-Commands: \`open <url>\`, \`snapshot -i\` (→ \`@e1\`/\`@e2\` refs), \`click @e1\`, \`fill @e2 "text"\`, \`screenshot\`, \`auth save/login <profile>\`, \`state save/load <name>\`.
+### Where to Find More
+- Vibekit loop: see \`.claude/commands/\` for /simulate, /build, /launch
+- MCP tools: call \`list_commands\` or \`list_skills\` via MCP server
+- Browser automation: see \`~/.claude/skills/simulate/SKILL.md\`
 ${END_MARKER}`;
 
 const INJECT_BLOCK_PLAIN = `
@@ -75,6 +76,8 @@ ${HASH_START_MARKER}
 #   npx codebase query <path>                    → Any data (e.g. stack.languages)
 #   npx codebase issue create "title"            → Track bugs/features/TODOs
 #   npx codebase issue close <n> --reason "why"  → Close after fixing
+#   npx codebase handoff                         → Generate HANDOFF.md for next agent
+#   npx codebase tokens                          → Show token budget report
 #
 # MAINTENANCE:
 #   codebase doctor   → Health check — diagnose broken setup
@@ -87,6 +90,12 @@ ${HASH_START_MARKER}
 #   - Create issues for bugs/TODOs — keep the project brain alive
 #   - Close issues when fixed — with a reason
 #   - If any command fails, run doctor then fix — self-heal before asking for help
+#
+# WORKFLOW TIPS:
+#   - Use subagents/Task tool for isolation — keeps main session token-efficient
+#   - Commit often with detailed messages — git history is your session memory
+#   - Run handoff before closing — saves state for the next agent
+#   - Opus for architecture decisions; Sonnet for implementation
 #
 # MCP TOOLS (for IDE/agent integrations):
 #   If using MCP: call project_brief, get_next_task, refresh_status, list_skills
@@ -155,6 +164,8 @@ Returns: project identity, tech stack, commands, structure, current status, next
 | \`npx codebase query <path>\` | Any data point (e.g. \`stack.languages\`, \`commands.test\`) |
 | \`npx codebase issue create "title"\` | Track a bug, feature, or TODO |
 | \`npx codebase issue close <n> --reason "why"\` | Close an issue after fixing it |
+| \`npx codebase handoff\` | Generate HANDOFF.md — session transfer for next agent |
+| \`npx codebase tokens\` | Show token budget report for this project |
 
 ### Maintenance
 | Command | What it does |
@@ -170,19 +181,18 @@ Returns: project identity, tech stack, commands, structure, current status, next
 - **Close issues when you fix them** — with a reason so the team knows why
 - **If any command fails, run \`codebase doctor\` then \`codebase fix\`** — self-heal before asking for help
 
-### Vibekit Workflow
-\`\`\`
-/simulate → /build → /launch
-\`\`\`
-- \`/simulate\` — agent-browser customer journeys find & fix bugs inline. Creates GitHub issues for arch problems.
-- \`/build\` — Implements architectural issues autonomously. Runs until all \`arch\`+\`vibekit\` issues are closed.
-- \`/launch\` — Gates on open bugs, generates GTM artifacts, creates GitHub release, merges to main.
+### Workflow Tips
+- **Subagents for isolation**: use Task tool for large refactors — keeps main session clean
+- **Session hygiene**: keep sessions focused; start fresh rather than pushing through context limits
+- **Commit often**: detailed commit messages serve as memory between sessions
+- **End of session**: run \`codebase handoff\` before closing to save state for the next agent
+- **Model selection**: Opus for architecture/security decisions; Sonnet for implementation/iteration
+- **Rewind mistakes**: ESC ESC after a bad edit — reverts and lets you try a different approach
 
-### MCP Tools (for IDE/agent integrations)
-If using MCP instead of CLI: call \`project_brief\` (not \`npx codebase brief\`), \`get_next_task\`, \`refresh_status\`, \`list_skills\`. Full tool list via \`list_commands\` and \`list_skills\`.
-
-### Browser Automation (agent-browser)
-Commands: \`open <url>\`, \`snapshot -i\` (→ \`@e1\`/\`@e2\` refs), \`click @e1\`, \`fill @e2 "text"\`, \`screenshot\`, \`auth save/login <profile>\`, \`state save/load <name>\`.
+### Where to Find More
+- Vibekit loop: see \`.claude/commands/\` for /simulate, /build, /launch
+- MCP tools: call \`list_commands\` or \`list_skills\` via MCP server
+- Browser automation: see \`~/.claude/skills/simulate/SKILL.md\`
 ${END_MARKER}`;
 }
 
@@ -218,6 +228,8 @@ ${cmdSection}#
 #   npx codebase query <path>                    → Any data (e.g. stack.languages)
 #   npx codebase issue create "title"            → Track bugs/features/TODOs
 #   npx codebase issue close <n> --reason "why"  → Close after fixing
+#   npx codebase handoff                         → Generate HANDOFF.md for next agent
+#   npx codebase tokens                          → Show token budget report
 #
 # MAINTENANCE:
 #   codebase doctor   → Health check — diagnose broken setup
@@ -230,6 +242,12 @@ ${cmdSection}#
 #   - Create issues for bugs/TODOs — keep the project brain alive
 #   - Close issues when fixed — with a reason
 #   - If any command fails, run doctor then fix — self-heal before asking for help
+#
+# WORKFLOW TIPS:
+#   - Use subagents/Task tool for isolation — keeps main session token-efficient
+#   - Commit often with detailed messages — git history is your session memory
+#   - Run handoff before closing — saves state for the next agent
+#   - Opus for architecture decisions; Sonnet for implementation
 #
 # MCP TOOLS (for IDE/agent integrations):
 #   If using MCP: call project_brief, get_next_task, refresh_status, list_skills
