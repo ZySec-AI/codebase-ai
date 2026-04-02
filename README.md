@@ -131,6 +131,7 @@ codebase setup
 
 # AI interface
 codebase brief             # full project briefing
+codebase brief --slim      # lightweight ~20-line brief
 codebase next              # highest-priority open issue
 codebase status            # kanban board + milestones
 codebase query <path>      # e.g. stack.languages or commands.test
@@ -140,9 +141,13 @@ codebase issue create "title"
 codebase issue close <n> --reason "why"
 codebase issue comment <n> --message "text"
 
+# Session management
+codebase handoff           # generate HANDOFF.md for session transfer
+codebase tokens            # token budget report (A/B/C/D grades)
+
 # Maintenance
 codebase scan              # refresh .codebase.json
-codebase doctor            # health check
+codebase doctor            # health check (includes TOKEN HEALTH section)
 codebase fix               # auto-repair
 codebase mcp               # start MCP server
 ```
@@ -162,7 +167,7 @@ codebase mcp               # start MCP server
 }
 ```
 
-Add to `.mcp.json` in your project root. Tools: `project_brief`, `get_codebase`, `query_codebase`, `get_next_task`, `get_blockers`, `create_issue`, `close_issue`, `rescan_project`, `list_commands`.
+Add to `.mcp.json` in your project root. Tools: `project_brief` (supports `slim: true`), `get_codebase`, `query_codebase`, `get_next_task`, `get_blockers`, `create_issue`, `close_issue`, `rescan_project`, `list_commands`, `generate_handoff`.
 
 ---
 

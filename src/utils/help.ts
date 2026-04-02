@@ -88,8 +88,12 @@ const HELP: Record<string, CommandHelp> = {
         description:
           "Comma-separated sections to include: stack,commands,status,git,roadmap,decisions",
       },
+      {
+        flag: "--slim",
+        description: "Lightweight ~20-line brief (manifest age, next task, blockers, last commits)",
+      },
     ],
-    seeAlso: ["next", "status"],
+    seeAlso: ["next", "status", "handoff"],
   },
 
   next: {
@@ -232,6 +236,34 @@ const HELP: Record<string, CommandHelp> = {
     ],
     seeAlso: ["doctor"],
   },
+
+  handoff: {
+    description: "Generate HANDOFF.md capturing current session state for context transfer",
+    usage: "codebase handoff [options]",
+    examples: [
+      { command: "codebase handoff", description: "Generate HANDOFF.md in project root" },
+      {
+        command: 'codebase handoff --message "Finished auth, next: billing"',
+        description: "Include session notes",
+      },
+    ],
+    options: [
+      {
+        flag: "--message <text>",
+        description: "Session notes to include in HANDOFF.md",
+      },
+    ],
+    seeAlso: ["brief"],
+  },
+
+  tokens: {
+    description: "Estimate per-session token budget across all context sources",
+    usage: "codebase tokens",
+    examples: [
+      { command: "codebase tokens", description: "Show token budget with A/B/C/D grades" },
+    ],
+    seeAlso: ["doctor"],
+  },
 };
 
 export function printMainHelp(): void {
@@ -245,9 +277,11 @@ ${bold("AI INTERFACE")}
   These are the commands your AI tools call:
 
   ${command("codebase brief")}             Full project briefing — run this first
+  ${command("codebase brief --slim")}      Lightweight brief (~20 lines) for session-start hooks
   ${command("codebase next")}              What should I work on next?
   ${command("codebase status")}            Kanban board, priorities, milestones
   ${command("codebase query <path>")}      Query any field (e.g. ${code("stack.languages")})
+  ${command("codebase handoff")}           Generate HANDOFF.md for session transfer
 
 ${bold("AUTONOMOUS LOOP")}
   After ${command("codebase setup")}, these slash commands are available in Claude Code:
@@ -267,6 +301,7 @@ ${bold("HUMAN COMMANDS")}
   ${command("codebase setup")}             Wire AI tools + install slash commands
   ${command("codebase release")}           Gate check → tag → develop→main
   ${command("codebase doctor")}            Health check & diagnostics
+  ${command("codebase tokens")}            Token budget report (A/B/C/D grades)
 
 ${bold("OPTIONS")}
   ${code("--help, -h")}                    Show this help or command-specific help

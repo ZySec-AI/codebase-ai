@@ -38,9 +38,15 @@ codebase issue list                         # list all issues
 # Skills
 codebase skills                             # list installed skills
 
+# Session management
+codebase handoff                            # generate HANDOFF.md for session transfer
+codebase handoff --message "notes"          # include session notes
+codebase tokens                             # token budget report (A/B/C/D grades)
+codebase brief --slim                       # lightweight ~20-line brief
+
 # Maintenance
 codebase scan                               # refresh .codebase.json (lightweight)
-codebase doctor                             # health check
+codebase doctor                             # health check (includes TOKEN HEALTH section)
 codebase fix                                # auto-repair issues
 codebase release                            # gate check → tag → merge develop→main
 ```
@@ -83,12 +89,13 @@ codebase setup                        # full setup for autonomous loop
 
 **What it adds beyond `init`:**
 1. Claude Code hooks (git-guard for branch protection, PR reminders)
-2. Slash commands → `.claude/commands/` (/simulate, /build, /launch, /review, /setup)
-3. Skills → `.claude/skills/` + `~/.claude/skills/` (py-declutter, nextjs-declutter, arch-review, vibeloop)
-4. agent-browser (headless Chrome for /simulate)
-5. GitHub labels (bug, arch, sim, critical, high, medium, low, vibekit, etc.)
-6. `docs/PRODUCT.md` skeleton (personas, roles, dev credentials)
-7. `.vibekit/` directory for loop state
+2. Session-start hook (`.claude/hooks/session-start.sh`) — auto-refreshes manifest on every new Claude session
+3. Slash commands → `.claude/commands/` (/simulate, /build, /launch, /review, /setup)
+4. Skills → `.claude/skills/` + `~/.claude/skills/` (py-declutter, nextjs-declutter, arch-review, vibeloop)
+5. agent-browser (headless Chrome for /simulate)
+6. GitHub labels (bug, arch, sim, critical, high, medium, low, vibekit, etc.)
+7. `docs/PRODUCT.md` skeleton (personas, roles, dev credentials)
+8. `.vibekit/` directory for loop state
 
 ---
 
@@ -111,9 +118,14 @@ Full project briefing. AI agents call this at session start.
 
 ```bash
 codebase brief                        # everything in one call
+codebase brief --slim                 # lightweight ~20-line brief (manifest age, next task, blockers, last commits)
+codebase brief --format json          # structured JSON output
+codebase brief --categories stack,status  # filter to specific sections
 ```
 
 Returns: project identity, tech stack, commands, structure, current status (kanban, priorities), next task with body snippet, blockers, milestones, recent decisions, recent commits.
+
+`--slim` returns a concise ~20-line summary ideal for session-start hooks and low-context situations.
 
 ---
 
@@ -205,7 +217,7 @@ codebase mcp                           # start stdio MCP server
 **MCP tools available:**
 | Tool | What it does |
 |------|--------------|
-| `project_brief` | Full project briefing (call first) |
+| `project_brief` | Full project briefing (call first); `slim: true` for ~20-line brief |
 | `get_next_task` | Highest-priority task with body |
 | `get_blockers` | Issues blocked, PRs failing, merge conflicts |
 | `get_issue` | Full issue detail by number |
@@ -221,6 +233,7 @@ codebase mcp                           # start stdio MCP server
 | `update_plan` | Append to PLAN.md |
 | `get_codebase` | Get structured manifest data |
 | `query_codebase` | Query specific field by dot-path |
+| `generate_handoff` | Generate HANDOFF.md for session transfer |
 
 `codebase init` writes `.mcp.json` automatically.
 
@@ -244,6 +257,37 @@ codebase release --dry-run            # preview without tagging
 
 ---
 
+### `codebase tokens`
+
+Token budget report — estimates per-session context cost across all sources.
+
+```bash
+codebase tokens                       # show token budget with A/B/C/D grades
+```
+
+**Sources measured:** CLAUDE.md, `.codebase.json`, MCP servers (~10k tokens each), slash commands, `settings.json`.
+
+**Grades:** A (<15k) | B (<30k) | C (<60k) | D (>60k)
+
+Includes recommendations when CLAUDE.md is large or too many MCP servers are configured.
+
+---
+
+### `codebase handoff`
+
+Generate `HANDOFF.md` capturing current session state for context transfer to the next agent or human.
+
+```bash
+codebase handoff                           # generate HANDOFF.md in project root
+codebase handoff --message "notes"         # include session notes
+```
+
+**Captures:** branch, recent commits, changed files, uncommitted changes, stashes, in-progress issues, next priority task, blockers, and active PLAN.md snippet.
+
+Run this at the end of a session so the next session can pick up instantly with full context.
+
+---
+
 ### `codebase doctor` / `codebase fix`
 
 Health check and auto-repair.
@@ -253,7 +297,13 @@ codebase doctor                       # diagnose issues
 codebase fix                          # auto-repair everything
 ```
 
-**Checks:** manifest freshness, detector coverage, CLAUDE.md injection, MCP config, git hooks, Claude Code hooks, slash commands, skills, GitHub CLI status, `.gitignore`.
+**Checks:** manifest freshness, detector coverage, CLAUDE.md injection, MCP config, git hooks, Claude Code hooks, slash commands, skills, GitHub CLI status, `.gitignore`, and TOKEN HEALTH (CLAUDE.md size, injection block size, MCP server count, session-start hook).
+
+**TOKEN HEALTH section** grades your context setup and warns when:
+- CLAUDE.md exceeds 300 lines (tokens wasted per session)
+- Injection block exceeds 80 lines
+- More than 3 MCP servers configured
+- Session-start hook is missing
 
 ---
 

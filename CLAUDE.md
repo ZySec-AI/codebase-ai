@@ -44,7 +44,7 @@ Registered detectors: `project`, `repo`, `structure`, `stack`, `commands`, `depe
 
 ### MCP Server (`src/mcp/`)
 
-JSON-RPC 2.0 over stdio. Exposes 16 tools including `project_brief`, `get_next_task`, `create_issue`, `update_issue`, `get_issue`, `get_pr`, `list_skills`, `refresh_status`. Entry: `src/mcp/server.ts`.
+JSON-RPC 2.0 over stdio. Exposes 17 tools including `project_brief` (supports `slim: true`), `get_next_task`, `create_issue`, `update_issue`, `get_issue`, `get_pr`, `list_skills`, `refresh_status`, `generate_handoff`. Entry: `src/mcp/server.ts`.
 
 ### GitHub Integration (`src/github/`)
 
@@ -52,7 +52,7 @@ Optional — requires `gh` CLI. Fetches issues, PRs, milestones via GitHub Graph
 
 ### Utilities (`src/utils/`)
 
-CLI arg parser (`args.ts`), console output formatting with colors (`output.ts`), glob matching (`glob.ts`), dot-path JSON queries (`json-path.ts`). All zero-dependency.
+CLI arg parser (`args.ts`), console output formatting with colors (`output.ts`), glob matching (`glob.ts`), dot-path JSON queries (`json-path.ts`), token estimation (`tokens.ts`). All zero-dependency.
 
 ## Key Conventions
 
@@ -71,7 +71,7 @@ Commands: `open <url>`, `snapshot -i` (accessibility tree → `@e1`/`@e2` refs),
 
 ### Doctor & Fix (`src/commands/doctor.ts`, `src/commands/fix.ts`)
 
-`doctor` runs read-only health checks against the project setup: manifest presence/freshness, detector coverage, GitHub CLI status, AI tool injection markers, MCP configs, git hooks, and `.gitignore`. `fix` auto-repairs anything `doctor` flags by re-scanning, re-injecting, reconfiguring MCP, and reinstalling hooks. Both reuse helpers exported from `init.ts` (`checkGhDetailed`, `detectGlobalTools`, `autoConfigureMcp`, `configureMcpFile`).
+`doctor` runs read-only health checks against the project setup: manifest presence/freshness, detector coverage, GitHub CLI status, AI tool injection markers, MCP configs, git hooks, Claude Code hooks (including session-start), and `.gitignore`. Includes a TOKEN HEALTH section (CLAUDE.md size, injection block size, MCP server count, session hook presence). `fix` auto-repairs anything `doctor` flags by re-scanning, re-injecting, reconfiguring MCP, reinstalling hooks, and restoring the session-start hook. Both reuse helpers exported from `init.ts` (`checkGhDetailed`, `detectGlobalTools`, `autoConfigureMcp`, `configureMcpFile`).
 
 ## Adding a Command
 
