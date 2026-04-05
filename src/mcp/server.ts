@@ -676,6 +676,8 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
           reason: "",
           examples: false,
           helpCommand: false,
+          model: "",
+          provider: "",
         });
         return respond(req.id, {
           content: [{ type: "text", text: "HANDOFF.md generated in project root." }],

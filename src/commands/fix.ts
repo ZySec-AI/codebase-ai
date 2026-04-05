@@ -213,6 +213,29 @@ export async function runFix(options: CLIOptions): Promise<void> {
     fixCount++;
   }
 
+  // ─── 8c. Context inject hook (UserPromptSubmit) ───────────
+  const contextHook = join(root, ".claude", "hooks", "context-inject.sh");
+  const contextHookOk = (() => {
+    if (!existsSync(contextHook)) {
+      return false;
+    }
+    if (!existsSync(settingsFile)) {
+      return false;
+    }
+    try {
+      const s = JSON.parse(readFileSync(settingsFile, "utf-8"));
+      return JSON.stringify(s.hooks?.UserPromptSubmit ?? "").includes("context-inject");
+    } catch {
+      return false;
+    }
+  })();
+  if (!contextHookOk) {
+    const { installContextInjectHookForFix } = await import("./setup.js");
+    installContextInjectHookForFix(root);
+    fixed("Installed context-inject hook → .claude/hooks/context-inject.sh");
+    fixCount++;
+  }
+
   // ─── Summary ──────────────────────────────────────────────
   log("");
   if (fixCount === 0) {

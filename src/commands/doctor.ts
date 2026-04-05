@@ -446,6 +446,41 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
     });
   }
 
+  // T5. Context inject hook (UserPromptSubmit)
+  const contextHookPath = join(root, ".claude", "hooks", "context-inject.sh");
+  const contextHookInstalled = existsSync(contextHookPath);
+  const contextHookWired = (() => {
+    if (!existsSync(settingsFile)) {
+      return false;
+    }
+    try {
+      const s = JSON.parse(readFileSync(settingsFile, "utf-8"));
+      return JSON.stringify(s.hooks?.UserPromptSubmit ?? "").includes("context-inject");
+    } catch {
+      return false;
+    }
+  })();
+  if (contextHookInstalled && contextHookWired) {
+    results.push({
+      label: "Context Hook",
+      ok: true,
+      detail: "context-inject.sh installed + wired as UserPromptSubmit",
+    });
+  } else {
+    const missing: string[] = [];
+    if (!contextHookInstalled) {
+      missing.push("script");
+    }
+    if (!contextHookWired) {
+      missing.push("UserPromptSubmit wiring");
+    }
+    results.push({
+      label: "Context Hook",
+      ok: false,
+      detail: `Missing: ${missing.join(", ")} — run \`codebase fix\``,
+    });
+  }
+
   // ─── 11. Gitignore ────────────────────────────────────────
   const gitignorePath = join(root, ".gitignore");
   if (existsSync(gitignorePath)) {

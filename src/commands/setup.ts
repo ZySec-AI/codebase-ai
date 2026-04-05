@@ -64,6 +64,7 @@ export async function runSetup(options: CLIOptions): Promise<void> {
   heading("Claude Code Hooks");
   installClaudeHooks(root);
   installSessionStartHook(root);
+  installContextInjectHook(root);
 
   // ── Step 3c: agent-browser ────────────────────────────────────
   heading("Browser Automation");
@@ -340,6 +341,97 @@ export function installClaudeHooksForFix(root: string): void {
 
 export function installSessionStartHookForFix(root: string): void {
   installSessionStartHook(root);
+}
+
+export function installContextInjectHookForFix(root: string): void {
+  installContextInjectHook(root);
+}
+
+// ─── Context inject hook (UserPromptSubmit) ───────────────────
+
+/**
+ * Installs context-inject.sh and wires it as a UserPromptSubmit hook.
+ *
+ * The hook fires when the user submits a prompt. Its stdout becomes a
+ * <system-reminder> that Claude sees automatically — giving Claude the
+ * project slim brief at session start with zero tool calls.
+ *
+ * Uses a sentinel file to inject only on the first prompt per session,
+ * then re-injects if the manifest is refreshed mid-session.
+ */
+function installContextInjectHook(root: string): void {
+  const hooksDir = join(root, ".claude", "hooks");
+  mkdirSync(hooksDir, { recursive: true });
+
+  const hookPath = join(hooksDir, "context-inject.sh");
+
+  // md5sum is Linux; md5 is macOS — fall back gracefully
+  const hookScript = `#!/bin/bash
+# context-inject.sh — UserPromptSubmit hook
+# Outputs project slim brief as system-reminder on session start.
+# Only fires on the first prompt per session (sentinel) or when the
+# manifest is refreshed mid-session.
+
+MANIFEST=".codebase.json"
+
+# Build a per-project, per-session sentinel path
+HASH=$(echo "$(pwd)" | md5sum 2>/dev/null | cut -c1-8 || echo "$(pwd)" | md5 2>/dev/null | cut -c1-8 || echo "default")
+SENTINEL="/tmp/.codebase-ctx-\${HASH}-\$\$"
+
+# Not first prompt — check if manifest was refreshed since sentinel was created
+if [ -f "\$SENTINEL" ]; then
+  if [ -f "\$MANIFEST" ] && [ "\$MANIFEST" -nt "\$SENTINEL" ]; then
+    echo "--- codebase context refreshed ---"
+    npx --yes codebase context --quiet 2>/dev/null || true
+    touch "\$SENTINEL"
+  fi
+  exit 0
+fi
+
+# First prompt of this session — create sentinel and output slim brief
+touch "\$SENTINEL"
+
+if [ -f "\$MANIFEST" ]; then
+  # Re-scan if manifest is older than CODEBASE_HOOK_TTL_MINUTES (default 30)
+  TTL_MINUTES=\${CODEBASE_HOOK_TTL_MINUTES:-30}
+  AGE_SECONDS=$(( \$(date +%s) - \$(stat -f %m "\$MANIFEST" 2>/dev/null || stat -c %Y "\$MANIFEST" 2>/dev/null || echo 0) ))
+  if [ "\$AGE_SECONDS" -gt \$(( TTL_MINUTES * 60 )) ]; then
+    npx --yes codebase scan-only --quiet 2>/dev/null || true
+  fi
+fi
+
+npx --yes codebase context --quiet 2>/dev/null || true
+`;
+
+  writeFileSync(hookPath, hookScript, "utf-8");
+  chmodSync(hookPath, 0o755);
+
+  // Wire into .claude/settings.json as UserPromptSubmit hook
+  const settingsPath = join(root, ".claude", "settings.json");
+  let settings: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
+  const promptHooks = (hooks["UserPromptSubmit"] as unknown[]) ?? [];
+  const hasContextHook = JSON.stringify(promptHooks).includes("context-inject");
+  if (!hasContextHook) {
+    promptHooks.push({
+      matcher: "",
+      hooks: [{ type: "command", command: `bash .claude/hooks/context-inject.sh` }],
+    });
+  }
+  hooks["UserPromptSubmit"] = promptHooks;
+  settings.hooks = hooks;
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+  success(
+    ".claude/hooks/context-inject.sh (UserPromptSubmit — auto-inject slim brief on session start)"
+  );
 }
 
 function installClaudeHooks(root: string): void {

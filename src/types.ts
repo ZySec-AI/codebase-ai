@@ -292,4 +292,6 @@ export interface CLIOptions {
   examples: boolean;
   helpCommand: boolean;
   slim: boolean;
+  model: string;
+  provider: string;
 }

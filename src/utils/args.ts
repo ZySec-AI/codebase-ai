@@ -2,7 +2,7 @@ import type { CLIOptions } from "../types.js";
 import { printMainHelp, printCommandHelp } from "./help.js";
 
 const DEFAULTS: CLIOptions = {
-  command: "init",
+  command: "start",
   subcommand: "",
   positionals: [],
   path: process.cwd(),
@@ -23,6 +23,8 @@ const DEFAULTS: CLIOptions = {
   examples: false,
   helpCommand: false,
   slim: false,
+  model: "",
+  provider: "",
 };
 
 const COMMANDS = new Set([
@@ -44,6 +46,8 @@ const COMMANDS = new Set([
   "serve",
   "handoff",
   "tokens",
+  "context",
+  "start",
 ]);
 
 export function parseArgs(argv: string[]): CLIOptions {
@@ -147,6 +151,10 @@ export function parseArgs(argv: string[]): CLIOptions {
         opts.message = next;
       } else if (key === "reason") {
         opts.reason = next;
+      } else if (key === "model") {
+        opts.model = next;
+      } else if (key === "provider") {
+        opts.provider = next;
       }
 
       continue;
@@ -163,7 +171,19 @@ export function parseArgs(argv: string[]): CLIOptions {
   // Second positional could be subcommand (for hook install/uninstall, issue create/close/list)
   if (positionals.length > 0) {
     const sub = positionals[0];
-    if (["install", "uninstall", "create", "close", "comment", "list", "map"].includes(sub)) {
+    if (
+      [
+        "install",
+        "uninstall",
+        "create",
+        "close",
+        "comment",
+        "list",
+        "map",
+        "reset",
+        "age",
+      ].includes(sub)
+    ) {
       opts.subcommand = positionals.shift()!;
     }
   }

@@ -92,6 +92,18 @@ export async function runTokens(options: CLIOptions): Promise<void> {
     sources.push({ label: "settings.json", tokens, detail: "" });
   }
 
+  // ── Context hook (UserPromptSubmit) ───────────────────────────
+  const contextHookPath = join(root, ".claude", "hooks", "context-inject.sh");
+  if (existsSync(contextHookPath)) {
+    // Slim brief is ~20 lines / ~400 tokens. Injected once per session via sentinel.
+    const HOOK_INJECTION_TOKENS = 400;
+    sources.push({
+      label: "Context hook (1× per session)",
+      tokens: HOOK_INJECTION_TOKENS,
+      detail: "slim brief auto-injected at session start",
+    });
+  }
+
   if (sources.length === 0) {
     log("  No codebase context found. Run `codebase init` first.\n");
     return;

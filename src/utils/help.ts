@@ -264,6 +264,59 @@ const HELP: Record<string, CommandHelp> = {
     ],
     seeAlso: ["doctor"],
   },
+
+  start: {
+    description: "Launch Claude Code with smart model routing (default command when no args given)",
+    usage: "codebase start [options]",
+    examples: [
+      { command: "codebase", description: "Interactive launcher — detect providers, pick model" },
+      { command: "codebase start", description: "Same as above, explicit" },
+      {
+        command: "codebase start --provider openrouter",
+        description: "Use OpenRouter with default model",
+      },
+      {
+        command: "codebase start --model anthropic/claude-haiku-4-5",
+        description: "Skip prompt, use Haiku via OpenRouter",
+      },
+      {
+        command: "codebase start --provider anthropic",
+        description: "Force Anthropic direct (no routing)",
+      },
+    ],
+    options: [
+      {
+        flag: "--provider <name>",
+        description: "anthropic | openrouter | custom — skip interactive prompt",
+      },
+      {
+        flag: "--model <id>",
+        description: "OpenRouter model ID (e.g. anthropic/claude-haiku-4-5)",
+      },
+    ],
+    seeAlso: ["brief", "context"],
+  },
+
+  context: {
+    description: "Lightweight session context — slim brief, force reset, or check manifest age",
+    usage: "codebase context [reset|age]",
+    examples: [
+      { command: "codebase context", description: "Output slim brief (same as brief --slim)" },
+      {
+        command: "codebase context reset",
+        description: "Force re-scan + fresh slim brief; clears hook sentinels",
+      },
+      {
+        command: "codebase context age",
+        description: "Print manifest age in seconds (for use in scripts)",
+      },
+    ],
+    options: [
+      { flag: "reset", description: "Force re-scan and re-inject context on next prompt" },
+      { flag: "age", description: "Print manifest staleness in seconds (−1 if missing)" },
+    ],
+    seeAlso: ["brief", "doctor"],
+  },
 };
 
 export function printMainHelp(): void {
@@ -271,13 +324,16 @@ export function printMainHelp(): void {
 ${bold("codebase")} — One command. Every AI tool understands your project instantly.
 
 ${bold("QUICK START")}
-  ${command("npx codebase")}              ← Run this once. That's it.
+  ${command("codebase")}                  ← Default: smart launcher → picks provider/model → starts Claude Code
+  ${command("npx codebase")}              ← First time setup (init + start)
 
 ${bold("AI INTERFACE")}
   These are the commands your AI tools call:
 
   ${command("codebase brief")}             Full project briefing — run this first
   ${command("codebase brief --slim")}      Lightweight brief (~20 lines) for session-start hooks
+  ${command("codebase context")}           Slim brief shorthand — used by session hooks
+  ${command("codebase context reset")}     Force re-scan + fresh context injection
   ${command("codebase next")}              What should I work on next?
   ${command("codebase status")}            Kanban board, priorities, milestones
   ${command("codebase query <path>")}      Query any field (e.g. ${code("stack.languages")})
