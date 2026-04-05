@@ -120,25 +120,26 @@ export async function runStart(options: CLIOptions): Promise<void> {
     // --model without --provider → infer OpenRouter
     providerMode = "openrouter";
     selectedModel = options.model;
-  } else if (savedProvider === "openrouter" && hasOpenRouter) {
-    // Saved config says openrouter + have a saved model → go direct (no prompt)
-    providerMode = "openrouter";
-    selectedModel = savedModel || POPULAR_MODELS[0].id;
-    info(`Using saved config: OpenRouter / ${selectedModel}`);
   } else if (savedProvider === "anthropic" || (!hasOpenRouter && !hasCustom)) {
     providerMode = "anthropic";
   } else {
-    // Interactive selection
-    const result = await promptModeSelection(hasAnthropic, hasOpenRouter, hasCustom, savedModel);
+    // Interactive selection — always prompt so user can confirm or change
+    const result = await promptModeSelection(
+      hasAnthropic,
+      hasOpenRouter,
+      hasCustom,
+      savedProvider,
+      savedModel
+    );
     providerMode = result.mode;
     selectedModel = result.model;
     // Persist choice for next time
+    const cfg = loadConfig();
+    cfg.provider = result.mode;
     if (result.model) {
-      const cfg = loadConfig();
-      cfg.provider = result.mode;
       cfg.lastModel = result.model;
-      saveConfig(cfg);
     }
+    saveConfig(cfg);
   }
 
   // ── 7. Build env vars ─────────────────────────────────────────
@@ -213,8 +214,58 @@ async function promptModeSelection(
   hasAnthropic: boolean,
   hasOpenRouter: boolean,
   hasCustom: boolean,
+  savedProvider?: string,
   savedModel?: string
 ): Promise<{ mode: "anthropic" | "openrouter" | "custom"; model: string }> {
+  // If there's a saved OpenRouter model, offer quick-confirm or change
+  if (savedProvider === "openrouter" && savedModel && hasOpenRouter) {
+    const modelInfo = POPULAR_MODELS.find((m) => m.id === savedModel);
+    const priceLabel = modelInfo ? `  \x1b[2m${modelInfo.price}\x1b[0m` : "";
+    log(`  Model: \x1b[1m${savedModel}\x1b[0m${priceLabel}`);
+    log(`  \x1b[2mPress Enter to continue, or type a number to switch:\x1b[0m`);
+    log("");
+    POPULAR_MODELS.forEach((m, i) => {
+      const marker = m.id === savedModel ? " \x1b[32m←\x1b[0m" : "";
+      console.log(
+        `    ${bold(String(i + 1))}. ${m.label.padEnd(22)} \x1b[2m${m.price}\x1b[0m${marker}`
+      );
+    });
+    log(`    ${bold(String(POPULAR_MODELS.length + 1))}. Enter model ID manually`);
+    log("");
+
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise<string>((res) => {
+      rl.question("  > ", (a) => {
+        rl.close();
+        res(a.trim());
+      });
+    });
+
+    // Enter with no input → use saved model
+    if (!answer) {
+      return { mode: "openrouter", model: savedModel };
+    }
+    const n = parseInt(answer, 10);
+    if (!isNaN(n) && n >= 1 && n <= POPULAR_MODELS.length) {
+      return { mode: "openrouter", model: POPULAR_MODELS[n - 1].id };
+    }
+    if (!isNaN(n) && n === POPULAR_MODELS.length + 1) {
+      const rl2 = createInterface({ input: process.stdin, output: process.stdout });
+      const customModel = await new Promise<string>((res) => {
+        rl2.question("  Model ID: ", (a) => {
+          rl2.close();
+          res(a.trim());
+        });
+      });
+      return { mode: "openrouter", model: customModel || savedModel };
+    }
+    if (answer.includes("/")) {
+      return { mode: "openrouter", model: answer };
+    }
+    return { mode: "openrouter", model: savedModel };
+  }
+
+  // No saved config — full provider + model selection
   const options: Array<{ label: string; mode: "anthropic" | "openrouter" | "custom" }> = [];
 
   if (hasAnthropic) {
@@ -230,9 +281,6 @@ async function promptModeSelection(
     });
   }
 
-  if (savedModel) {
-    console.log(`  \x1b[2m(last used: ${savedModel})\x1b[0m`);
-  }
   log("  Select provider:");
   options.forEach((o, i) => log(`    ${bold(String(i + 1))}. ${o.label}`));
   log("");
