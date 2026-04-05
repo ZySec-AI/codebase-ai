@@ -444,17 +444,11 @@ async function promptModeSelection(
   }
 
   if (chosen.mode === "custom") {
-    // Prompt for model ID — custom endpoints need an explicit model
-    log("");
-    log("  Enter model ID for custom endpoint (e.g. qwen/qwen2.5-72b-instruct):");
-    const rl2 = createInterface({ input: process.stdin, output: process.stdout });
-    const customModel = await new Promise<string>((res) => {
-      rl2.question("  > ", (a) => {
-        rl2.close();
-        res(a.trim());
-      });
-    });
-    return { mode: "custom", model: customModel };
+    const model = await promptCustomModelSelection(
+      resolveProviderConfig().customUrl,
+      resolveProviderConfig().customKey
+    );
+    return { mode: "custom", model };
   }
 
   return { mode: chosen.mode, model: "" };
@@ -504,6 +498,68 @@ async function promptModelSelection(): Promise<string> {
   }
 
   return POPULAR_MODELS[0].id;
+}
+
+async function promptCustomModelSelection(customUrl: string, customKey: string): Promise<string> {
+  log("");
+
+  // Try to fetch models from the endpoint's /v1/models
+  const baseUrl = customUrl.replace(/\/v1\/?$/, "");
+  let fetchedModels: string[] = [];
+
+  try {
+    process.stdout.write("  \x1b[2mFetching models from endpoint...\x1b[0m");
+    // Use Node's built-in fetch (available Node 18+)
+    const res = await fetch(`${baseUrl}/v1/models`, {
+      headers: { Authorization: `Bearer ${customKey}`, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { data?: Array<{ id: string }> };
+      fetchedModels = (json.data || []).map((m) => m.id).filter(Boolean);
+    }
+    process.stdout.write("\r" + " ".repeat(40) + "\r"); // clear the fetching line
+  } catch {
+    process.stdout.write("\r" + " ".repeat(40) + "\r");
+  }
+
+  if (fetchedModels.length > 0) {
+    log(`  Available models on ${baseUrl}:\n`);
+    fetchedModels.forEach((id, i) => {
+      console.log(`    ${bold(String(i + 1))}. ${id}`);
+    });
+    log(`    ${bold(String(fetchedModels.length + 1))}. Enter model ID manually`);
+    log("");
+
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise<string>((res) => {
+      rl.question("  > ", (a) => {
+        rl.close();
+        res(a.trim());
+      });
+    });
+
+    const n = parseInt(answer, 10);
+    if (!isNaN(n) && n >= 1 && n <= fetchedModels.length) {
+      return fetchedModels[n - 1];
+    }
+    if (!isNaN(n) && n === fetchedModels.length + 1) {
+      // fall through to manual entry
+    } else if (answer) {
+      return answer; // typed a model ID directly
+    }
+  }
+
+  // Manual entry fallback
+  log("  Enter model ID:");
+  const rl2 = createInterface({ input: process.stdin, output: process.stdout });
+  const manual = await new Promise<string>((res) => {
+    rl2.question("  > ", (a) => {
+      rl2.close();
+      res(a.trim());
+    });
+  });
+  return manual;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────
