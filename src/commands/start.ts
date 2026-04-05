@@ -14,6 +14,8 @@ import { runSetup } from "./setup.js";
 // ─── Provider config ──────────────────────────────────────────────
 
 /** Curated model list shown in "pick a model" mode. */
+// Fallback list used when OpenRouter API fetch fails.
+// Keep IDs in sync with what OpenRouter actually serves.
 const POPULAR_MODELS = [
   {
     id: "anthropic/claude-sonnet-4-5",
@@ -35,7 +37,19 @@ const POPULAR_MODELS = [
   },
   { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25/$10 per Mtok", ctx: "1M" },
   { id: "openai/gpt-4o", label: "GPT-4o", price: "$2.50/$10 per Mtok", ctx: "128k" },
-  { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash", price: "free tier", ctx: "1M" },
+  {
+    id: "google/gemini-2.0-flash-001",
+    label: "Gemini 2.0 Flash",
+    price: "free tier",
+    ctx: "1M",
+  },
+  { id: "deepseek/deepseek-r1", label: "DeepSeek R1", price: "$0.55/$2.19 per Mtok", ctx: "64k" },
+  {
+    id: "meta-llama/llama-4-maverick",
+    label: "Llama 4 Maverick",
+    price: "$0.18/$0.59 per Mtok",
+    ctx: "128k",
+  },
 ] as const;
 
 // ─── Main entry ───────────────────────────────────────────────────
@@ -931,13 +945,21 @@ export function runSessions(days = 7): void {
     return;
   }
 
-  const recent = allEntries.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 30);
+  const sorted = allEntries.sort((a, b) => b.ts.localeCompare(a.ts));
+  const PAGE = 30;
+  const recent = sorted.slice(0, PAGE);
+  const truncated = sorted.length > PAGE;
 
-  console.log(`\n  \x1b[1mRecent sessions\x1b[0m  (last ${days} days)\n`);
+  console.log(
+    `\n  \x1b[1mRecent sessions\x1b[0m  (last ${days} days · showing ${recent.length}${truncated ? ` of ${sorted.length}` : ""})\n`
+  );
   console.log(
     `  ${"Date".padEnd(18)} ${"Provider".padEnd(12)} ${"Model".padEnd(34)} ${"Project".padEnd(18)} Duration`
   );
   console.log(`  ${"─".repeat(18)} ${"─".repeat(12)} ${"─".repeat(34)} ${"─".repeat(18)} ────────`);
+
+  const trunc = (s: string, max: number) =>
+    s.length > max ? s.slice(0, max - 1) + "…" : s.padEnd(max);
 
   for (const s of recent) {
     const date = new Date(s.ts).toLocaleString(undefined, {
@@ -954,7 +976,7 @@ export function runSessions(days = 7): void {
           : `${Math.floor(s.durationSec / 3600)}h ${Math.floor((s.durationSec % 3600) / 60)}m`;
 
     console.log(
-      `  ${date.padEnd(18)} ${s.provider.padEnd(12)} ${s.model.slice(0, 33).padEnd(34)} ${s.project.slice(0, 17).padEnd(18)} ${dur}`
+      `  ${date.padEnd(18)} ${s.provider.padEnd(12)} ${trunc(s.model, 34)} ${trunc(s.project, 18)} ${dur}`
     );
   }
 

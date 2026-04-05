@@ -74,7 +74,7 @@ export async function runConfig(options: CLIOptions): Promise<void> {
     if (!key || value === undefined) {
       error("Usage: codebase config set <key> <value>");
       log("");
-      log("  Keys: provider, model, openrouter-key, custom-url, custom-key");
+      log("  Keys: provider, model, openrouter-key, zai-key, custom-url, custom-key");
       process.exit(1);
     }
 
@@ -144,25 +144,28 @@ function printConfig(_quiet: boolean): void {
   log("");
 
   // Show effective values (env vars + config)
-  const effectiveOpenRouter = process.env.OPENROUTER_API_KEY || cfg.openrouterKey || "";
   const effectiveAnthropic = process.env.ANTHROPIC_API_KEY || "";
+  const effectiveCustomUrl = process.env.CODEBASE_PROVIDER_URL || cfg.customUrl || "";
+  const effectiveCustomKey = process.env.CODEBASE_PROVIDER_KEY || cfg.customKey || "";
+
+  const status = (env: string | undefined, cfgVal: string | undefined, envName: string) =>
+    env ? `✓ set (${envName})` : cfgVal ? "✓ set (config)" : "(not set)";
 
   log(`  ${bold("Effective (env vars override config):")}`);
-  log(`  ANTHROPIC_API_KEY    ${effectiveAnthropic ? "✓ set (env)" : "(not set)"}`);
+  log(`  ANTHROPIC_API_KEY      ${effectiveAnthropic ? "✓ set (env)" : "(not set)"}`);
   log(
-    `  OPENROUTER_API_KEY   ${
-      process.env.OPENROUTER_API_KEY
-        ? "✓ set (env)"
-        : effectiveOpenRouter
-          ? "✓ set (config)"
-          : "(not set)"
-    }`
+    `  OPENROUTER_API_KEY     ${status(process.env.OPENROUTER_API_KEY, cfg.openrouterKey, "env")}`
   );
+  log(`  ZAI_API_KEY            ${status(process.env.ZAI_API_KEY, cfg.zaiKey, "env")}`);
+  log(`  CODEBASE_PROVIDER_URL  ${effectiveCustomUrl ? `✓ ${effectiveCustomUrl}` : "(not set)"}`);
+  log(`  CODEBASE_PROVIDER_KEY  ${effectiveCustomKey ? "✓ set" : "(not set)"}`);
   log("");
   log(`  ${bold("Quick setup:")}`);
-  log(`  codebase config set openrouter-key sk-or-...   # OpenRouter`);
-  log(`  codebase config set zai-key <key>              # z.ai (GLM models)`);
-  log(`  codebase config set provider openrouter`);
+  log(`  codebase config set openrouter-key sk-or-...     # OpenRouter (200+ models)`);
+  log(`  codebase config set zai-key <key>                # z.ai (GLM models)`);
+  log(`  codebase config set custom-url https://host/v1   # Custom endpoint`);
+  log(`  codebase config set custom-key <key>             # Custom endpoint key`);
+  log(`  codebase config set provider openrouter          # Remember provider`);
   log("");
 }
 

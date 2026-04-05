@@ -269,18 +269,26 @@ const HELP: Record<string, CommandHelp> = {
     description: "View and set persistent config (~/.config/codebase/config.json)",
     usage: "codebase config [set|get|unset|path] [key] [value]",
     examples: [
-      { command: "codebase config", description: "Show current config" },
+      { command: "codebase config", description: "Show current config and effective env vars" },
       {
         command: "codebase config set openrouter-key sk-or-...",
-        description: "Store OpenRouter API key (no env var needed after this)",
+        description: "Store OpenRouter API key",
       },
       {
-        command: "codebase config set model anthropic/claude-haiku-4-5",
-        description: "Default to Haiku every session",
+        command: "codebase config set zai-key <key>",
+        description: "Store z.ai API key (GLM models)",
+      },
+      {
+        command: "codebase config set custom-url https://my-proxy/v1",
+        description: "Set custom OpenAI-compatible endpoint",
+      },
+      {
+        command: "codebase config set custom-key sk-...",
+        description: "API key for custom endpoint",
       },
       {
         command: "codebase config set provider openrouter",
-        description: "Default to OpenRouter (skip prompt)",
+        description: "Remember provider across sessions",
       },
       { command: "codebase config path", description: "Print config file location" },
     ],
@@ -301,11 +309,15 @@ const HELP: Record<string, CommandHelp> = {
       { command: "codebase start", description: "Same as above, explicit" },
       {
         command: "codebase start --provider openrouter",
-        description: "Use OpenRouter with default model",
+        description: "Use OpenRouter — shows live model browser",
+      },
+      {
+        command: "codebase start --provider zai",
+        description: "Use z.ai (GLM models, Anthropic-compatible API)",
       },
       {
         command: "codebase start --model anthropic/claude-haiku-4-5",
-        description: "Skip prompt, use Haiku via OpenRouter",
+        description: "Skip prompt, use specific model via OpenRouter",
       },
       {
         command: "codebase start --provider anthropic",
@@ -315,14 +327,22 @@ const HELP: Record<string, CommandHelp> = {
     options: [
       {
         flag: "--provider <name>",
-        description: "anthropic | openrouter | custom — skip interactive prompt",
+        description: "anthropic | openrouter | zai | custom — skip interactive prompt",
       },
       {
         flag: "--model <id>",
-        description: "OpenRouter model ID (e.g. anthropic/claude-haiku-4-5)",
+        description: "Model ID to pass to claude (e.g. anthropic/claude-haiku-4-5)",
       },
     ],
-    seeAlso: ["brief", "context"],
+    seeAlso: ["config", "sessions", "brief"],
+  },
+
+  sessions: {
+    description: "Show recent Claude Code session log (provider, model, project, duration)",
+    usage: "codebase sessions",
+    examples: [{ command: "codebase sessions", description: "Show last 7 days of sessions" }],
+    options: [],
+    seeAlso: ["start", "tokens"],
   },
 
   context: {
@@ -385,7 +405,17 @@ ${bold("HUMAN COMMANDS")}
   ${command("codebase setup")}             Wire AI tools + install slash commands
   ${command("codebase release")}           Gate check → tag → develop→main
   ${command("codebase doctor")}            Health check & diagnostics
+  ${command("codebase fix")}               Auto-repair issues found by doctor
   ${command("codebase tokens")}            Token budget report (A/B/C/D grades)
+  ${command("codebase sessions")}          Recent Claude Code session log (provider, model, duration)
+
+${bold("PROVIDER SETUP")}
+  ${command("codebase config")}            Show stored keys and effective env vars
+  ${command("codebase config set openrouter-key sk-or-...")}
+  ${command("codebase config set zai-key <key>")}
+  ${command("codebase config set custom-url https://my-proxy/v1")}
+  ${command("codebase start --provider openrouter")}    Skip prompt, use OpenRouter
+  ${command("codebase start --provider zai")}           Skip prompt, use z.ai
 
 ${bold("OPTIONS")}
   ${code("--help, -h")}                    Show this help or command-specific help
