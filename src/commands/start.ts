@@ -581,10 +581,9 @@ function getClaudeAuthStatus(): {
     const parsed = JSON.parse(raw);
     const auth = { ...defaults, ...parsed };
 
-    // `claude auth status` reports loggedIn:false for keychain/subscription auth.
-    // Heuristic: if apiProvider is "firstParty" and claude is available with no
-    // ANTHROPIC_API_KEY, the user is likely authenticated via subscription.
-    if (!auth.loggedIn && auth.apiProvider === "firstParty" && !process.env.ANTHROPIC_API_KEY) {
+    // Only trust loggedIn if authMethod is not "none" — "firstParty" + authMethod:"none"
+    // means no credentials at all, not subscription auth.
+    if (!auth.loggedIn && auth.authMethod !== "none" && auth.apiProvider === "firstParty") {
       auth.loggedIn = true;
       auth.authMethod = "subscription";
       auth.subscriptionType = "plan";
