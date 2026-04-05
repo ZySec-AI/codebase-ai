@@ -1,5 +1,5 @@
 import { resolve, join } from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { spawn, execFileSync } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
@@ -13,12 +13,27 @@ import { runSetup } from "./setup.js";
 
 /** Curated model list shown in "pick a model" mode. */
 const POPULAR_MODELS = [
-  { id: "anthropic/claude-sonnet-4-5", label: "Claude Sonnet 4.5", price: "$3/M in · $15/M out" },
-  { id: "anthropic/claude-haiku-4-5", label: "Claude Haiku 4.5", price: "$0.80/M in · $4/M out" },
-  { id: "anthropic/claude-opus-4-5", label: "Claude Opus 4.5", price: "$15/M in · $75/M out" },
-  { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25/M in · $10/M out" },
-  { id: "openai/gpt-4o", label: "GPT-4o", price: "$2.50/M in · $10/M out" },
-  { id: "meta-llama/llama-4-maverick:free", label: "Llama 4 Maverick", price: "free" },
+  {
+    id: "anthropic/claude-sonnet-4-5",
+    label: "Claude Sonnet 4.5",
+    price: "$3/$15 per Mtok",
+    ctx: "200k",
+  },
+  {
+    id: "anthropic/claude-haiku-4-5",
+    label: "Claude Haiku 4.5",
+    price: "$0.80/$4 per Mtok",
+    ctx: "200k",
+  },
+  {
+    id: "anthropic/claude-opus-4-5",
+    label: "Claude Opus 4.5",
+    price: "$15/$75 per Mtok",
+    ctx: "200k",
+  },
+  { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25/$10 per Mtok", ctx: "1M" },
+  { id: "openai/gpt-4o", label: "GPT-4o", price: "$2.50/$10 per Mtok", ctx: "128k" },
+  { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash", price: "free tier", ctx: "1M" },
 ] as const;
 
 // ─── Main entry ───────────────────────────────────────────────────
@@ -59,7 +74,8 @@ export async function runStart(options: CLIOptions): Promise<void> {
   }
 
   // ── 3. Load project info for banner ──────────────────────────
-  const { name: projectName, branch, uncommitted } = loadProjectInfo(root);
+  const projectInfo = loadProjectInfo(root);
+  const { name: projectName, branch, uncommitted } = projectInfo;
 
   // ── 4. Detect providers (env vars > stored config) ───────────
   const resolved = resolveProviderConfig();
@@ -70,26 +86,28 @@ export async function runStart(options: CLIOptions): Promise<void> {
   const hasCustom = !!customUrl;
 
   // ── 5. Print startup banner ───────────────────────────────────
-  printBanner(projectName, branch, uncommitted);
+  printBanner(projectName, branch, uncommitted, projectInfo);
 
   // Provider status lines
   if (hasAnthropic) {
-    console.log(`    \x1b[1mAnthropic\x1b[0m   \x1b[2mANTHROPIC_API_KEY ✓\x1b[0m`);
+    console.log(
+      `    \x1b[1mAnthropic\x1b[0m   \x1b[32m✓\x1b[0m \x1b[2mANTHROPIC_API_KEY set — Claude direct\x1b[0m`
+    );
   } else {
-    console.log(`    \x1b[2mAnthropic   (no ANTHROPIC_API_KEY)\x1b[0m`);
+    console.log(`    \x1b[2mAnthropic   ✗ no ANTHROPIC_API_KEY\x1b[0m`);
   }
   if (hasOpenRouter) {
     const src = process.env.OPENROUTER_API_KEY ? "env" : "config";
     console.log(
-      `    \x1b[1mOpenRouter\x1b[0m  \x1b[2mOPENROUTER_API_KEY ✓ (${src})\x1b[0m — 200+ models`
+      `    \x1b[1mOpenRouter\x1b[0m  \x1b[32m✓\x1b[0m \x1b[2mkey set (${src}) — 200+ models, often cheaper\x1b[0m`
     );
   } else {
     console.log(
-      `    \x1b[2mOpenRouter  (not set — run: codebase config set openrouter-key sk-or-...)\x1b[0m`
+      `    \x1b[2mOpenRouter  ✗ not set  →  codebase config set openrouter-key sk-or-...\x1b[0m`
     );
   }
   if (hasCustom) {
-    console.log(`    \x1b[1mCustom\x1b[0m      \x1b[2m${customUrl}\x1b[0m`);
+    console.log(`    \x1b[1mCustom\x1b[0m      \x1b[32m✓\x1b[0m \x1b[2m${customUrl}\x1b[0m`);
   }
   log("");
 
@@ -176,15 +194,39 @@ export async function runStart(options: CLIOptions): Promise<void> {
   const modelLabel = selectedModel || "default";
   const contextActive = existsSync(contextHookPath);
 
+  // Model context window info
+  const modelMeta = POPULAR_MODELS.find((m) => m.id === selectedModel);
+
   success(`Launching Claude Code`);
-  info(`Provider: ${bold(providerLabel)} | Model: ${bold(modelLabel)}`);
+  log(
+    `  \x1b[2mProvider:\x1b[0m ${bold(providerLabel)}  \x1b[2mModel:\x1b[0m ${bold(modelLabel)}${modelMeta ? `  \x1b[2m(${modelMeta.ctx} context · ${modelMeta.price})\x1b[0m` : ""}`
+  );
+
   if (contextActive) {
     const savings = computeTokenSavings(root);
-    info(
-      `codebase context active — slim brief injected (${savings.slimTokens} tokens vs ~${savings.fullTokens} full — saves ~${savings.savedPct}%)`
+    const manifestAge = projectInfo.manifestAgeSec;
+    const ageLabel =
+      manifestAge < 0
+        ? ""
+        : manifestAge < 60
+          ? ` · manifest ${manifestAge}s old`
+          : manifestAge < 3600
+            ? ` · manifest ${Math.floor(manifestAge / 60)}m old`
+            : ` · manifest ${Math.floor(manifestAge / 3600)}h old — consider \`codebase scan\``;
+    log(
+      `  \x1b[32m✓\x1b[0m \x1b[2mcodebase context: ${savings.slimTokens} tokens injected (${savings.savedPct}% less than full brief${ageLabel})\x1b[0m`
     );
   } else {
     warn("context-inject.sh not found — run `codebase setup` manually");
+  }
+
+  if (projectInfo.nextTask) {
+    log(`  \x1b[2mNext task:\x1b[0m ${projectInfo.nextTask}`);
+  }
+  if (projectInfo.openIssues > 0) {
+    log(
+      `  \x1b[2mOpen issues:\x1b[0m ${projectInfo.openIssues}  \x1b[2m(run \`codebase status\` for details)\x1b[0m`
+    );
   }
   log("");
 
@@ -227,7 +269,7 @@ async function promptModeSelection(
     POPULAR_MODELS.forEach((m, i) => {
       const marker = m.id === savedModel ? " \x1b[32m←\x1b[0m" : "";
       console.log(
-        `    ${bold(String(i + 1))}. ${m.label.padEnd(22)} \x1b[2m${m.price}\x1b[0m${marker}`
+        `    ${bold(String(i + 1))}. ${m.label.padEnd(22)} \x1b[2m${m.ctx} ctx · ${m.price}\x1b[0m${marker}`
       );
     });
     log(`    ${bold(String(POPULAR_MODELS.length + 1))}. Enter model ID manually`);
@@ -309,7 +351,9 @@ async function promptModelSelection(): Promise<string> {
   log("");
   log("  Popular models:");
   POPULAR_MODELS.forEach((m, i) => {
-    console.log(`    ${bold(String(i + 1))}. ${m.label.padEnd(28)} \x1b[2m${m.price}\x1b[0m`);
+    console.log(
+      `    ${bold(String(i + 1))}. ${m.label.padEnd(22)} \x1b[2m${m.ctx} ctx · ${m.price}\x1b[0m`
+    );
     console.log(`       \x1b[2m${m.id}\x1b[0m`);
   });
   log(`    ${bold(String(POPULAR_MODELS.length + 1))}. Enter model ID manually`);
@@ -351,13 +395,18 @@ async function promptModelSelection(): Promise<string> {
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
-function printBanner(project: string, branch: string, uncommitted: boolean): void {
+function printBanner(
+  project: string,
+  branch: string,
+  uncommitted: boolean,
+  info: { stack: string }
+): void {
   const version = typeof __VERSION__ !== "undefined" ? __VERSION__ : "";
   const versionStr = version ? `v${version}` : "";
-  const branchStr = uncommitted ? `${branch} (uncommitted changes)` : branch;
+  const branchStr = uncommitted ? `${branch} *` : branch;
 
   const line1 = `  codebase ${versionStr}`;
-  const line2 = `  Project: ${project}`;
+  const line2 = `  Project: ${project}${info.stack ? `  (${info.stack})` : ""}`;
   const line3 = `  Branch:  ${branchStr}`;
   const width = Math.max(line1.length, line2.length, line3.length) + 2;
   const border = "─".repeat(width);
@@ -402,17 +451,44 @@ function loadProjectInfo(root: string): {
   name: string;
   branch: string;
   uncommitted: boolean;
+  stack: string;
+  openIssues: number;
+  nextTask: string;
+  manifestAgeSec: number;
 } {
   const manifestPath = join(root, ".codebase.json");
+  const defaults = {
+    name: "unknown",
+    branch: "main",
+    uncommitted: false,
+    stack: "",
+    openIssues: 0,
+    nextTask: "",
+    manifestAgeSec: -1,
+  };
   try {
     const m: Manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    const langs: string[] = (m.stack as unknown as { languages?: string[] })?.languages ?? [];
+    const issues =
+      (m as unknown as { github?: { issues?: { open?: unknown[] } } })?.github?.issues?.open ?? [];
+    const nextTask = (m as unknown as { next_task?: { title?: string } }).next_task?.title ?? "";
+    let manifestAgeSec = -1;
+    try {
+      manifestAgeSec = Math.floor((Date.now() - statSync(manifestPath).mtimeMs) / 1000);
+    } catch {
+      /* ignore */
+    }
     return {
       name: m.project?.name || "unknown",
       branch: m.repo?.default_branch || "main",
       uncommitted: !!m.git?.uncommitted_changes,
+      stack: langs.slice(0, 3).join(", "),
+      openIssues: issues.length,
+      nextTask,
+      manifestAgeSec,
     };
   } catch {
-    return { name: "unknown", branch: "main", uncommitted: false };
+    return defaults;
   }
 }
 
