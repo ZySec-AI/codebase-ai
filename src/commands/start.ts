@@ -220,15 +220,16 @@ export async function runStart(options: CLIOptions): Promise<void> {
   if (providerMode === "openrouter") {
     env.ANTHROPIC_BASE_URL = openrouterBase;
     env.ANTHROPIC_AUTH_TOKEN = openrouterKey;
-    env.ANTHROPIC_API_KEY = "openrouter";
+    delete env.ANTHROPIC_API_KEY;
   } else if (providerMode === "zai") {
     env.ANTHROPIC_BASE_URL = ZAI_BASE_URL;
     env.ANTHROPIC_AUTH_TOKEN = zaiKey;
-    env.ANTHROPIC_API_KEY = "zai";
+    delete env.ANTHROPIC_API_KEY;
   } else if (providerMode === "custom") {
-    env.ANTHROPIC_BASE_URL = customUrl;
+    // Strip trailing /v1 — Claude Code appends /v1/messages itself
+    env.ANTHROPIC_BASE_URL = customUrl.replace(/\/v1\/?$/, "");
     env.ANTHROPIC_AUTH_TOKEN = customKey || anthropicKey;
-    env.ANTHROPIC_API_KEY = customKey || anthropicKey;
+    delete env.ANTHROPIC_API_KEY;
   }
 
   // ── 8. Ensure context-inject hook is installed ────────────────
