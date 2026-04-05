@@ -86,16 +86,27 @@ export async function runStart(options: CLIOptions): Promise<void> {
   const hasZai = !!zaiKey;
   const hasCustom = !!customUrl;
 
+  // Detect Claude plan subscription (claude auth status)
+  const claudeAuth = getClaudeAuthStatus();
+  const hasClaudePlan = claudeAuth.loggedIn && claudeAuth.apiProvider === "firstParty";
+
   // ── 5. Print startup banner ───────────────────────────────────
   printBanner(projectName, branch, uncommitted, projectInfo);
 
   // Provider status lines
-  if (hasAnthropic) {
+  if (hasClaudePlan) {
+    const plan = claudeAuth.subscriptionType ? ` (${claudeAuth.subscriptionType})` : "";
+    console.log(
+      `    \x1b[1mClaude Plan\x1b[0m \x1b[32m✓\x1b[0m \x1b[2mLogged in as ${claudeAuth.email}${plan} — no API key needed\x1b[0m`
+    );
+  } else if (hasAnthropic) {
     console.log(
       `    \x1b[1mAnthropic\x1b[0m   \x1b[32m✓\x1b[0m \x1b[2mANTHROPIC_API_KEY set — Claude direct\x1b[0m`
     );
   } else {
-    console.log(`    \x1b[2mAnthropic   ✗ no ANTHROPIC_API_KEY\x1b[0m`);
+    console.log(
+      `    \x1b[2mAnthropic   ✗ no API key  →  set ANTHROPIC_API_KEY or subscribe at claude.ai\x1b[0m`
+    );
   }
   if (hasOpenRouter) {
     const src = process.env.OPENROUTER_API_KEY ? "env" : "config";
@@ -120,11 +131,11 @@ export async function runStart(options: CLIOptions): Promise<void> {
   }
   log("");
 
-  if (!hasAnthropic && !hasOpenRouter && !hasZai && !hasCustom) {
-    error("No API keys found.");
-    info("Quick setup:  codebase config set openrouter-key sk-or-...");
-    info("Or:           codebase config set zai-key <key>");
-    info("Or set env:   export ANTHROPIC_API_KEY=sk-ant-...");
+  if (!hasClaudePlan && !hasAnthropic && !hasOpenRouter && !hasZai && !hasCustom) {
+    error("No API keys found and not logged in to Claude.");
+    info("Option 1:  claude auth login  (Claude subscription)");
+    info("Option 2:  codebase config set openrouter-key sk-or-...");
+    info("Option 3:  export ANTHROPIC_API_KEY=sk-ant-...");
     process.exit(1);
   }
 
@@ -156,7 +167,11 @@ export async function runStart(options: CLIOptions): Promise<void> {
     // --model without --provider → infer OpenRouter
     providerMode = "openrouter";
     selectedModel = options.model;
-  } else if (savedProvider === "anthropic" || (!hasOpenRouter && !hasZai && !hasCustom)) {
+  } else if (
+    savedProvider === "anthropic" ||
+    hasClaudePlan ||
+    (!hasOpenRouter && !hasZai && !hasCustom)
+  ) {
     providerMode = "anthropic";
   } else {
     // Interactive selection — always prompt so user can confirm or change
@@ -517,6 +532,43 @@ function loadProjectInfo(root: string): {
     };
   } catch {
     return defaults;
+  }
+}
+
+function getClaudeAuthStatus(): {
+  loggedIn: boolean;
+  authMethod: string;
+  apiProvider: string;
+  email: string;
+  subscriptionType: string;
+} {
+  const defaults = {
+    loggedIn: false,
+    authMethod: "",
+    apiProvider: "",
+    email: "",
+    subscriptionType: "",
+  };
+  try {
+    const out = execFileSync("claude", ["auth", "status", "--output-format", "json"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 3000,
+    });
+    return { ...defaults, ...JSON.parse(out) };
+  } catch {
+    // claude auth status without --output-format flag (older versions)
+    try {
+      const out = execFileSync("claude", ["auth", "status"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 3000,
+      });
+      // Try JSON parse; falls back gracefully
+      return { ...defaults, ...JSON.parse(out) };
+    } catch {
+      return defaults;
+    }
   }
 }
 
