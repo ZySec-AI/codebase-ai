@@ -172,12 +172,24 @@ export async function runStart(options: CLIOptions): Promise<void> {
     providerMode = "openrouter";
     selectedModel = options.model;
   } else if (
-    savedProvider === "anthropic" ||
-    // Only auto-select Anthropic if it's the only option available
+    // Only auto-select when exactly one provider is available (no choice to make)
     (hasClaudePlan && !hasOpenRouter && !hasZai && !hasCustom) ||
-    (!hasClaudePlan && !hasAnthropic && !hasOpenRouter && !hasZai && !hasCustom)
+    (hasAnthropic && !hasClaudePlan && !hasOpenRouter && !hasZai && !hasCustom) ||
+    (!hasAnthropic && !hasClaudePlan && hasOpenRouter && !hasZai && !hasCustom) ||
+    (!hasAnthropic && !hasClaudePlan && !hasOpenRouter && hasZai && !hasCustom) ||
+    (!hasAnthropic && !hasClaudePlan && !hasOpenRouter && !hasZai && hasCustom)
   ) {
-    providerMode = "anthropic";
+    // Single provider — use it directly
+    if (hasOpenRouter) {
+      providerMode = "openrouter";
+      selectedModel = savedModel || POPULAR_MODELS[0].id;
+    } else if (hasZai) {
+      providerMode = "zai";
+    } else if (hasCustom) {
+      providerMode = "custom";
+    } else {
+      providerMode = "anthropic";
+    }
   } else {
     // Interactive selection — always prompt so user can confirm or change
     const result = await promptModeSelection(
