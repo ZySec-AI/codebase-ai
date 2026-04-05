@@ -365,20 +365,27 @@ function installContextInjectHook(root: string): void {
 
   const hookPath = join(hooksDir, "context-inject.sh");
 
-  // md5sum is Linux; md5 is macOS — fall back gracefully
   const hookScript = `#!/bin/bash
 # context-inject.sh — UserPromptSubmit hook
-# Outputs project slim brief as system-reminder on session start.
-# Only fires on the first prompt per session (sentinel) or when the
-# manifest is refreshed mid-session.
+# Outputs project slim brief as system-reminder on the FIRST prompt of each
+# Claude Code session only. Re-injects if the manifest is refreshed mid-session.
 
 MANIFEST=".codebase.json"
 
-# Build a per-project, per-session sentinel path
-HASH=$(echo "$(pwd)" | md5sum 2>/dev/null | cut -c1-8 || echo "$(pwd)" | md5 2>/dev/null | cut -c1-8 || echo "default")
-SENTINEL="/tmp/.codebase-ctx-\${HASH}-\$\$"
+# Read session_id from stdin JSON (Claude Code passes hook data as JSON)
+# Fall back to a hash of cwd if jq/python unavailable
+STDIN_DATA=$(cat)
+SESSION_ID=$(echo "\$STDIN_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('session_id',''))" 2>/dev/null || true)
 
-# Not first prompt — check if manifest was refreshed since sentinel was created
+if [ -z "\$SESSION_ID" ]; then
+  # Fallback: use stable hash of cwd (one injection per directory per day)
+  SESSION_ID=$(echo "\$(pwd)\$(date +%Y%m%d)" | md5sum 2>/dev/null | cut -c1-12 || echo "\$(pwd)\$(date +%Y%m%d)" | md5 2>/dev/null | cut -c1-12 || echo "default")
+fi
+
+HASH=$(echo "\$(pwd)" | md5sum 2>/dev/null | cut -c1-8 || echo "\$(pwd)" | md5 2>/dev/null | cut -c1-8 || echo "proj")
+SENTINEL="/tmp/.codebase-ctx-\${HASH}-\${SESSION_ID}"
+
+# Not first prompt of this session — check if manifest was refreshed
 if [ -f "\$SENTINEL" ]; then
   if [ -f "\$MANIFEST" ] && [ "\$MANIFEST" -nt "\$SENTINEL" ]; then
     echo "--- codebase context refreshed ---"
