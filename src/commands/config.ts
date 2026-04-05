@@ -82,16 +82,16 @@ export async function runConfig(options: CLIOptions): Promise<void> {
     const ck = camelKey(key);
 
     // Validate known keys
-    const allowed = ["provider", "model", "openrouterKey", "customUrl", "customKey"];
+    const allowed = ["provider", "model", "openrouterKey", "zaiKey", "customUrl", "customKey"];
     if (!allowed.includes(ck)) {
       error(`Unknown key: ${key}`);
-      log(`  Valid keys: provider, model, openrouter-key, custom-url, custom-key`);
+      log(`  Valid keys: provider, model, openrouter-key, zai-key, custom-url, custom-key`);
       process.exit(1);
     }
 
-    if (ck === "provider" && !["anthropic", "openrouter", "custom"].includes(value)) {
+    if (ck === "provider" && !["anthropic", "openrouter", "zai", "custom"].includes(value)) {
       error(`Invalid provider: ${value}`);
-      log("  Valid: anthropic | openrouter | custom");
+      log("  Valid: anthropic | openrouter | zai | custom");
       process.exit(1);
     }
 
@@ -118,13 +118,14 @@ function printConfig(_quiet: boolean): void {
   log("");
 
   const rows: Array<[string, string, string]> = [
-    ["provider", cfg.provider || "(not set)", "anthropic | openrouter | custom"],
+    ["provider", cfg.provider || "(not set)", "anthropic | openrouter | zai | custom"],
     ["model", cfg.model || "(not set)", "e.g. anthropic/claude-haiku-4-5"],
     [
       "openrouter-key",
       cfg.openrouterKey ? maskKey(cfg.openrouterKey) : "(not set)",
       "OpenRouter API key",
     ],
+    ["zai-key", cfg.zaiKey ? maskKey(cfg.zaiKey) : "(not set)", "z.ai API key"],
     ["custom-url", cfg.customUrl || "(not set)", "Custom provider base URL"],
     ["custom-key", cfg.customKey ? maskKey(cfg.customKey) : "(not set)", "Custom API key"],
   ];
@@ -159,8 +160,8 @@ function printConfig(_quiet: boolean): void {
   );
   log("");
   log(`  ${bold("Quick setup:")}`);
-  log(`  codebase config set openrouter-key sk-or-...`);
-  log(`  codebase config set model anthropic/claude-haiku-4-5`);
+  log(`  codebase config set openrouter-key sk-or-...   # OpenRouter`);
+  log(`  codebase config set zai-key <key>              # z.ai (GLM models)`);
   log(`  codebase config set provider openrouter`);
   log("");
 }
@@ -172,6 +173,8 @@ function camelKey(key: string): string {
     model: "model",
     "openrouter-key": "openrouterKey",
     openrouterkey: "openrouterKey",
+    "zai-key": "zaiKey",
+    zaikey: "zaiKey",
     "custom-url": "customUrl",
     customurl: "customUrl",
     "custom-key": "customKey",

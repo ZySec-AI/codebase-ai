@@ -12,9 +12,10 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
  */
 export interface CodebaseConfig {
   version: "1.0";
-  provider?: "anthropic" | "openrouter" | "custom";
+  provider?: "anthropic" | "openrouter" | "zai" | "custom";
   model?: string; // e.g. "anthropic/claude-haiku-4-5"
   openrouterKey?: string;
+  zaiKey?: string;
   customUrl?: string;
   customKey?: string;
   lastModel?: string; // last successfully picked model (auto-updated)
@@ -50,10 +51,14 @@ export function getConfigPath(): string {
  * Merge env vars + config into a resolved provider config.
  * Env vars win over stored config; stored config wins over defaults.
  */
+// z.ai base URL — Anthropic-compatible endpoint
+export const ZAI_BASE_URL = "https://api.z.ai/api/anthropic";
+
 export function resolveProviderConfig(): {
   anthropicKey: string;
   openrouterKey: string;
   openrouterBase: string;
+  zaiKey: string;
   customUrl: string;
   customKey: string;
   savedProvider: string;
@@ -64,6 +69,7 @@ export function resolveProviderConfig(): {
   // Env vars override stored keys
   const anthropicKey = process.env.ANTHROPIC_API_KEY || "";
   const openrouterKey = process.env.OPENROUTER_API_KEY || cfg.openrouterKey || "";
+  const zaiKey = process.env.ZAI_API_KEY || cfg.zaiKey || "";
   const customUrl = process.env.CODEBASE_PROVIDER_URL || cfg.customUrl || "";
   const customKey = process.env.CODEBASE_PROVIDER_KEY || cfg.customKey || "";
 
@@ -75,6 +81,7 @@ export function resolveProviderConfig(): {
     anthropicKey,
     openrouterKey,
     openrouterBase,
+    zaiKey,
     customUrl,
     customKey,
     savedProvider: cfg.provider || "",

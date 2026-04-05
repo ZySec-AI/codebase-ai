@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { spawn, execFileSync } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
 import { log, info, warn, success, error, bold } from "../utils/output.js";
-import { resolveProviderConfig, saveConfig, loadConfig } from "../utils/config.js";
+import { resolveProviderConfig, saveConfig, loadConfig, ZAI_BASE_URL } from "../utils/config.js";
 import { estimateTokens } from "../utils/tokens.js";
 import { runInit } from "./init.js";
 import { runSetup } from "./setup.js";
@@ -79,10 +79,11 @@ export async function runStart(options: CLIOptions): Promise<void> {
 
   // ── 4. Detect providers (env vars > stored config) ───────────
   const resolved = resolveProviderConfig();
-  const { anthropicKey, openrouterKey, openrouterBase, customUrl, customKey } = resolved;
+  const { anthropicKey, openrouterKey, openrouterBase, zaiKey, customUrl, customKey } = resolved;
 
   const hasAnthropic = !!anthropicKey;
   const hasOpenRouter = !!openrouterKey;
+  const hasZai = !!zaiKey;
   const hasCustom = !!customUrl;
 
   // ── 5. Print startup banner ───────────────────────────────────
@@ -106,29 +107,46 @@ export async function runStart(options: CLIOptions): Promise<void> {
       `    \x1b[2mOpenRouter  ✗ not set  →  codebase config set openrouter-key sk-or-...\x1b[0m`
     );
   }
+  if (hasZai) {
+    const src = process.env.ZAI_API_KEY ? "env" : "config";
+    console.log(
+      `    \x1b[1mz.ai\x1b[0m        \x1b[32m✓\x1b[0m \x1b[2mkey set (${src}) — GLM models via Anthropic-compatible API\x1b[0m`
+    );
+  } else {
+    console.log(`    \x1b[2mz.ai        ✗ not set  →  codebase config set zai-key <key>\x1b[0m`);
+  }
   if (hasCustom) {
     console.log(`    \x1b[1mCustom\x1b[0m      \x1b[32m✓\x1b[0m \x1b[2m${customUrl}\x1b[0m`);
   }
   log("");
 
-  if (!hasAnthropic && !hasOpenRouter && !hasCustom) {
+  if (!hasAnthropic && !hasOpenRouter && !hasZai && !hasCustom) {
     error("No API keys found.");
     info("Quick setup:  codebase config set openrouter-key sk-or-...");
+    info("Or:           codebase config set zai-key <key>");
     info("Or set env:   export ANTHROPIC_API_KEY=sk-ant-...");
     process.exit(1);
   }
 
   // ── 6. Resolve provider + model ───────────────────────────────
-  let providerMode: "anthropic" | "openrouter" | "custom" = "anthropic";
+  let providerMode: "anthropic" | "openrouter" | "zai" | "custom" = "anthropic";
   let selectedModel = "";
 
   // Priority: CLI flags > saved config > interactive
-  const savedProvider = resolved.savedProvider as "anthropic" | "openrouter" | "custom" | "";
+  const savedProvider = resolved.savedProvider as
+    | "anthropic"
+    | "openrouter"
+    | "zai"
+    | "custom"
+    | "";
   const savedModel = resolved.savedModel;
 
   if (options.provider === "openrouter" && hasOpenRouter) {
     providerMode = "openrouter";
     selectedModel = options.model || savedModel || POPULAR_MODELS[0].id;
+  } else if (options.provider === "zai" && hasZai) {
+    providerMode = "zai";
+    selectedModel = options.model;
   } else if (options.provider === "anthropic") {
     providerMode = "anthropic";
   } else if (options.provider === "custom" && hasCustom) {
@@ -138,13 +156,14 @@ export async function runStart(options: CLIOptions): Promise<void> {
     // --model without --provider → infer OpenRouter
     providerMode = "openrouter";
     selectedModel = options.model;
-  } else if (savedProvider === "anthropic" || (!hasOpenRouter && !hasCustom)) {
+  } else if (savedProvider === "anthropic" || (!hasOpenRouter && !hasZai && !hasCustom)) {
     providerMode = "anthropic";
   } else {
     // Interactive selection — always prompt so user can confirm or change
     const result = await promptModeSelection(
       hasAnthropic,
       hasOpenRouter,
+      hasZai,
       hasCustom,
       savedProvider,
       savedModel
@@ -166,8 +185,11 @@ export async function runStart(options: CLIOptions): Promise<void> {
   if (providerMode === "openrouter") {
     env.ANTHROPIC_BASE_URL = openrouterBase;
     env.ANTHROPIC_AUTH_TOKEN = openrouterKey;
-    // Suppress Claude Code's own key validation
     env.ANTHROPIC_API_KEY = "openrouter";
+  } else if (providerMode === "zai") {
+    env.ANTHROPIC_BASE_URL = ZAI_BASE_URL;
+    env.ANTHROPIC_AUTH_TOKEN = zaiKey;
+    env.ANTHROPIC_API_KEY = "zai";
   } else if (providerMode === "custom") {
     env.ANTHROPIC_BASE_URL = customUrl;
     env.ANTHROPIC_AUTH_TOKEN = customKey || anthropicKey;
@@ -188,9 +210,11 @@ export async function runStart(options: CLIOptions): Promise<void> {
   const providerLabel =
     providerMode === "openrouter"
       ? "OpenRouter"
-      : providerMode === "custom"
-        ? `Custom (${customUrl})`
-        : "Anthropic";
+      : providerMode === "zai"
+        ? "z.ai"
+        : providerMode === "custom"
+          ? `Custom (${customUrl})`
+          : "Anthropic";
   const modelLabel = selectedModel || "default";
   const contextActive = existsSync(contextHookPath);
 
@@ -255,10 +279,11 @@ export async function runStart(options: CLIOptions): Promise<void> {
 async function promptModeSelection(
   hasAnthropic: boolean,
   hasOpenRouter: boolean,
+  hasZai: boolean,
   hasCustom: boolean,
   savedProvider?: string,
   savedModel?: string
-): Promise<{ mode: "anthropic" | "openrouter" | "custom"; model: string }> {
+): Promise<{ mode: "anthropic" | "openrouter" | "zai" | "custom"; model: string }> {
   // If there's a saved OpenRouter model, offer quick-confirm or change
   if (savedProvider === "openrouter" && savedModel && hasOpenRouter) {
     const modelInfo = POPULAR_MODELS.find((m) => m.id === savedModel);
@@ -308,13 +333,16 @@ async function promptModeSelection(
   }
 
   // No saved config — full provider + model selection
-  const options: Array<{ label: string; mode: "anthropic" | "openrouter" | "custom" }> = [];
+  const options: Array<{ label: string; mode: "anthropic" | "openrouter" | "zai" | "custom" }> = [];
 
   if (hasAnthropic) {
     options.push({ label: "Claude direct       → Anthropic API", mode: "anthropic" });
   }
   if (hasOpenRouter) {
     options.push({ label: "Pick a model        → OpenRouter (200+ models)", mode: "openrouter" });
+  }
+  if (hasZai) {
+    options.push({ label: "z.ai                → GLM models (Anthropic-compatible)", mode: "zai" });
   }
   if (hasCustom) {
     options.push({
