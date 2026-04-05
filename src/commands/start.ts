@@ -4,21 +4,10 @@ import { createInterface } from "node:readline";
 import { spawn, execFileSync } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
 import { log, info, warn, success, error, bold } from "../utils/output.js";
+import { resolveProviderConfig, saveConfig, loadConfig } from "../utils/config.js";
 import { runInit } from "./init.js";
 
 // ─── Provider config ──────────────────────────────────────────────
-
-// Claude Code appends /v1/messages to ANTHROPIC_BASE_URL.
-// OPENROUTER_BASE_URL env var may be set to https://openrouter.ai/api/v1 — strip trailing /v1 so
-// Claude Code constructs the correct path: https://openrouter.ai/api/v1/messages
-function getOpenRouterBase(): string {
-  const envBase = process.env.OPENROUTER_BASE_URL || "";
-  if (envBase) {
-    // Strip trailing /v1 if present — Claude Code will add /v1/messages
-    return envBase.replace(/\/v1\/?$/, "");
-  }
-  return "https://openrouter.ai/api";
-}
 
 /** Curated model list shown in "pick a model" mode. */
 const POPULAR_MODELS = [
@@ -70,11 +59,9 @@ export async function runStart(options: CLIOptions): Promise<void> {
   // ── 3. Load project info for banner ──────────────────────────
   const { name: projectName, branch, uncommitted } = loadProjectInfo(root);
 
-  // ── 4. Detect providers ───────────────────────────────────────
-  const anthropicKey = process.env.ANTHROPIC_API_KEY || "";
-  const openrouterKey = process.env.OPENROUTER_API_KEY || "";
-  const customUrl = process.env.CODEBASE_PROVIDER_URL || "";
-  const customKey = process.env.CODEBASE_PROVIDER_KEY || "";
+  // ── 4. Detect providers (env vars > stored config) ───────────
+  const resolved = resolveProviderConfig();
+  const { anthropicKey, openrouterKey, openrouterBase, customUrl, customKey } = resolved;
 
   const hasAnthropic = !!anthropicKey;
   const hasOpenRouter = !!openrouterKey;
@@ -83,17 +70,20 @@ export async function runStart(options: CLIOptions): Promise<void> {
   // ── 5. Print startup banner ───────────────────────────────────
   printBanner(projectName, branch, uncommitted);
 
-  // Provider status lines — use console.log directly to avoid dim()/bold() void-in-template issue
+  // Provider status lines
   if (hasAnthropic) {
     console.log(`    \x1b[1mAnthropic\x1b[0m   \x1b[2mANTHROPIC_API_KEY ✓\x1b[0m`);
   } else {
     console.log(`    \x1b[2mAnthropic   (no ANTHROPIC_API_KEY)\x1b[0m`);
   }
   if (hasOpenRouter) {
-    console.log(`    \x1b[1mOpenRouter\x1b[0m  \x1b[2mOPENROUTER_API_KEY ✓\x1b[0m — 200+ models`);
+    const src = process.env.OPENROUTER_API_KEY ? "env" : "config";
+    console.log(
+      `    \x1b[1mOpenRouter\x1b[0m  \x1b[2mOPENROUTER_API_KEY ✓ (${src})\x1b[0m — 200+ models`
+    );
   } else {
     console.log(
-      `    \x1b[2mOpenRouter  (no OPENROUTER_API_KEY — export OPENROUTER_API_KEY=sk-or-... to enable)\x1b[0m`
+      `    \x1b[2mOpenRouter  (not set — run: codebase config set openrouter-key sk-or-...)\x1b[0m`
     );
   }
   if (hasCustom) {
@@ -102,8 +92,9 @@ export async function runStart(options: CLIOptions): Promise<void> {
   log("");
 
   if (!hasAnthropic && !hasOpenRouter && !hasCustom) {
-    error("No API keys found. Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY.");
-    info("Get keys at: https://console.anthropic.com  or  https://openrouter.ai/keys");
+    error("No API keys found.");
+    info("Quick setup:  codebase config set openrouter-key sk-or-...");
+    info("Or set env:   export ANTHROPIC_API_KEY=sk-ant-...");
     process.exit(1);
   }
 
@@ -111,31 +102,48 @@ export async function runStart(options: CLIOptions): Promise<void> {
   let providerMode: "anthropic" | "openrouter" | "custom" = "anthropic";
   let selectedModel = "";
 
-  // Fast path: --provider flag given
+  // Priority: CLI flags > saved config > interactive
+  const savedProvider = resolved.savedProvider as "anthropic" | "openrouter" | "custom" | "";
+  const savedModel = resolved.savedModel;
+
   if (options.provider === "openrouter" && hasOpenRouter) {
     providerMode = "openrouter";
-    selectedModel = options.model || POPULAR_MODELS[0].id;
-  } else if (options.provider === "anthropic" || (!hasOpenRouter && !hasCustom)) {
+    selectedModel = options.model || savedModel || POPULAR_MODELS[0].id;
+  } else if (options.provider === "anthropic") {
     providerMode = "anthropic";
   } else if (options.provider === "custom" && hasCustom) {
     providerMode = "custom";
     selectedModel = options.model;
   } else if (options.model) {
-    // --model given without --provider → infer OpenRouter
+    // --model without --provider → infer OpenRouter
     providerMode = "openrouter";
     selectedModel = options.model;
-  } else if (hasOpenRouter || hasCustom) {
+  } else if (savedProvider === "openrouter" && hasOpenRouter) {
+    // Saved config says openrouter + have a saved model → go direct (no prompt)
+    providerMode = "openrouter";
+    selectedModel = savedModel || POPULAR_MODELS[0].id;
+    info(`Using saved config: OpenRouter / ${selectedModel}`);
+  } else if (savedProvider === "anthropic" || (!hasOpenRouter && !hasCustom)) {
+    providerMode = "anthropic";
+  } else {
     // Interactive selection
-    const result = await promptModeSelection(hasAnthropic, hasOpenRouter, hasCustom);
+    const result = await promptModeSelection(hasAnthropic, hasOpenRouter, hasCustom, savedModel);
     providerMode = result.mode;
     selectedModel = result.model;
+    // Persist choice for next time
+    if (result.model) {
+      const cfg = loadConfig();
+      cfg.provider = result.mode;
+      cfg.lastModel = result.model;
+      saveConfig(cfg);
+    }
   }
 
   // ── 7. Build env vars ─────────────────────────────────────────
   const env: NodeJS.ProcessEnv = { ...process.env };
 
   if (providerMode === "openrouter") {
-    env.ANTHROPIC_BASE_URL = getOpenRouterBase();
+    env.ANTHROPIC_BASE_URL = openrouterBase;
     env.ANTHROPIC_AUTH_TOKEN = openrouterKey;
     // Suppress Claude Code's own key validation
     env.ANTHROPIC_API_KEY = "openrouter";
@@ -189,7 +197,8 @@ export async function runStart(options: CLIOptions): Promise<void> {
 async function promptModeSelection(
   hasAnthropic: boolean,
   hasOpenRouter: boolean,
-  hasCustom: boolean
+  hasCustom: boolean,
+  savedModel?: string
 ): Promise<{ mode: "anthropic" | "openrouter" | "custom"; model: string }> {
   const options: Array<{ label: string; mode: "anthropic" | "openrouter" | "custom" }> = [];
 
@@ -206,6 +215,9 @@ async function promptModeSelection(
     });
   }
 
+  if (savedModel) {
+    console.log(`  \x1b[2m(last used: ${savedModel})\x1b[0m`);
+  }
   log("  Select provider:");
   options.forEach((o, i) => log(`    ${bold(String(i + 1))}. ${o.label}`));
   log("");

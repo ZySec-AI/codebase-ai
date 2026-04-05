@@ -265,6 +265,34 @@ const HELP: Record<string, CommandHelp> = {
     seeAlso: ["doctor"],
   },
 
+  config: {
+    description: "View and set persistent config (~/.config/codebase/config.json)",
+    usage: "codebase config [set|get|unset|path] [key] [value]",
+    examples: [
+      { command: "codebase config", description: "Show current config" },
+      {
+        command: "codebase config set openrouter-key sk-or-...",
+        description: "Store OpenRouter API key (no env var needed after this)",
+      },
+      {
+        command: "codebase config set model anthropic/claude-haiku-4-5",
+        description: "Default to Haiku every session",
+      },
+      {
+        command: "codebase config set provider openrouter",
+        description: "Default to OpenRouter (skip prompt)",
+      },
+      { command: "codebase config path", description: "Print config file location" },
+    ],
+    options: [
+      { flag: "set <key> <value>", description: "Set a key" },
+      { flag: "get <key>", description: "Print a single value" },
+      { flag: "unset <key>", description: "Remove a key" },
+      { flag: "path", description: "Print config file path" },
+    ],
+    seeAlso: ["start"],
+  },
+
   start: {
     description: "Launch Claude Code with smart model routing (default command when no args given)",
     usage: "codebase start [options]",

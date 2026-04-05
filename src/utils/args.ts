@@ -48,6 +48,7 @@ const COMMANDS = new Set([
   "tokens",
   "context",
   "start",
+  "config",
 ]);
 
 export function parseArgs(argv: string[]): CLIOptions {
@@ -182,6 +183,10 @@ export function parseArgs(argv: string[]): CLIOptions {
         "map",
         "reset",
         "age",
+        "set",
+        "get",
+        "unset",
+        "path",
       ].includes(sub)
     ) {
       opts.subcommand = positionals.shift()!;
