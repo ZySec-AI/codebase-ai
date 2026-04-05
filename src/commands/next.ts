@@ -2,7 +2,7 @@ import { resolve, join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import type { CLIOptions, Manifest } from "../types.js";
-import { error, log, bold, info } from "../utils/output.js";
+import { error, log, bold } from "../utils/output.js";
 import { rankIssues } from "../github/sync.js";
 
 function priorityReason(labels: string[]): string {
@@ -78,7 +78,34 @@ export async function runNext(options: CLIOptions): Promise<void> {
 
   const status = manifest.status;
   if (!status || !status.github_available) {
-    info("No GitHub data. Run `npx codebase` with `gh` CLI authenticated.");
+    // Provide useful fallback even without GitHub
+    log(bold("NO GITHUB DATA"));
+    log("  Issues and priorities require GitHub CLI authentication.");
+    log("  To enable: gh auth login  →  then re-run codebase scan");
+    log("");
+
+    // Show recent commits as a proxy for "what's in flight"
+    const commits = manifest.git?.recent_commits ?? [];
+    if (commits.length) {
+      log(bold("RECENT COMMITS (what's in flight):"));
+      for (const c of commits.slice(0, 5)) {
+        log(`  ${c}`);
+      }
+      log("");
+    }
+
+    // Show uncommitted changes
+    if (manifest.git?.uncommitted_changes) {
+      log(bold("UNCOMMITTED CHANGES:"));
+      log("  There are staged/unstaged changes. Commit or stash before starting new work.");
+      log("");
+    }
+
+    log("  Once GitHub is connected, `codebase next` shows:");
+    log("  - Highest-priority open issue");
+    log("  - What's currently in progress (to avoid collisions)");
+    log("  - Blockers");
+    log('  Create a task now: codebase issue create "task title"');
     return;
   }
 

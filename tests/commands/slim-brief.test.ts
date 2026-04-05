@@ -40,9 +40,9 @@ describe("generateSlimBrief", () => {
     expect(brief).toMatch(/manifest: \d+m ago|manifest: \d+h ago/);
   });
 
-  it("includes 'For full context' footer", () => {
+  it("includes footer with codebase brief reference", () => {
     const brief = generateSlimBrief(minimal());
-    expect(brief).toContain("For full context: `codebase brief`");
+    expect(brief).toContain("codebase brief");
   });
 
   it("shows uncommitted changes warning when git has changes", () => {
@@ -51,7 +51,8 @@ describe("generateSlimBrief", () => {
         git: { uncommitted_changes: true, recent_commits: [], branch: "main", remote_url: null },
       })
     );
-    expect(brief).toContain("WARNING: Uncommitted changes");
+    expect(brief).toContain("WARNING");
+    expect(brief).toContain("uncommitted changes");
   });
 
   it("does not show uncommitted warning when no changes", () => {

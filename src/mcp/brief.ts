@@ -200,16 +200,33 @@ export function generateBrief(m: Manifest): string {
   // ─── Git status ────────────────────────────────────────────────
   if (m.git) {
     if (m.git.uncommitted_changes) {
-      sections.push("\n## WARNING");
-      sections.push("There are uncommitted changes in the working directory.");
+      sections.push("\n## Uncommitted Changes");
+      sections.push(
+        "Working directory has uncommitted changes. Commit or stash before starting new work."
+      );
     }
     if (m.git.recent_commits?.length) {
       sections.push("\n## Recent Commits");
-      for (const c of m.git.recent_commits.slice(0, 3)) {
+      for (const c of m.git.recent_commits.slice(0, 5)) {
         sections.push(`- ${c}`);
       }
     }
   }
+
+  // ─── What to do if no GitHub data ─────────────────────────────
+  if (!m.status?.github_available) {
+    sections.push("\n## No Issue Tracker Data");
+    sections.push("GitHub issues/PRs not synced. To enable: `gh auth login` then `codebase scan`.");
+    sections.push('Track work manually: `codebase issue create "task title"`');
+  }
+
+  // ─── Available actions (always last — for AI agents) ──────────
+  sections.push("\n## Available Actions");
+  sections.push("- `codebase next` — highest-priority task to work on");
+  sections.push("- `codebase status` — kanban board + priorities");
+  sections.push('- `codebase issue create "title"` — track a new task');
+  sections.push("- `codebase scan` — refresh manifest from current codebase");
+  sections.push("- `codebase tokens` — check token budget for this session");
 
   return sections.join("\n");
 }
@@ -228,11 +245,26 @@ export function generateSlimBrief(m: Manifest): string {
   const ageMin = ageMs >= 0 ? Math.round(ageMs / 60000) : -1;
   const ageStr =
     ageMin < 0 ? "unknown age" : ageMin < 60 ? `${ageMin}m ago` : `${Math.round(ageMin / 60)}h ago`;
-  sections.push(`# ${name} — Session Start (manifest: ${ageStr})`);
+
+  // Stack summary for header
+  const langs = m.stack?.languages?.slice(0, 3).join(", ") ?? "";
+  const stackStr = langs ? ` · ${langs}` : "";
+  sections.push(`# ${name}${stackStr} — session start (manifest: ${ageStr})`);
+
+  // Key commands upfront (most useful for AI)
+  const cmds = m.commands ? Object.entries(m.commands).filter(([, v]) => v) : [];
+  if (cmds.length) {
+    sections.push(
+      `\nCommands: ${cmds
+        .slice(0, 4)
+        .map(([k, v]) => `${k}: \`${v}\``)
+        .join(" · ")}`
+    );
+  }
 
   // Uncommitted changes warning
   if (m.git?.uncommitted_changes) {
-    sections.push("\nWARNING: Uncommitted changes in working directory.");
+    sections.push("\nWARNING: uncommitted changes in working directory");
   }
 
   // In progress
@@ -275,6 +307,14 @@ export function generateSlimBrief(m: Manifest): string {
     }
   }
 
-  sections.push("\nFor full context: `codebase brief`");
+  if (!m.status?.github_available) {
+    sections.push(
+      "\nNo GitHub data — run `gh auth login` then `codebase scan` to enable issues/PRs"
+    );
+  }
+
+  sections.push(
+    "\nFull context: `codebase brief` · Task tracking: `codebase next` · Token budget: `codebase tokens`"
+  );
   return sections.join("\n");
 }
