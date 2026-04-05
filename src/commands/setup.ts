@@ -63,6 +63,8 @@ export async function runSetup(options: CLIOptions): Promise<void> {
   // ── Step 3b: Claude Code hooks ────────────────────────────────
   heading("Claude Code Hooks");
   installClaudeHooks(root);
+  installSessionStartHook(root);
+  installContextInjectHook(root);
 
   // ── Step 3c: agent-browser ────────────────────────────────────
   heading("Browser Automation");
@@ -337,6 +339,108 @@ export function installClaudeHooksForFix(root: string): void {
   installClaudeHooks(root);
 }
 
+export function installSessionStartHookForFix(root: string): void {
+  installSessionStartHook(root);
+}
+
+export function installContextInjectHookForFix(root: string): void {
+  installContextInjectHook(root);
+}
+
+// ─── Context inject hook (UserPromptSubmit) ───────────────────
+
+/**
+ * Installs context-inject.sh and wires it as a UserPromptSubmit hook.
+ *
+ * The hook fires when the user submits a prompt. Its stdout becomes a
+ * <system-reminder> that Claude sees automatically — giving Claude the
+ * project slim brief at session start with zero tool calls.
+ *
+ * Uses a sentinel file to inject only on the first prompt per session,
+ * then re-injects if the manifest is refreshed mid-session.
+ */
+function installContextInjectHook(root: string): void {
+  const hooksDir = join(root, ".claude", "hooks");
+  mkdirSync(hooksDir, { recursive: true });
+
+  const hookPath = join(hooksDir, "context-inject.sh");
+
+  const hookScript = `#!/bin/bash
+# context-inject.sh — UserPromptSubmit hook
+# Outputs project slim brief as system-reminder on the FIRST prompt of each
+# Claude Code session only. Re-injects if the manifest is refreshed mid-session.
+
+MANIFEST=".codebase.json"
+
+# Read session_id from stdin JSON (Claude Code passes hook data as JSON)
+# Fall back to a hash of cwd if jq/python unavailable
+STDIN_DATA=$(cat)
+SESSION_ID=$(echo "\$STDIN_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('session_id',''))" 2>/dev/null || true)
+
+if [ -z "\$SESSION_ID" ]; then
+  # Fallback: use stable hash of cwd (one injection per directory per day)
+  SESSION_ID=$(echo "\$(pwd)\$(date +%Y%m%d)" | md5sum 2>/dev/null | cut -c1-12 || echo "\$(pwd)\$(date +%Y%m%d)" | md5 2>/dev/null | cut -c1-12 || echo "default")
+fi
+
+HASH=$(echo "\$(pwd)" | md5sum 2>/dev/null | cut -c1-8 || echo "\$(pwd)" | md5 2>/dev/null | cut -c1-8 || echo "proj")
+SENTINEL="/tmp/.codebase-ctx-\${HASH}-\${SESSION_ID}"
+
+# Not first prompt of this session — check if manifest was refreshed
+if [ -f "\$SENTINEL" ]; then
+  if [ -f "\$MANIFEST" ] && [ "\$MANIFEST" -nt "\$SENTINEL" ]; then
+    echo "--- codebase context refreshed ---"
+    npx --yes codebase context --quiet 2>/dev/null || true
+    touch "\$SENTINEL"
+  fi
+  exit 0
+fi
+
+# First prompt of this session — create sentinel and output slim brief
+touch "\$SENTINEL"
+
+if [ -f "\$MANIFEST" ]; then
+  # Re-scan if manifest is older than CODEBASE_HOOK_TTL_MINUTES (default 30)
+  TTL_MINUTES=\${CODEBASE_HOOK_TTL_MINUTES:-30}
+  AGE_SECONDS=$(( \$(date +%s) - \$(stat -f %m "\$MANIFEST" 2>/dev/null || stat -c %Y "\$MANIFEST" 2>/dev/null || echo 0) ))
+  if [ "\$AGE_SECONDS" -gt \$(( TTL_MINUTES * 60 )) ]; then
+    npx --yes codebase scan-only --quiet 2>/dev/null || true
+  fi
+fi
+
+npx --yes codebase context --quiet 2>/dev/null || true
+`;
+
+  writeFileSync(hookPath, hookScript, "utf-8");
+  chmodSync(hookPath, 0o755);
+
+  // Wire into .claude/settings.json as UserPromptSubmit hook
+  const settingsPath = join(root, ".claude", "settings.json");
+  let settings: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
+  const promptHooks = (hooks["UserPromptSubmit"] as unknown[]) ?? [];
+  const hasContextHook = JSON.stringify(promptHooks).includes("context-inject");
+  if (!hasContextHook) {
+    promptHooks.push({
+      matcher: "",
+      hooks: [{ type: "command", command: `bash .claude/hooks/context-inject.sh` }],
+    });
+  }
+  hooks["UserPromptSubmit"] = promptHooks;
+  settings.hooks = hooks;
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+  success(
+    ".claude/hooks/context-inject.sh (UserPromptSubmit — auto-inject slim brief on session start)"
+  );
+}
+
 function installClaudeHooks(root: string): void {
   const hooksDir = join(root, ".claude", "hooks");
   mkdirSync(hooksDir, { recursive: true });
@@ -491,6 +595,48 @@ exit 0
   settings.hooks = hooks;
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
   success(".claude/settings.json (PreToolUse + PostToolUse hooks registered)");
+}
+
+// ─── Session-start hook ───────────────────────────────────────────
+
+function installSessionStartHook(root: string): void {
+  const hooksDir = join(root, ".claude", "hooks");
+  mkdirSync(hooksDir, { recursive: true });
+
+  const hookPath = join(hooksDir, "session-start.sh");
+  const hookScript = `#!/bin/bash
+# codebase session-start — fires once per Claude Code session
+# Keeps .codebase.json fresh without blocking Claude startup.
+npx --yes codebase scan-only --quiet 2>/dev/null || true
+`;
+  writeFileSync(hookPath, hookScript, "utf-8");
+  chmodSync(hookPath, 0o755);
+
+  // Wire into .claude/settings.json as a PreToolUse hook on the first Bash call,
+  // using a sentinel file so it only fires once per session.
+  const settingsPath = join(root, ".claude", "settings.json");
+  let settings: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
+  const preHooks = (hooks["PreToolUse"] as unknown[]) ?? [];
+  const hasSessionHook = JSON.stringify(preHooks).includes("session-start");
+  if (!hasSessionHook) {
+    preHooks.push({
+      matcher: "Bash",
+      hooks: [{ type: "command", command: `bash .claude/hooks/session-start.sh` }],
+    });
+  }
+  hooks["PreToolUse"] = preHooks;
+  settings.hooks = hooks;
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+  success(".claude/hooks/session-start.sh (PreToolUse — auto-refresh manifest on session start)");
 }
 
 // ─── commit-msg hook: block commits directly to main/master ─────

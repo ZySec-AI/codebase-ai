@@ -138,13 +138,13 @@ export async function runRelease(options: CLIOptions): Promise<void> {
   await gitRun(root, ["push", "origin", version]);
   success(`Tagged ${version}`);
 
-  // ── Merge develop → main ──────────────────────────────────────
-  await gitRun(root, ["checkout", "main"]);
-  await gitRun(root, ["pull", "origin", "main"]);
+  // ── Merge develop → release ───────────────────────────────────
+  await gitRun(root, ["checkout", "release"]);
+  await gitRun(root, ["pull", "origin", "release"]);
   await gitRun(root, ["merge", "develop", "--no-ff", "-m", `Release ${version}`]);
-  await gitRun(root, ["push", "origin", "main"]);
+  await gitRun(root, ["push", "origin", "release"]);
   await gitRun(root, ["checkout", "develop"]);
-  success("Merged develop → main");
+  success("Merged develop → release");
 
   // ── GitHub release ────────────────────────────────────────────
   const { ok: releaseOk, stdout: releaseUrl } = await ghRun(root, [
@@ -168,7 +168,7 @@ export async function runRelease(options: CLIOptions): Promise<void> {
   await rotateMilestone(root);
 
   log(`\ncodebase release ${version} complete.`);
-  log("develop → main merged. Tag pushed. Ready.");
+  log("develop → release merged. Tag pushed. CI will publish to npm.");
 }
 
 // ─── Release gate helpers ────────────────────────────────────────
@@ -255,7 +255,7 @@ function detectTestCmd(root: string): string | null {
 function runTestSuite(root: string, cmd: string): Promise<{ ok: boolean; output: string }> {
   const [bin, ...args] = cmd.split(" ");
   return new Promise((resolve) => {
-    execFile(bin, args, { cwd: root, timeout: 120_000 }, (err, stdout, stderr) => {
+    execFile(bin, args, { cwd: root, timeout: 300_000 }, (err, stdout, stderr) => {
       resolve({ ok: !err, output: stdout + stderr });
     });
   });

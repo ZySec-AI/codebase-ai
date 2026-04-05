@@ -2,7 +2,7 @@ import { resolve, join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import type { CLIOptions, Manifest } from "../types.js";
-import { generateBrief } from "../mcp/brief.js";
+import { generateBrief, generateSlimBrief } from "../mcp/brief.js";
 import { error, warn } from "../utils/output.js";
 
 /**
@@ -50,7 +50,9 @@ export async function runBrief(options: CLIOptions): Promise<void> {
   }
 
   // Generate output based on format
-  const output = generateOutput(filteredManifest, options.format);
+  const output = options.slim
+    ? generateSlimBrief(filteredManifest)
+    : generateOutput(filteredManifest, options.format);
   process.stdout.write(output + "\n");
 }
 

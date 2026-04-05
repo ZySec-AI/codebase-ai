@@ -168,6 +168,7 @@ export async function runFix(options: CLIOptions): Promise<void> {
   // ─── 8. Claude Code hooks ─────────────────────────────────
   const guardHook = join(root, ".claude", "hooks", "git-guard.sh");
   const postHook = join(root, ".claude", "hooks", "git-post.sh");
+  const sessionHook = join(root, ".claude", "hooks", "session-start.sh");
   const settingsFile = join(root, ".claude", "settings.json");
   const hooksOk = existsSync(guardHook) && existsSync(postHook);
   const settingsOk = (() => {
@@ -187,6 +188,51 @@ export async function runFix(options: CLIOptions): Promise<void> {
     const { installClaudeHooksForFix } = await import("./setup.js");
     installClaudeHooksForFix(root);
     fixed("Installed Claude Code hooks → .claude/hooks/ + settings.json");
+    fixCount++;
+  }
+
+  // ─── 8b. Session-start hook ───────────────────────────────
+  const sessionHookOk = (() => {
+    if (!existsSync(sessionHook)) {
+      return false;
+    }
+    if (!existsSync(settingsFile)) {
+      return false;
+    }
+    try {
+      const s = JSON.parse(readFileSync(settingsFile, "utf-8"));
+      return JSON.stringify(s.hooks?.PreToolUse ?? "").includes("session-start");
+    } catch {
+      return false;
+    }
+  })();
+  if (!sessionHookOk) {
+    const { installSessionStartHookForFix } = await import("./setup.js");
+    installSessionStartHookForFix(root);
+    fixed("Installed session-start hook → .claude/hooks/session-start.sh");
+    fixCount++;
+  }
+
+  // ─── 8c. Context inject hook (UserPromptSubmit) ───────────
+  const contextHook = join(root, ".claude", "hooks", "context-inject.sh");
+  const contextHookOk = (() => {
+    if (!existsSync(contextHook)) {
+      return false;
+    }
+    if (!existsSync(settingsFile)) {
+      return false;
+    }
+    try {
+      const s = JSON.parse(readFileSync(settingsFile, "utf-8"));
+      return JSON.stringify(s.hooks?.UserPromptSubmit ?? "").includes("context-inject");
+    } catch {
+      return false;
+    }
+  })();
+  if (!contextHookOk) {
+    const { installContextInjectHookForFix } = await import("./setup.js");
+    installContextInjectHookForFix(root);
+    fixed("Installed context-inject hook → .claude/hooks/context-inject.sh");
     fixCount++;
   }
 

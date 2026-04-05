@@ -88,8 +88,12 @@ const HELP: Record<string, CommandHelp> = {
         description:
           "Comma-separated sections to include: stack,commands,status,git,roadmap,decisions",
       },
+      {
+        flag: "--slim",
+        description: "Lightweight ~20-line brief (manifest age, next task, blockers, last commits)",
+      },
     ],
-    seeAlso: ["next", "status"],
+    seeAlso: ["next", "status", "handoff"],
   },
 
   next: {
@@ -232,6 +236,135 @@ const HELP: Record<string, CommandHelp> = {
     ],
     seeAlso: ["doctor"],
   },
+
+  handoff: {
+    description: "Generate HANDOFF.md capturing current session state for context transfer",
+    usage: "codebase handoff [options]",
+    examples: [
+      { command: "codebase handoff", description: "Generate HANDOFF.md in project root" },
+      {
+        command: 'codebase handoff --message "Finished auth, next: billing"',
+        description: "Include session notes",
+      },
+    ],
+    options: [
+      {
+        flag: "--message <text>",
+        description: "Session notes to include in HANDOFF.md",
+      },
+    ],
+    seeAlso: ["brief"],
+  },
+
+  tokens: {
+    description: "Estimate per-session token budget across all context sources",
+    usage: "codebase tokens",
+    examples: [
+      { command: "codebase tokens", description: "Show token budget with A/B/C/D grades" },
+    ],
+    seeAlso: ["doctor"],
+  },
+
+  config: {
+    description: "View and set persistent config (~/.config/codebase/config.json)",
+    usage: "codebase config [set|get|unset|path] [key] [value]",
+    examples: [
+      { command: "codebase config", description: "Show current config and effective env vars" },
+      {
+        command: "codebase config set openrouter-key sk-or-...",
+        description: "Store OpenRouter API key",
+      },
+      {
+        command: "codebase config set zai-key <key>",
+        description: "Store z.ai API key (GLM models)",
+      },
+      {
+        command: "codebase config set custom-url https://my-proxy/v1",
+        description: "Set custom OpenAI-compatible endpoint",
+      },
+      {
+        command: "codebase config set custom-key sk-...",
+        description: "API key for custom endpoint",
+      },
+      {
+        command: "codebase config set provider openrouter",
+        description: "Remember provider across sessions",
+      },
+      { command: "codebase config path", description: "Print config file location" },
+    ],
+    options: [
+      { flag: "set <key> <value>", description: "Set a key" },
+      { flag: "get <key>", description: "Print a single value" },
+      { flag: "unset <key>", description: "Remove a key" },
+      { flag: "path", description: "Print config file path" },
+    ],
+    seeAlso: ["start"],
+  },
+
+  start: {
+    description: "Launch Claude Code with smart model routing (default command when no args given)",
+    usage: "codebase start [options]",
+    examples: [
+      { command: "codebase", description: "Interactive launcher — detect providers, pick model" },
+      { command: "codebase start", description: "Same as above, explicit" },
+      {
+        command: "codebase start --provider openrouter",
+        description: "Use OpenRouter — shows live model browser",
+      },
+      {
+        command: "codebase start --provider zai",
+        description: "Use z.ai (GLM models, Anthropic-compatible API)",
+      },
+      {
+        command: "codebase start --model anthropic/claude-haiku-4-5",
+        description: "Skip prompt, use specific model via OpenRouter",
+      },
+      {
+        command: "codebase start --provider anthropic",
+        description: "Force Anthropic direct (no routing)",
+      },
+    ],
+    options: [
+      {
+        flag: "--provider <name>",
+        description: "anthropic | openrouter | zai | custom — skip interactive prompt",
+      },
+      {
+        flag: "--model <id>",
+        description: "Model ID to pass to claude (e.g. anthropic/claude-haiku-4-5)",
+      },
+    ],
+    seeAlso: ["config", "sessions", "brief"],
+  },
+
+  sessions: {
+    description: "Show recent Claude Code session log (provider, model, project, duration)",
+    usage: "codebase sessions",
+    examples: [{ command: "codebase sessions", description: "Show last 7 days of sessions" }],
+    options: [],
+    seeAlso: ["start", "tokens"],
+  },
+
+  context: {
+    description: "Lightweight session context — slim brief, force reset, or check manifest age",
+    usage: "codebase context [reset|age]",
+    examples: [
+      { command: "codebase context", description: "Output slim brief (same as brief --slim)" },
+      {
+        command: "codebase context reset",
+        description: "Force re-scan + fresh slim brief; clears hook sentinels",
+      },
+      {
+        command: "codebase context age",
+        description: "Print manifest age in seconds (for use in scripts)",
+      },
+    ],
+    options: [
+      { flag: "reset", description: "Force re-scan and re-inject context on next prompt" },
+      { flag: "age", description: "Print manifest staleness in seconds (−1 if missing)" },
+    ],
+    seeAlso: ["brief", "doctor"],
+  },
 };
 
 export function printMainHelp(): void {
@@ -239,15 +372,20 @@ export function printMainHelp(): void {
 ${bold("codebase")} — One command. Every AI tool understands your project instantly.
 
 ${bold("QUICK START")}
-  ${command("npx codebase")}              ← Run this once. That's it.
+  ${command("codebase")}                  ← Default: smart launcher → picks provider/model → starts Claude Code
+  ${command("npx codebase")}              ← First time setup (init + start)
 
 ${bold("AI INTERFACE")}
   These are the commands your AI tools call:
 
   ${command("codebase brief")}             Full project briefing — run this first
+  ${command("codebase brief --slim")}      Lightweight brief (~20 lines) for session-start hooks
+  ${command("codebase context")}           Slim brief shorthand — used by session hooks
+  ${command("codebase context reset")}     Force re-scan + fresh context injection
   ${command("codebase next")}              What should I work on next?
   ${command("codebase status")}            Kanban board, priorities, milestones
   ${command("codebase query <path>")}      Query any field (e.g. ${code("stack.languages")})
+  ${command("codebase handoff")}           Generate HANDOFF.md for session transfer
 
 ${bold("AUTONOMOUS LOOP")}
   After ${command("codebase setup")}, these slash commands are available in Claude Code:
@@ -267,6 +405,17 @@ ${bold("HUMAN COMMANDS")}
   ${command("codebase setup")}             Wire AI tools + install slash commands
   ${command("codebase release")}           Gate check → tag → develop→main
   ${command("codebase doctor")}            Health check & diagnostics
+  ${command("codebase fix")}               Auto-repair issues found by doctor
+  ${command("codebase tokens")}            Token budget report (A/B/C/D grades)
+  ${command("codebase sessions")}          Recent Claude Code session log (provider, model, duration)
+
+${bold("PROVIDER SETUP")}
+  ${command("codebase config")}            Show stored keys and effective env vars
+  ${command("codebase config set openrouter-key sk-or-...")}
+  ${command("codebase config set zai-key <key>")}
+  ${command("codebase config set custom-url https://my-proxy/v1")}
+  ${command("codebase start --provider openrouter")}    Skip prompt, use OpenRouter
+  ${command("codebase start --provider zai")}           Skip prompt, use z.ai
 
 ${bold("OPTIONS")}
   ${code("--help, -h")}                    Show this help or command-specific help

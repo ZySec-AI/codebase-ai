@@ -19,6 +19,8 @@
 
 ## Install
 
+> Requires Node.js 20+. For the autonomous loop, also install [Claude Code](https://www.npmjs.com/package/@anthropic-ai/claude-code) and run `gh auth login`.
+
 ```bash
 npm install -g codebase-ai
 ```
@@ -26,12 +28,10 @@ npm install -g codebase-ai
 Then in your project:
 
 ```bash
-npx codebase-ai
+codebase
 ```
 
-That's it. Every Claude session now starts with instant project context.
-
-> Requires Node.js 20+. For the autonomous loop, also install [Claude Code](https://www.npmjs.com/package/@anthropic-ai/claude-code) and run `gh auth login`.
+That's it. Scans your project, picks a provider/model, and starts Claude Code with full context.
 
 ---
 
@@ -59,12 +59,12 @@ Or run the entire loop hands-free with one command:
 /vibeloop
 ```
 
-| Command | What it does |
-|---------|-------------|
-| `/simulate` | Opens your app in a real browser. Acts like real users. Fixes bugs inline, tracks complex ones as GitHub Issues. |
-| `/build` | Reads open issues, picks the highest priority, implements the fix, tests it, commits, closes the issue. Repeats. |
-| `/launch` | Checks quality gates (open bugs, test suite, UX score). If all pass: bumps version, tags release, merges to main, publishes GitHub Release. |
-| `/vibeloop` | **Runs everything.** Continuous `/simulate → /build → /launch` loop. Zero intervention. |
+| Command     | What it does                                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/simulate` | Opens your app in a real browser. Acts like real users. Fixes bugs inline, tracks complex ones as GitHub Issues.                            |
+| `/build`    | Reads open issues, picks the highest priority, implements the fix, tests it, commits, closes the issue. Repeats.                            |
+| `/launch`   | Checks quality gates (open bugs, test suite, UX score). If all pass: bumps version, tags release, merges to main, publishes GitHub Release. |
+| `/vibeloop` | **Runs everything.** Continuous `/simulate → /build → /launch` loop. Zero intervention.                                                     |
 
 First time? Run `/setup` in Claude Code to create `docs/PRODUCT.md` and your first milestone.
 
@@ -76,7 +76,7 @@ First time? Run `/setup` in Claude Code to create `docs/PRODUCT.md` and your fir
 
 ```bash
 cd your-project
-npx codebase-ai
+codebase
 ```
 
 Scans your project and wires everything: `.codebase.json`, `CLAUDE.md`, MCP server, git hooks, `.gitignore`.
@@ -123,14 +123,22 @@ Invoke once. Come back to a shipped, tested, tagged release.
 ## All CLI commands
 
 ```bash
-# First run
-npx codebase-ai            # scan + wire AI tools + hooks
+# Launcher (default command)
+codebase                   # detect providers, pick model, start Claude Code
+codebase start --provider openrouter --model anthropic/claude-haiku-4-5
 
-# Re-wire after adding a new AI tool
-codebase setup
+# Provider setup
+codebase config                              # show keys + effective env vars
+codebase config set openrouter-key sk-or-... # store OpenRouter key
+codebase config set zai-key <key>            # store z.ai key (GLM models)
+codebase config set custom-url https://...   # custom OpenAI-compatible endpoint
+
+# Session history
+codebase sessions          # last 7 days: provider, model, project, duration
 
 # AI interface
 codebase brief             # full project briefing
+codebase brief --slim      # lightweight ~20-line brief
 codebase next              # highest-priority open issue
 codebase status            # kanban board + milestones
 codebase query <path>      # e.g. stack.languages or commands.test
@@ -140,11 +148,16 @@ codebase issue create "title"
 codebase issue close <n> --reason "why"
 codebase issue comment <n> --message "text"
 
+# Session management
+codebase handoff           # generate HANDOFF.md for session transfer
+codebase tokens            # token budget report (A/B/C/D grades)
+
 # Maintenance
 codebase scan              # refresh .codebase.json
-codebase doctor            # health check
-codebase fix               # auto-repair
-codebase mcp               # start MCP server
+codebase doctor            # health check (includes TOKEN HEALTH section)
+codebase fix               # auto-repair issues found by doctor
+codebase setup             # re-wire AI tools + install slash commands
+codebase mcp               # start MCP server (stdio)
 ```
 
 ---
@@ -162,7 +175,7 @@ codebase mcp               # start MCP server
 }
 ```
 
-Add to `.mcp.json` in your project root. Tools: `project_brief`, `get_codebase`, `query_codebase`, `get_next_task`, `get_blockers`, `create_issue`, `close_issue`, `rescan_project`, `list_commands`.
+Add to `.mcp.json` in your project root. Tools: `project_brief` (supports `slim: true`), `get_codebase`, `query_codebase`, `get_next_task`, `get_blockers`, `create_issue`, `close_issue`, `rescan_project`, `list_commands`, `generate_handoff`.
 
 ---
 
@@ -175,7 +188,7 @@ Commit `.codebase.json` and `.claude/commands/`. Every teammate with Claude Code
 ## FAQ
 
 **Does it send my code to anyone?**
-No. Everything runs locally. External calls go only to GitHub (via `gh` CLI) and Anthropic's API (only when you run Claude commands).
+Scanning and manifest generation runs entirely locally. When you start a session, prompts go to whichever provider you pick: Anthropic directly, OpenRouter, z.ai, or your own custom endpoint. No data goes anywhere until you run Claude commands.
 
 **What if I don't use GitHub?**
 Manifest and AI tool wiring work without GitHub. You lose issues, PRs, releases, and labels — core context injection still works.

@@ -7,9 +7,9 @@ vi.spyOn(process, "exit").mockImplementation(() => {
 });
 
 describe("parseArgs", () => {
-  it("parses default command as init", () => {
+  it("parses default command as start", () => {
     const opts = parseArgs([]);
-    expect(opts.command).toBe("init");
+    expect(opts.command).toBe("start");
   });
 
   it("parses brief command", () => {

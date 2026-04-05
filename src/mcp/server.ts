@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { execFile } from "node:child_process";
 import { queryPath } from "../utils/json-path.js";
 import { scan } from "../scanner/engine.js";
-import { generateBrief } from "./brief.js";
+import { generateBrief, generateSlimBrief } from "./brief.js";
 import { rankIssues, syncGitHub } from "../github/sync.js";
 import type { Manifest } from "../types.js";
 
@@ -32,7 +32,13 @@ const TOOL_DEFINITIONS = [
       "CALL THIS FIRST at the start of every session. Returns a complete project briefing: what the project is, tech stack, current priorities, open issues, blockers, what to work on next, and recent decisions. This is your single source of truth — call it before doing anything else.",
     inputSchema: {
       type: "object" as const,
-      properties: {},
+      properties: {
+        slim: {
+          type: "boolean" as const,
+          description:
+            "Return a lightweight ~20-line brief (manifest age, next task, blockers, last commits). Faster for session-start hooks or low-context situations.",
+        },
+      },
     },
   },
 
@@ -259,6 +265,22 @@ const TOOL_DEFINITIONS = [
       properties: {},
     },
   },
+
+  // ─── Session Transfer ──────────────────────────────────────────
+  {
+    name: "generate_handoff",
+    description:
+      "Generate HANDOFF.md capturing current session state for context transfer. Collects git state (branch, recent commits, diff stat, uncommitted changes, stashes) and manifest data (in-progress issues, next task, blockers). Use at the end of a session to leave a breadcrumb for the next agent or human.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        message: {
+          type: "string" as const,
+          description: "Optional session notes to include in the handoff document.",
+        },
+      },
+    },
+  },
 ];
 
 export async function startMcpServer(root: string): Promise<void> {
@@ -320,7 +342,8 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
     switch (toolName) {
       case "project_brief": {
         const manifest = await loadOrScanManifest(root, true);
-        const brief = generateBrief(manifest);
+        const slim = args.slim as boolean | undefined;
+        const brief = slim ? generateSlimBrief(manifest) : generateBrief(manifest);
         return respond(req.id, {
           content: [{ type: "text", text: brief }],
         });
@@ -626,6 +649,38 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
         }
         return respond(req.id, {
           content: [{ type: "text", text: `GitHub data refreshed at ${new Date().toISOString()}` }],
+        });
+      }
+
+      case "generate_handoff": {
+        const { runHandoff } = await import("../commands/handoff.js");
+        await runHandoff({
+          command: "handoff",
+          subcommand: "",
+          positionals: [],
+          path: root,
+          message: (args.message as string) || "",
+          quiet: true,
+          slim: false,
+          categories: [],
+          depth: 4,
+          format: "text",
+          verbose: false,
+          incremental: false,
+          force: false,
+          port: 3000,
+          tools: [],
+          dryRun: false,
+          since: "",
+          sync: false,
+          reason: "",
+          examples: false,
+          helpCommand: false,
+          model: "",
+          provider: "",
+        });
+        return respond(req.id, {
+          content: [{ type: "text", text: "HANDOFF.md generated in project root." }],
         });
       }
 

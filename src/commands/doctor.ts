@@ -4,6 +4,7 @@ import { existsSync, readFileSync, statSync, readdirSync } from "node:fs";
 import type { CLIOptions, Manifest } from "../types.js";
 import { checkGhDetailed } from "./init.js";
 import { setQuiet, log, success, heading, dim, bold } from "../utils/output.js";
+import { estimateTokens } from "../utils/tokens.js";
 
 const HOOK_MARKER = "# codebase-auto-update";
 
@@ -39,10 +40,11 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
       const sizeKB = (stat.size / 1024).toFixed(1);
       const ageMs = Date.now() - stat.mtimeMs;
       const age = formatAge(ageMs);
+      const manifestTokens = estimateTokens(raw);
       results.push({
         label: "Manifest",
         ok: true,
-        detail: `.codebase.json (${sizeKB} KB, ${age})`,
+        detail: `.codebase.json (${sizeKB} KB, ~${manifestTokens} tokens, ${age})`,
       });
     } catch {
       results.push({ label: "Manifest", ok: false, detail: "Corrupted — run `codebase fix`" });
@@ -56,24 +58,29 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
     const generatedAt = manifest.generated_at ? new Date(manifest.generated_at).getTime() : 0;
     const ageHours = (Date.now() - generatedAt) / (1000 * 60 * 60);
 
-    // Check if src/ files are newer than manifest
-    let stale = false;
-    if (existsSync(join(root, "src"))) {
-      try {
-        const srcStat = statSync(join(root, "src"));
-        if (srcStat.mtimeMs > generatedAt) {
-          stale = true;
+    // Check if any key project paths are newer than the manifest
+    const freshnessCheckPaths = ["src", "lib", "app", "docs", "package.json", "tsconfig.json"];
+    let stalePath: string | null = null;
+    for (const p of freshnessCheckPaths) {
+      const full = join(root, p);
+      if (existsSync(full)) {
+        try {
+          const s = statSync(full);
+          if (s.mtimeMs > generatedAt) {
+            stalePath = p;
+            break;
+          }
+        } catch {
+          /* ignore */
         }
-      } catch {
-        /* ignore */
       }
     }
 
-    if (stale) {
+    if (stalePath) {
       results.push({
         label: "Freshness",
         ok: false,
-        detail: `Stale (${Math.round(ageHours)} hours old)`,
+        detail: `Stale — ${stalePath} changed since last scan (${Math.round(ageHours)}h ago)`,
       });
     } else {
       results.push({ label: "Freshness", ok: true, detail: "Up to date" });
@@ -293,9 +300,9 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
   }
 
   // ─── 10d. Claude Code hooks ────────────────────────────────
+  const settingsFile = join(root, ".claude", "settings.json");
   const guardHook = join(root, ".claude", "hooks", "git-guard.sh");
   const postHook = join(root, ".claude", "hooks", "git-post.sh");
-  const settingsFile = join(root, ".claude", "settings.json");
   const hooksInstalled = existsSync(guardHook) && existsSync(postHook);
   const settingsOk = (() => {
     if (!existsSync(settingsFile)) {
@@ -331,6 +338,175 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
     });
   }
 
+  // ─── TOKEN HEALTH ─────────────────────────────────────────
+
+  // T1. CLAUDE.md size
+  const claudeMdPath = join(root, "CLAUDE.md");
+  if (existsSync(claudeMdPath)) {
+    const claudeContent = readFileSync(claudeMdPath, "utf-8");
+    const claudeLines = claudeContent.split("\n").length;
+    const claudeTokens = estimateTokens(claudeContent);
+    if (claudeLines > 500) {
+      results.push({
+        label: "CLAUDE.md Size",
+        ok: false,
+        detail: `${claudeLines} lines, ~${claudeTokens} tokens — trim to under 300 lines`,
+      });
+    } else if (claudeLines > 300) {
+      results.push({
+        label: "CLAUDE.md Size",
+        ok: true,
+        detail: `${claudeLines} lines, ~${claudeTokens} tokens — consider trimming`,
+      });
+    } else {
+      results.push({
+        label: "CLAUDE.md Size",
+        ok: true,
+        detail: `${claudeLines} lines, ~${claudeTokens} tokens`,
+      });
+    }
+
+    // T2. Injection block size
+    const injStart = claudeContent.indexOf("<!-- codebase:start -->");
+    const injEnd = claudeContent.indexOf("<!-- codebase:end -->");
+    if (injStart !== -1 && injEnd !== -1) {
+      const injBlock = claudeContent.slice(injStart, injEnd + "<!-- codebase:end -->".length);
+      const injLines = injBlock.split("\n").length;
+      if (injLines > 80) {
+        results.push({
+          label: "Injection Block",
+          ok: false,
+          detail: `${injLines} lines — bloated, run \`codebase fix\` to re-inject`,
+        });
+      } else {
+        results.push({ label: "Injection Block", ok: true, detail: `${injLines} lines` });
+      }
+    }
+  }
+
+  // T3. MCP server count
+  const mcpPath = join(root, ".mcp.json");
+  if (existsSync(mcpPath)) {
+    try {
+      const mcpConfig = JSON.parse(readFileSync(mcpPath, "utf-8"));
+      const serverNames = Object.keys(mcpConfig.mcpServers ?? {});
+      const count = serverNames.length;
+      if (count > 5) {
+        results.push({
+          label: "MCP Servers",
+          ok: false,
+          detail: `${count} servers — each adds ~10k tokens; remove unused ones`,
+        });
+      } else if (count > 3) {
+        results.push({
+          label: "MCP Servers",
+          ok: true,
+          detail: `${count} servers — ${serverNames.join(", ")} (consider trimming)`,
+        });
+      } else {
+        results.push({
+          label: "MCP Servers",
+          ok: true,
+          detail: `${count} server${count !== 1 ? "s" : ""}: ${serverNames.join(", ") || "none"}`,
+        });
+      }
+    } catch {
+      /* already flagged by check #7 */
+    }
+  }
+
+  // T4. Session-start hook
+  const sessionHookPath = join(root, ".claude", "hooks", "session-start.sh");
+  const sessionHookInstalled = existsSync(sessionHookPath);
+  const sessionHookExecutable = sessionHookInstalled
+    ? !!(statSync(sessionHookPath).mode & 0o111)
+    : false;
+  const sessionHookWired = (() => {
+    if (!existsSync(settingsFile)) {
+      return false;
+    }
+    try {
+      const s = JSON.parse(readFileSync(settingsFile, "utf-8"));
+      return JSON.stringify(s.hooks?.PreToolUse ?? "").includes("session-start");
+    } catch {
+      return false;
+    }
+  })();
+  if (sessionHookInstalled && sessionHookWired && sessionHookExecutable) {
+    results.push({ label: "Session Hook", ok: true, detail: "session-start.sh installed + wired" });
+  } else {
+    const missing: string[] = [];
+    if (!sessionHookInstalled) {
+      missing.push("script");
+    } else if (!sessionHookExecutable) {
+      missing.push("not executable (chmod +x)");
+    }
+    if (!sessionHookWired) {
+      missing.push("settings.json wiring");
+    }
+    results.push({
+      label: "Session Hook",
+      ok: false,
+      detail: `Missing: ${missing.join(", ")} — run \`codebase fix\``,
+    });
+  }
+
+  // T5. Context inject hook (UserPromptSubmit)
+  const contextHookPath = join(root, ".claude", "hooks", "context-inject.sh");
+  const contextHookInstalled = existsSync(contextHookPath);
+  const contextHookExecutable = contextHookInstalled
+    ? !!(statSync(contextHookPath).mode & 0o111)
+    : false;
+  const contextHookWired = (() => {
+    if (!existsSync(settingsFile)) {
+      return false;
+    }
+    try {
+      const s = JSON.parse(readFileSync(settingsFile, "utf-8"));
+      return JSON.stringify(s.hooks?.UserPromptSubmit ?? "").includes("context-inject");
+    } catch {
+      return false;
+    }
+  })();
+  if (contextHookInstalled && contextHookWired && contextHookExecutable) {
+    // Show manifest age next to context hook status for quick staleness signal
+    const manifestAgeSec = (() => {
+      try {
+        return Math.floor((Date.now() - statSync(join(root, ".codebase.json")).mtimeMs) / 1000);
+      } catch {
+        return -1;
+      }
+    })();
+    const ageLabel =
+      manifestAgeSec < 0
+        ? "no manifest"
+        : manifestAgeSec < 60
+          ? `${manifestAgeSec}s ago`
+          : manifestAgeSec < 3600
+            ? `${Math.floor(manifestAgeSec / 60)}m ago`
+            : `${Math.floor(manifestAgeSec / 3600)}h ago`;
+    results.push({
+      label: "Context Hook",
+      ok: true,
+      detail: `context-inject.sh installed + wired — manifest ${ageLabel}`,
+    });
+  } else {
+    const missing: string[] = [];
+    if (!contextHookInstalled) {
+      missing.push("script");
+    } else if (!contextHookExecutable) {
+      missing.push("not executable (chmod +x)");
+    }
+    if (!contextHookWired) {
+      missing.push("UserPromptSubmit wiring");
+    }
+    results.push({
+      label: "Context Hook",
+      ok: false,
+      detail: `Missing: ${missing.join(", ")} — run \`codebase fix\``,
+    });
+  }
+
   // ─── 11. Gitignore ────────────────────────────────────────
   const gitignorePath = join(root, ".gitignore");
   if (existsSync(gitignorePath)) {
@@ -352,7 +528,7 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
 
   const LABEL_WIDTH = 20;
 
-  type Section = "MANIFEST" | "GITHUB" | "AI TOOLS" | "GIT";
+  type Section = "MANIFEST" | "GITHUB" | "AI TOOLS" | "TOKEN HEALTH" | "GIT";
 
   function sectionFor(label: string): Section {
     if (["Manifest", "Freshness", "Detectors", "Detector Warning"].includes(label)) {
@@ -365,6 +541,9 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
       ["Claude Code", "MCP", "Claude Commands", "Claude Skills", "Claude Hooks"].includes(label)
     ) {
       return "AI TOOLS";
+    }
+    if (["CLAUDE.md Size", "Injection Block", "MCP Servers", "Session Hook"].includes(label)) {
+      return "TOKEN HEALTH";
     }
     return "GIT";
   }
