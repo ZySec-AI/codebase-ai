@@ -201,7 +201,8 @@ export async function runStart(options: CLIOptions): Promise<void> {
       hasCustom,
       savedProvider,
       savedModel,
-      hasClaudePlan
+      hasClaudePlan,
+      openrouterKey
     );
     providerMode = result.mode;
     selectedModel = result.model;
@@ -328,7 +329,8 @@ async function promptModeSelection(
   hasCustom: boolean,
   savedProvider?: string,
   savedModel?: string,
-  hasClaudePlan?: boolean
+  hasClaudePlan?: boolean,
+  openrouterKey?: string
 ): Promise<{ mode: "anthropic" | "openrouter" | "zai" | "custom"; model: string }> {
   // If there's a saved OpenRouter model, offer quick-confirm or change
   if (savedProvider === "openrouter" && savedModel && hasOpenRouter) {
@@ -439,7 +441,7 @@ async function promptModeSelection(
   const chosen = options[idx - 1];
 
   if (chosen.mode === "openrouter") {
-    const model = await promptModelSelection();
+    const model = await promptModelSelection(openrouterKey);
     return { mode: "openrouter", model };
   }
 
@@ -454,20 +456,163 @@ async function promptModeSelection(
   return { mode: chosen.mode, model: "" };
 }
 
-async function promptModelSelection(): Promise<string> {
+interface LiveModel {
+  id: string;
+  name: string;
+  ctx: string;
+  price: string;
+  isFree: boolean;
+}
+
+async function fetchOpenRouterModels(apiKey: string): Promise<LiveModel[]> {
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) {
+      return [];
+    }
+    const json = (await res.json()) as {
+      data?: Array<{
+        id: string;
+        name?: string;
+        context_length?: number;
+        pricing?: { prompt?: string; completion?: string };
+      }>;
+    };
+    return (json.data || [])
+      .filter(
+        (m) => m.id && !m.id.includes("whisper") && !m.id.includes("embed") && !m.id.includes("tts")
+      )
+      .map((m) => {
+        const promptPer1M = parseFloat(m.pricing?.prompt || "0") * 1_000_000;
+        const compPer1M = parseFloat(m.pricing?.completion || "0") * 1_000_000;
+        const isFree = promptPer1M === 0 && compPer1M === 0;
+        const ctx = m.context_length
+          ? m.context_length >= 1_000_000
+            ? `${Math.round(m.context_length / 1_000_000)}M`
+            : `${Math.round(m.context_length / 1000)}k`
+          : "?";
+        const price = isFree
+          ? "free"
+          : `$${promptPer1M.toFixed(2)}/$${compPer1M.toFixed(2)} per Mtok`;
+        return { id: m.id, name: m.name || m.id, ctx, price, isFree };
+      });
+  } catch {
+    return [];
+  }
+}
+
+function groupModels(models: LiveModel[]): Array<{ heading: string; models: LiveModel[] }> {
+  const groups: Record<string, LiveModel[]> = {
+    "Claude (Anthropic)": [],
+    "GPT / o-series (OpenAI)": [],
+    "Gemini (Google)": [],
+    DeepSeek: [],
+    "Qwen / Llama / Other": [],
+    "Free tier": [],
+  };
+  for (const m of models) {
+    if (m.isFree) {
+      groups["Free tier"].push(m);
+      continue;
+    }
+    const id = m.id.toLowerCase();
+    if (id.startsWith("anthropic/")) {
+      groups["Claude (Anthropic)"].push(m);
+    } else if (id.startsWith("openai/") || id.startsWith("o1") || id.startsWith("o3")) {
+      groups["GPT / o-series (OpenAI)"].push(m);
+    } else if (id.startsWith("google/")) {
+      groups["Gemini (Google)"].push(m);
+    } else if (id.startsWith("deepseek")) {
+      groups["DeepSeek"].push(m);
+    } else {
+      groups["Qwen / Llama / Other"].push(m);
+    }
+  }
+  return Object.entries(groups)
+    .filter(([, ms]) => ms.length > 0)
+    .map(([heading, ms]) => ({ heading, models: ms.slice(0, 10) }));
+}
+
+async function promptModelSelection(openrouterKey?: string): Promise<string> {
   log("");
-  log("  Popular models:");
-  POPULAR_MODELS.forEach((m, i) => {
-    console.log(
-      `    ${bold(String(i + 1))}. ${m.label.padEnd(22)} \x1b[2m${m.ctx} ctx · ${m.price}\x1b[0m`
-    );
-    console.log(`       \x1b[2m${m.id}\x1b[0m`);
-  });
-  log(`    ${bold(String(POPULAR_MODELS.length + 1))}. Enter model ID manually`);
+
+  let liveModels: LiveModel[] = [];
+  if (openrouterKey) {
+    process.stdout.write("  \x1b[2mFetching models from OpenRouter...\x1b[0m");
+    liveModels = await fetchOpenRouterModels(openrouterKey);
+    process.stdout.write("\r" + " ".repeat(46) + "\r");
+  }
+
+  if (liveModels.length === 0) {
+    // Fallback to hardcoded list
+    log("  Popular models:");
+    POPULAR_MODELS.forEach((m, i) => {
+      console.log(
+        `    ${bold(String(i + 1))}. ${m.label.padEnd(22)} \x1b[2m${m.ctx} ctx · ${m.price}\x1b[0m`
+      );
+      console.log(`       \x1b[2m${m.id}\x1b[0m`);
+    });
+    log(`    ${bold(String(POPULAR_MODELS.length + 1))}. Enter model ID manually`);
+    log("");
+
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise<string>((res) => {
+      rl.question("  > ", (a) => {
+        rl.close();
+        res(a.trim());
+      });
+    });
+    const n = parseInt(answer, 10);
+    if (!isNaN(n) && n >= 1 && n <= POPULAR_MODELS.length) {
+      return POPULAR_MODELS[n - 1].id;
+    }
+    if (!isNaN(n) && n === POPULAR_MODELS.length + 1) {
+      const rl2 = createInterface({ input: process.stdin, output: process.stdout });
+      const custom = await new Promise<string>((res) => {
+        rl2.question("  Model ID: ", (a) => {
+          rl2.close();
+          res(a.trim());
+        });
+      });
+      return custom || POPULAR_MODELS[0].id;
+    }
+    if (answer.includes("/")) {
+      return answer;
+    }
+    return POPULAR_MODELS[0].id;
+  }
+
+  // Show grouped live models
+  const groups = groupModels(liveModels);
+  const flat: LiveModel[] = [];
+
+  log(`  ${liveModels.length} models available on OpenRouter:\n`);
+  for (const g of groups) {
+    console.log(`  \x1b[1m${g.heading}\x1b[0m`);
+    for (const m of g.models) {
+      const idx = flat.length + 1;
+      flat.push(m);
+      const nameStr = m.name.slice(0, 32).padEnd(33);
+      console.log(
+        `    ${bold(String(idx).padStart(3))}. ${nameStr} \x1b[2m${m.ctx} ctx · ${m.price}\x1b[0m`
+      );
+      console.log(`         \x1b[2m${m.id}\x1b[0m`);
+    }
+    log("");
+  }
+
+  const manualIdx = flat.length + 1;
+  log(`    ${bold(String(manualIdx))}. \x1b[2mEnter model ID manually\x1b[0m`);
+  log("");
+  log(
+    `  \x1b[2mTip: type a model ID directly (e.g. mistralai/mistral-large) or pick a number\x1b[0m`
+  );
   log("");
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-
   const answer = await new Promise<string>((res) => {
     rl.question("  > ", (a) => {
       rl.close();
@@ -475,29 +620,27 @@ async function promptModelSelection(): Promise<string> {
     });
   });
 
-  const n = parseInt(answer, 10);
-  if (!isNaN(n) && n >= 1 && n <= POPULAR_MODELS.length) {
-    return POPULAR_MODELS[n - 1].id;
+  if (!answer) {
+    return flat[0].id;
   }
-
-  if (!isNaN(n) && n === POPULAR_MODELS.length + 1) {
-    // Manual entry
+  const n = parseInt(answer, 10);
+  if (!isNaN(n) && n >= 1 && n <= flat.length) {
+    return flat[n - 1].id;
+  }
+  if (!isNaN(n) && n === manualIdx) {
     const rl2 = createInterface({ input: process.stdin, output: process.stdout });
-    const customModel = await new Promise<string>((res) => {
-      rl2.question("  Model ID (e.g. mistralai/mistral-large): ", (a) => {
+    const manual = await new Promise<string>((res) => {
+      rl2.question("  Model ID: ", (a) => {
         rl2.close();
         res(a.trim());
       });
     });
-    return customModel || POPULAR_MODELS[0].id;
+    return manual || flat[0].id;
   }
-
-  // If they typed a model ID directly
-  if (answer.includes("/")) {
+  if (answer.includes("/") || answer.includes(":")) {
     return answer;
   }
-
-  return POPULAR_MODELS[0].id;
+  return flat[0].id;
 }
 
 async function promptCustomModelSelection(customUrl: string, customKey: string): Promise<string> {
