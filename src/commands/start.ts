@@ -1,7 +1,7 @@
 import { resolve, join } from "node:path";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { createInterface } from "node:readline";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn, execFileSync, spawnSync } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
 import { log, info, warn, success, error, bold } from "../utils/output.js";
 import { resolveProviderConfig, saveConfig, loadConfig, ZAI_BASE_URL } from "../utils/config.js";
@@ -95,9 +95,13 @@ export async function runStart(options: CLIOptions): Promise<void> {
 
   // Provider status lines
   if (hasClaudePlan) {
-    const plan = claudeAuth.subscriptionType ? ` (${claudeAuth.subscriptionType})` : "";
+    const who = claudeAuth.email ? claudeAuth.email : "subscription auth";
+    const plan =
+      claudeAuth.subscriptionType && claudeAuth.subscriptionType !== "plan"
+        ? ` (${claudeAuth.subscriptionType})`
+        : "";
     console.log(
-      `    \x1b[1mClaude Plan\x1b[0m \x1b[32m✓\x1b[0m \x1b[2mLogged in as ${claudeAuth.email}${plan} — no API key needed\x1b[0m`
+      `    \x1b[1mClaude Plan\x1b[0m \x1b[32m✓\x1b[0m \x1b[2m${who}${plan} — use /model inside to switch Claude models\x1b[0m`
     );
   } else if (hasAnthropic) {
     console.log(
@@ -169,19 +173,21 @@ export async function runStart(options: CLIOptions): Promise<void> {
     selectedModel = options.model;
   } else if (
     savedProvider === "anthropic" ||
-    hasClaudePlan ||
-    (!hasOpenRouter && !hasZai && !hasCustom)
+    // Only auto-select Anthropic if it's the only option available
+    (hasClaudePlan && !hasOpenRouter && !hasZai && !hasCustom) ||
+    (!hasClaudePlan && !hasAnthropic && !hasOpenRouter && !hasZai && !hasCustom)
   ) {
     providerMode = "anthropic";
   } else {
     // Interactive selection — always prompt so user can confirm or change
     const result = await promptModeSelection(
-      hasAnthropic,
+      hasAnthropic || hasClaudePlan,
       hasOpenRouter,
       hasZai,
       hasCustom,
       savedProvider,
-      savedModel
+      savedModel,
+      hasClaudePlan
     );
     providerMode = result.mode;
     selectedModel = result.model;
@@ -297,7 +303,8 @@ async function promptModeSelection(
   hasZai: boolean,
   hasCustom: boolean,
   savedProvider?: string,
-  savedModel?: string
+  savedModel?: string,
+  hasClaudePlan?: boolean
 ): Promise<{ mode: "anthropic" | "openrouter" | "zai" | "custom"; model: string }> {
   // If there's a saved OpenRouter model, offer quick-confirm or change
   if (savedProvider === "openrouter" && savedModel && hasOpenRouter) {
@@ -350,14 +357,25 @@ async function promptModeSelection(
   // No saved config — full provider + model selection
   const options: Array<{ label: string; mode: "anthropic" | "openrouter" | "zai" | "custom" }> = [];
 
-  if (hasAnthropic) {
-    options.push({ label: "Claude direct       → Anthropic API", mode: "anthropic" });
+  if (hasClaudePlan) {
+    options.push({
+      label: "Claude Plan         → your Max/Pro subscription (use /model inside)",
+      mode: "anthropic",
+    });
+  } else if (hasAnthropic) {
+    options.push({ label: "Anthropic API       → direct Claude access", mode: "anthropic" });
   }
   if (hasOpenRouter) {
-    options.push({ label: "Pick a model        → OpenRouter (200+ models)", mode: "openrouter" });
+    options.push({
+      label: "OpenRouter          → 200+ models (Gemini, GPT-4o, Llama...)",
+      mode: "openrouter",
+    });
   }
   if (hasZai) {
-    options.push({ label: "z.ai                → GLM models (Anthropic-compatible)", mode: "zai" });
+    options.push({
+      label: "z.ai                → GLM models via Anthropic-compatible API",
+      mode: "zai",
+    });
   }
   if (hasCustom) {
     options.push({
@@ -550,25 +568,30 @@ function getClaudeAuthStatus(): {
     subscriptionType: "",
   };
   try {
-    const out = execFileSync("claude", ["auth", "status", "--output-format", "json"], {
+    // claude auth status may exit non-zero on subscription auth (keychain-based).
+    // Check both stdout and stderr for JSON output.
+    const result = spawnSync("claude", ["auth", "status"], {
       encoding: "utf-8",
-      stdio: ["ignore", "pipe", "ignore"],
       timeout: 3000,
     });
-    return { ...defaults, ...JSON.parse(out) };
-  } catch {
-    // claude auth status without --output-format flag (older versions)
-    try {
-      const out = execFileSync("claude", ["auth", "status"], {
-        encoding: "utf-8",
-        stdio: ["ignore", "pipe", "ignore"],
-        timeout: 3000,
-      });
-      // Try JSON parse; falls back gracefully
-      return { ...defaults, ...JSON.parse(out) };
-    } catch {
+    const raw = result.stdout?.trim() || result.stderr?.trim() || "";
+    if (!raw) {
       return defaults;
     }
+    const parsed = JSON.parse(raw);
+    const auth = { ...defaults, ...parsed };
+
+    // `claude auth status` reports loggedIn:false for keychain/subscription auth.
+    // Heuristic: if apiProvider is "firstParty" and claude is available with no
+    // ANTHROPIC_API_KEY, the user is likely authenticated via subscription.
+    if (!auth.loggedIn && auth.apiProvider === "firstParty" && !process.env.ANTHROPIC_API_KEY) {
+      auth.loggedIn = true;
+      auth.authMethod = "subscription";
+      auth.subscriptionType = "plan";
+    }
+    return auth;
+  } catch {
+    return defaults;
   }
 }
 
