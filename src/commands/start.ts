@@ -342,7 +342,16 @@ async function promptModeSelection(
         `    ${bold(String(i + 1))}. ${m.label.padEnd(22)} \x1b[2m${m.ctx} ctx · ${m.price}\x1b[0m${marker}`
       );
     });
-    log(`    ${bold(String(POPULAR_MODELS.length + 1))}. Enter model ID manually`);
+    const enterManuallyIdx = POPULAR_MODELS.length + 1;
+    log(`    ${bold(String(enterManuallyIdx))}. Enter model ID manually`);
+    // "Change provider" only shown when other providers are available
+    const hasOtherProviders = hasZai || hasCustom || hasAnthropic || hasClaudePlan;
+    const changeProviderIdx = hasOtherProviders ? POPULAR_MODELS.length + 2 : -1;
+    if (hasOtherProviders) {
+      log(
+        `    ${bold(String(changeProviderIdx))}. \x1b[2mChange provider (z.ai / Custom / Anthropic...)\x1b[0m`
+      );
+    }
     log("");
 
     const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -361,7 +370,7 @@ async function promptModeSelection(
     if (!isNaN(n) && n >= 1 && n <= POPULAR_MODELS.length) {
       return { mode: "openrouter", model: POPULAR_MODELS[n - 1].id };
     }
-    if (!isNaN(n) && n === POPULAR_MODELS.length + 1) {
+    if (!isNaN(n) && n === enterManuallyIdx) {
       const rl2 = createInterface({ input: process.stdin, output: process.stdout });
       const customModel = await new Promise<string>((res) => {
         rl2.question("  Model ID: ", (a) => {
@@ -371,10 +380,13 @@ async function promptModeSelection(
       });
       return { mode: "openrouter", model: customModel || savedModel };
     }
-    if (answer.includes("/")) {
+    if (!isNaN(n) && n === changeProviderIdx) {
+      // Fall through to full provider selection below
+    } else if (answer.includes("/")) {
       return { mode: "openrouter", model: answer };
+    } else {
+      return { mode: "openrouter", model: savedModel };
     }
-    return { mode: "openrouter", model: savedModel };
   }
 
   // No saved config — full provider + model selection
