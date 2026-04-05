@@ -418,6 +418,9 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
   // T4. Session-start hook
   const sessionHookPath = join(root, ".claude", "hooks", "session-start.sh");
   const sessionHookInstalled = existsSync(sessionHookPath);
+  const sessionHookExecutable = sessionHookInstalled
+    ? !!(statSync(sessionHookPath).mode & 0o111)
+    : false;
   const sessionHookWired = (() => {
     if (!existsSync(settingsFile)) {
       return false;
@@ -429,12 +432,14 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
       return false;
     }
   })();
-  if (sessionHookInstalled && sessionHookWired) {
+  if (sessionHookInstalled && sessionHookWired && sessionHookExecutable) {
     results.push({ label: "Session Hook", ok: true, detail: "session-start.sh installed + wired" });
   } else {
     const missing: string[] = [];
     if (!sessionHookInstalled) {
       missing.push("script");
+    } else if (!sessionHookExecutable) {
+      missing.push("not executable (chmod +x)");
     }
     if (!sessionHookWired) {
       missing.push("settings.json wiring");
@@ -449,6 +454,9 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
   // T5. Context inject hook (UserPromptSubmit)
   const contextHookPath = join(root, ".claude", "hooks", "context-inject.sh");
   const contextHookInstalled = existsSync(contextHookPath);
+  const contextHookExecutable = contextHookInstalled
+    ? !!(statSync(contextHookPath).mode & 0o111)
+    : false;
   const contextHookWired = (() => {
     if (!existsSync(settingsFile)) {
       return false;
@@ -460,16 +468,34 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
       return false;
     }
   })();
-  if (contextHookInstalled && contextHookWired) {
+  if (contextHookInstalled && contextHookWired && contextHookExecutable) {
+    // Show manifest age next to context hook status for quick staleness signal
+    const manifestAgeSec = (() => {
+      try {
+        return Math.floor((Date.now() - statSync(join(root, ".codebase.json")).mtimeMs) / 1000);
+      } catch {
+        return -1;
+      }
+    })();
+    const ageLabel =
+      manifestAgeSec < 0
+        ? "no manifest"
+        : manifestAgeSec < 60
+          ? `${manifestAgeSec}s ago`
+          : manifestAgeSec < 3600
+            ? `${Math.floor(manifestAgeSec / 60)}m ago`
+            : `${Math.floor(manifestAgeSec / 3600)}h ago`;
     results.push({
       label: "Context Hook",
       ok: true,
-      detail: "context-inject.sh installed + wired as UserPromptSubmit",
+      detail: `context-inject.sh installed + wired — manifest ${ageLabel}`,
     });
   } else {
     const missing: string[] = [];
     if (!contextHookInstalled) {
       missing.push("script");
+    } else if (!contextHookExecutable) {
+      missing.push("not executable (chmod +x)");
     }
     if (!contextHookWired) {
       missing.push("UserPromptSubmit wiring");

@@ -5,6 +5,7 @@ import { spawn, execFileSync } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
 import { log, info, warn, success, error, bold } from "../utils/output.js";
 import { resolveProviderConfig, saveConfig, loadConfig } from "../utils/config.js";
+import { estimateTokens } from "../utils/tokens.js";
 import { runInit } from "./init.js";
 
 // ─── Provider config ──────────────────────────────────────────────
@@ -172,7 +173,10 @@ export async function runStart(options: CLIOptions): Promise<void> {
   success(`Launching Claude Code`);
   info(`Provider: ${bold(providerLabel)} | Model: ${bold(modelLabel)}`);
   if (contextActive) {
-    info("codebase context active — slim brief will be injected on session start");
+    const savings = computeTokenSavings(root);
+    info(
+      `codebase context active — slim brief injected (${savings.slimTokens} tokens vs ~${savings.fullTokens} full — saves ~${savings.savedPct}%)`
+    );
   } else {
     warn("context-inject.sh not found — run `codebase setup` for auto-context injection");
   }
@@ -304,6 +308,35 @@ function printBanner(project: string, branch: string, uncommitted: boolean): voi
   log(`  │ ${line2.slice(2).padEnd(width - 1)}│`);
   log(`  │ ${line3.slice(2).padEnd(width - 1)}│`);
   log(`  └${border}┘\n`);
+}
+
+function computeTokenSavings(root: string): {
+  slimTokens: number;
+  fullTokens: number;
+  savedPct: number;
+} {
+  const manifestPath = join(root, ".codebase.json");
+  if (!existsSync(manifestPath)) {
+    return { slimTokens: 400, fullTokens: 400, savedPct: 0 };
+  }
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    // Full manifest token count
+    const fullTokens = estimateTokens(JSON.stringify(manifest));
+    // Slim brief: project identity + stack + commands (the fields codebase context outputs)
+    const slim = {
+      project: manifest.project,
+      stack: manifest.stack,
+      commands: manifest.commands,
+      git: manifest.git,
+    };
+    const slimTokens = estimateTokens(JSON.stringify(slim));
+    const savedPct =
+      fullTokens > 0 ? Math.round(((fullTokens - slimTokens) / fullTokens) * 100) : 0;
+    return { slimTokens, fullTokens, savedPct };
+  } catch {
+    return { slimTokens: 400, fullTokens: 400, savedPct: 0 };
+  }
 }
 
 function loadProjectInfo(root: string): {
