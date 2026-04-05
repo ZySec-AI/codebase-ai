@@ -7,6 +7,7 @@ import { log, info, warn, success, error, bold } from "../utils/output.js";
 import { resolveProviderConfig, saveConfig, loadConfig } from "../utils/config.js";
 import { estimateTokens } from "../utils/tokens.js";
 import { runInit } from "./init.js";
+import { runSetup } from "./setup.js";
 
 // ─── Provider config ──────────────────────────────────────────────
 
@@ -154,12 +155,16 @@ export async function runStart(options: CLIOptions): Promise<void> {
     env.ANTHROPIC_API_KEY = customKey || anthropicKey;
   }
 
-  if (selectedModel) {
-    env.ANTHROPIC_CUSTOM_MODEL_OPTION = selectedModel;
-    env.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME = selectedModel;
+  // ── 8. Ensure context-inject hook is installed ────────────────
+  const contextHookPath = join(root, ".claude", "hooks", "context-inject.sh");
+  if (!existsSync(contextHookPath)) {
+    info("Installing context hook — running setup...");
+    log("");
+    await runSetup({ ...options, path: root });
+    log("");
   }
 
-  // ── 8. Print launch confirmation ──────────────────────────────
+  // ── 9. Print launch confirmation ──────────────────────────────
   log("");
   const providerLabel =
     providerMode === "openrouter"
@@ -168,7 +173,7 @@ export async function runStart(options: CLIOptions): Promise<void> {
         ? `Custom (${customUrl})`
         : "Anthropic";
   const modelLabel = selectedModel || "default";
-  const contextActive = existsSync(join(root, ".claude", "hooks", "context-inject.sh"));
+  const contextActive = existsSync(contextHookPath);
 
   success(`Launching Claude Code`);
   info(`Provider: ${bold(providerLabel)} | Model: ${bold(modelLabel)}`);
@@ -178,12 +183,18 @@ export async function runStart(options: CLIOptions): Promise<void> {
       `codebase context active — slim brief injected (${savings.slimTokens} tokens vs ~${savings.fullTokens} full — saves ~${savings.savedPct}%)`
     );
   } else {
-    warn("context-inject.sh not found — run `codebase setup` for auto-context injection");
+    warn("context-inject.sh not found — run `codebase setup` manually");
   }
   log("");
 
-  // ── 9. Spawn claude ───────────────────────────────────────────
-  const child = spawn(claudePath, [], { stdio: "inherit", env });
+  // ── 10. Build claude args ──────────────────────────────────────
+  const claudeArgs: string[] = [];
+  if (selectedModel) {
+    claudeArgs.push("--model", selectedModel);
+  }
+
+  // ── 11. Spawn claude ───────────────────────────────────────────
+  const child = spawn(claudePath, claudeArgs, { stdio: "inherit", env });
 
   child.on("error", (err) => {
     error(`Failed to start Claude Code: ${err.message}`);
