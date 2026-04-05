@@ -1,5 +1,7 @@
 import { resolve, join } from "node:path";
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { mkdir, appendFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { createInterface } from "node:readline";
 import { spawn, execFileSync, spawnSync } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
@@ -294,6 +296,7 @@ export async function runStart(options: CLIOptions): Promise<void> {
   }
 
   // ── 11. Spawn claude ───────────────────────────────────────────
+  const sessionStart = Date.now();
   const child = spawn(claudePath, claudeArgs, { stdio: "inherit", env });
 
   child.on("error", (err) => {
@@ -303,6 +306,14 @@ export async function runStart(options: CLIOptions): Promise<void> {
   });
 
   child.on("exit", (code) => {
+    const durationSec = Math.round((Date.now() - sessionStart) / 1000);
+    logSession({
+      provider: providerMode,
+      model: selectedModel || "default",
+      project: projectInfo.name,
+      durationSec,
+      exitCode: code ?? 0,
+    });
     process.exit(code ?? 0);
   });
 }
@@ -390,8 +401,10 @@ async function promptModeSelection(
     });
   }
   if (hasCustom) {
+    const customUrlDisplay =
+      process.env.CODEBASE_PROVIDER_URL || resolveProviderConfig().customUrl || "";
     options.push({
-      label: "Custom endpoint     → " + (process.env.CODEBASE_PROVIDER_URL || ""),
+      label: `Custom endpoint     → ${customUrlDisplay}`,
       mode: "custom",
     });
   }
@@ -415,6 +428,20 @@ async function promptModeSelection(
   if (chosen.mode === "openrouter") {
     const model = await promptModelSelection();
     return { mode: "openrouter", model };
+  }
+
+  if (chosen.mode === "custom") {
+    // Prompt for model ID — custom endpoints need an explicit model
+    log("");
+    log("  Enter model ID for custom endpoint (e.g. qwen/qwen2.5-72b-instruct):");
+    const rl2 = createInterface({ input: process.stdin, output: process.stdout });
+    const customModel = await new Promise<string>((res) => {
+      rl2.question("  > ", (a) => {
+        rl2.close();
+        res(a.trim());
+      });
+    });
+    return { mode: "custom", model: customModel };
   }
 
   return { mode: chosen.mode, model: "" };
@@ -623,4 +650,111 @@ function findClaude(): string | null {
   } catch {
     return null;
   }
+}
+
+// ─── Session logging ───────────────────────────────────────────────
+
+const SESSION_LOG_DIR = join(
+  process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
+  "codebase",
+  "sessions"
+);
+
+function getSessionLogPath(): string {
+  // One file per day: sessions/2026-04-06.jsonl
+  const date = new Date().toISOString().slice(0, 10);
+  return join(SESSION_LOG_DIR, `${date}.jsonl`);
+}
+
+interface SessionEntry {
+  ts: string; // ISO timestamp of session start
+  provider: string;
+  model: string;
+  project: string;
+  durationSec: number;
+  exitCode: number;
+}
+
+/** Fire-and-forget async write — never blocks the exit path */
+function logSession(entry: Omit<SessionEntry, "ts">): void {
+  const line = JSON.stringify({ ts: new Date().toISOString(), ...entry }) + "\n";
+  const logPath = getSessionLogPath();
+  mkdir(SESSION_LOG_DIR, { recursive: true })
+    .then(() => appendFile(logPath, line, "utf-8"))
+    .catch(() => {
+      /* non-fatal */
+    });
+}
+
+/**
+ * `codebase sessions` — show recent session log.
+ * Reads ~/.config/codebase/sessions/<date>.jsonl (one file per day).
+ */
+export function runSessions(days = 7): void {
+  if (!existsSync(SESSION_LOG_DIR)) {
+    info("No sessions logged yet. Sessions are recorded when you run `codebase`.");
+    return;
+  }
+
+  // Read all daily files within the last N days
+  const allEntries: SessionEntry[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const file = join(SESSION_LOG_DIR, `${d}.jsonl`);
+    if (!existsSync(file)) {
+      continue;
+    }
+    for (const l of readFileSync(file, "utf-8").split("\n").filter(Boolean)) {
+      try {
+        allEntries.push(JSON.parse(l) as SessionEntry);
+      } catch {
+        /* skip corrupt line */
+      }
+    }
+  }
+
+  if (allEntries.length === 0) {
+    info(`No sessions in the last ${days} days.`);
+    info(`Log dir: ${SESSION_LOG_DIR}`);
+    return;
+  }
+
+  const recent = allEntries.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 30);
+
+  console.log(`\n  \x1b[1mRecent sessions\x1b[0m  (last ${days} days)\n`);
+  console.log(
+    `  ${"Date".padEnd(18)} ${"Provider".padEnd(12)} ${"Model".padEnd(34)} ${"Project".padEnd(18)} Duration`
+  );
+  console.log(`  ${"─".repeat(18)} ${"─".repeat(12)} ${"─".repeat(34)} ${"─".repeat(18)} ────────`);
+
+  for (const s of recent) {
+    const date = new Date(s.ts).toLocaleString(undefined, {
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const dur =
+      s.durationSec < 60
+        ? `${s.durationSec}s`
+        : s.durationSec < 3600
+          ? `${Math.floor(s.durationSec / 60)}m ${s.durationSec % 60}s`
+          : `${Math.floor(s.durationSec / 3600)}h ${Math.floor((s.durationSec % 3600) / 60)}m`;
+
+    console.log(
+      `  ${date.padEnd(18)} ${s.provider.padEnd(12)} ${s.model.slice(0, 33).padEnd(34)} ${s.project.slice(0, 17).padEnd(18)} ${dur}`
+    );
+  }
+
+  const totalMin = Math.round(allEntries.reduce((a, s) => a + s.durationSec, 0) / 60);
+  const byProvider: Record<string, number> = {};
+  for (const s of allEntries) {
+    byProvider[s.provider] = (byProvider[s.provider] || 0) + 1;
+  }
+  const providerSummary = Object.entries(byProvider)
+    .map(([p, n]) => `${p}: ${n}`)
+    .join("  ");
+
+  console.log(`\n  ${allEntries.length} sessions · ${totalMin}m total · ${providerSummary}`);
+  console.log(`  ${SESSION_LOG_DIR}\n`);
 }

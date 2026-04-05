@@ -18,7 +18,7 @@ import { runSkills } from "./commands/skills.js";
 import { runTokens } from "./commands/tokens.js";
 import { runHandoff } from "./commands/handoff.js";
 import { runContext } from "./commands/context.js";
-import { runStart } from "./commands/start.js";
+import { runStart, runSessions } from "./commands/start.js";
 import { runConfig } from "./commands/config.js";
 import { startServer } from "./server/index.js";
 import type { CLIOptions } from "./types.js";
@@ -55,6 +55,10 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
   handoff: runHandoff,
   context: runContext,
   start: runStart,
+  sessions: () => {
+    runSessions();
+    return Promise.resolve();
+  },
   config: runConfig,
   serve: (opts: CLIOptions) => {
     startServer(opts.path, opts.port ?? 3000);

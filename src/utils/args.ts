@@ -48,6 +48,7 @@ const COMMANDS = new Set([
   "tokens",
   "context",
   "start",
+  "sessions",
   "config",
 ]);
 
