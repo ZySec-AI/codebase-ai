@@ -152,11 +152,69 @@ export async function runStart(options: CLIOptions): Promise<void> {
   log("");
 
   if (!hasClaudePlan && !hasAnthropic && !hasOpenRouter && !hasZai && !hasCustom) {
-    error("No API keys found and not logged in to Claude.");
-    info("Option 1:  claude auth login  (Claude subscription)");
-    info("Option 2:  codebase config set openrouter-key sk-or-...");
-    info("Option 3:  export ANTHROPIC_API_KEY=sk-ant-...");
-    process.exit(1);
+    // First-run wizard — interactively collect a provider key instead of hard-exiting
+    const wizardResult = await runFirstRunWizard(claudePath);
+    if (!wizardResult) {
+      process.exit(1);
+    }
+    // Re-resolve config now that the wizard has saved keys
+    const fresh = resolveProviderConfig();
+    if (wizardResult.provider === "openrouter") {
+      resolved.openrouterKey = fresh.openrouterKey;
+    } else if (wizardResult.provider === "zai") {
+      resolved.zaiKey = fresh.zaiKey;
+    } else if (wizardResult.provider === "anthropic") {
+      resolved.anthropicKey = fresh.anthropicKey;
+    } else if (wizardResult.provider === "custom") {
+      resolved.customUrl = fresh.customUrl;
+      resolved.customKey = fresh.customKey;
+    }
+    // Jump straight to launch with the chosen provider
+    const env2: NodeJS.ProcessEnv = { ...process.env };
+    if (wizardResult.provider === "openrouter") {
+      env2.ANTHROPIC_BASE_URL = fresh.openrouterBase;
+      env2.ANTHROPIC_AUTH_TOKEN = fresh.openrouterKey;
+      delete env2.ANTHROPIC_API_KEY;
+    } else if (wizardResult.provider === "zai") {
+      env2.ANTHROPIC_BASE_URL = ZAI_BASE_URL;
+      env2.ANTHROPIC_AUTH_TOKEN = fresh.zaiKey;
+      delete env2.ANTHROPIC_API_KEY;
+    } else if (wizardResult.provider === "custom") {
+      env2.ANTHROPIC_BASE_URL = fresh.customUrl.replace(/\/v1\/?$/, "");
+      env2.ANTHROPIC_AUTH_TOKEN = fresh.customKey;
+      delete env2.ANTHROPIC_API_KEY;
+    }
+    const contextHookPath2 = join(root, ".claude", "hooks", "context-inject.sh");
+    if (!existsSync(contextHookPath2)) {
+      await runSetup({ ...options, path: root });
+    }
+    const claudeArgs2: string[] = [];
+    if (wizardResult.model) {
+      claudeArgs2.push("--model", wizardResult.model);
+    }
+    log("");
+    success("Launching Claude Code");
+    log(
+      `  \x1b[2mProvider:\x1b[0m ${bold(wizardResult.provider)}  \x1b[2mModel:\x1b[0m ${bold(wizardResult.model || "default")}`
+    );
+    log("");
+    const sessionStart2 = Date.now();
+    const child2 = spawn(claudePath, claudeArgs2, { stdio: "inherit", env: env2 });
+    child2.on("error", (err) => {
+      error(`Failed to start Claude Code: ${err.message}`);
+      process.exit(1);
+    });
+    child2.on("exit", (code) => {
+      logSession({
+        provider: wizardResult.provider,
+        model: wizardResult.model || "default",
+        project: projectName,
+        durationSec: Math.round((Date.now() - sessionStart2) / 1000),
+        exitCode: code ?? 0,
+      });
+      process.exit(code ?? 0);
+    });
+    return;
   }
 
   // ── 6. Resolve provider + model ───────────────────────────────
@@ -717,6 +775,188 @@ async function promptCustomModelSelection(customUrl: string, customKey: string):
     });
   });
   return manual;
+}
+
+// ─── First-run wizard ─────────────────────────────────────────────
+
+/**
+ * Interactive setup wizard shown when no provider is configured.
+ * Guides the user through picking a provider and entering their key,
+ * then saves it to config so the normal launch flow can proceed.
+ */
+async function runFirstRunWizard(
+  _claudePath: string
+): Promise<{ provider: "anthropic" | "openrouter" | "zai" | "custom"; model: string } | null> {
+  log("");
+  log("  \x1b[1mWelcome to codebase!\x1b[0m  No provider is configured yet.");
+  log("  Let's set one up — this takes about 30 seconds and is saved for next time.");
+  log("");
+
+  const providerChoices = [
+    {
+      label: "Claude Plan (Max/Pro subscription)",
+      hint: "Run  claude auth login  in your terminal — free if you already subscribe",
+      mode: "claude-login" as const,
+    },
+    {
+      label: "Anthropic API key",
+      hint: "Get yours at console.anthropic.com  →  API Keys",
+      mode: "anthropic" as const,
+    },
+    {
+      label: "OpenRouter  (200+ models, often cheaper)",
+      hint: "Get yours at openrouter.ai/keys",
+      mode: "openrouter" as const,
+    },
+    {
+      label: "z.ai  (GLM models, Anthropic-compatible)",
+      hint: "Get yours at z.ai",
+      mode: "zai" as const,
+    },
+    {
+      label: "Custom endpoint  (any Anthropic-compatible API)",
+      hint: "E.g. a local Ollama or LM Studio instance",
+      mode: "custom" as const,
+    },
+  ];
+
+  providerChoices.forEach((p, i) => {
+    console.log(`    \x1b[1m${i + 1}.\x1b[0m ${p.label}`);
+    console.log(`       \x1b[2m${p.hint}\x1b[0m`);
+  });
+  log("");
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const idxStr = await new Promise<string>((res) => {
+    rl.question("  Pick a provider [1]: ", (a) => {
+      rl.close();
+      res(a.trim());
+    });
+  });
+
+  const idx = parseInt(idxStr, 10);
+  const chosen =
+    providerChoices[!isNaN(idx) && idx >= 1 && idx <= providerChoices.length ? idx - 1 : 0];
+  log("");
+
+  if (chosen.mode === "claude-login") {
+    log("  Run this command in your terminal, then re-run \x1b[1mcodebase\x1b[0m:");
+    log("");
+    log("    \x1b[1mclaude auth login\x1b[0m");
+    log("");
+    return null;
+  }
+
+  if (chosen.mode === "anthropic") {
+    log(`  \x1b[2m${chosen.hint}\x1b[0m`);
+    const rl2 = createInterface({ input: process.stdin, output: process.stdout });
+    const key = await new Promise<string>((res) => {
+      rl2.question("  Paste your Anthropic API key (sk-ant-...): ", (a) => {
+        rl2.close();
+        res(a.trim());
+      });
+    });
+    if (!key) {
+      error("No key entered. Run `codebase` again to retry.");
+      return null;
+    }
+    // Store in env for this process (won't persist across processes, but the Claude launch uses env directly)
+    process.env.ANTHROPIC_API_KEY = key;
+    log("");
+    success("Anthropic API key set for this session.");
+    log("  \x1b[2mTo persist it, add to your shell profile: export ANTHROPIC_API_KEY=...\x1b[0m");
+    log("");
+    return { provider: "anthropic", model: "" };
+  }
+
+  if (chosen.mode === "openrouter") {
+    log(`  \x1b[2m${chosen.hint}\x1b[0m`);
+    const rl2 = createInterface({ input: process.stdin, output: process.stdout });
+    const key = await new Promise<string>((res) => {
+      rl2.question("  Paste your OpenRouter key (sk-or-...): ", (a) => {
+        rl2.close();
+        res(a.trim());
+      });
+    });
+    if (!key) {
+      error("No key entered. Run `codebase` again to retry.");
+      return null;
+    }
+    const cfg = loadConfig();
+    cfg.openrouterKey = key;
+    saveConfig(cfg);
+    log("");
+    success("OpenRouter key saved to config.");
+    log("");
+    // Now let the user pick a model
+    const model = await promptModelSelection(key);
+    const cfg2 = loadConfig();
+    cfg2.provider = "openrouter";
+    cfg2.lastModel = model;
+    saveConfig(cfg2);
+    return { provider: "openrouter", model };
+  }
+
+  if (chosen.mode === "zai") {
+    log(`  \x1b[2m${chosen.hint}\x1b[0m`);
+    const rl2 = createInterface({ input: process.stdin, output: process.stdout });
+    const key = await new Promise<string>((res) => {
+      rl2.question("  Paste your z.ai API key: ", (a) => {
+        rl2.close();
+        res(a.trim());
+      });
+    });
+    if (!key) {
+      error("No key entered. Run `codebase` again to retry.");
+      return null;
+    }
+    const cfg = loadConfig();
+    cfg.zaiKey = key;
+    cfg.provider = "zai";
+    saveConfig(cfg);
+    log("");
+    success("z.ai key saved to config.");
+    log("");
+    return { provider: "zai", model: "" };
+  }
+
+  if (chosen.mode === "custom") {
+    log(`  \x1b[2m${chosen.hint}\x1b[0m`);
+    const rl2 = createInterface({ input: process.stdin, output: process.stdout });
+    const url = await new Promise<string>((res) => {
+      rl2.question("  Endpoint URL (e.g. http://localhost:11434): ", (a) => {
+        rl2.close();
+        res(a.trim());
+      });
+    });
+    if (!url) {
+      error("No URL entered. Run `codebase` again to retry.");
+      return null;
+    }
+    const rl3 = createInterface({ input: process.stdin, output: process.stdout });
+    const key = await new Promise<string>((res) => {
+      rl3.question("  API key (leave blank if not required): ", (a) => {
+        rl3.close();
+        res(a.trim());
+      });
+    });
+    const cfg = loadConfig();
+    cfg.customUrl = url;
+    cfg.customKey = key;
+    cfg.provider = "custom";
+    saveConfig(cfg);
+    // Try to pick a model from the endpoint
+    const model = await promptCustomModelSelection(url, key);
+    const cfg2 = loadConfig();
+    cfg2.lastModel = model;
+    saveConfig(cfg2);
+    log("");
+    success("Custom endpoint saved to config.");
+    log("");
+    return { provider: "custom", model };
+  }
+
+  return null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────
