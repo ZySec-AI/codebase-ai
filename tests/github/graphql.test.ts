@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ChildProcess } from "node:child_process";
 import { checkGraphQLSupport, fetchGitHubGraphQLData } from "../../src/github/graphql.js";
+import { resetAllBreakers } from "../../src/utils/circuit-breaker.js";
 
 // Mock child_process.execFile
 vi.mock("node:child_process", () => ({
@@ -10,6 +11,8 @@ vi.mock("node:child_process", () => ({
 describe("GitHub GraphQL Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset circuit breaker state between tests to prevent cascading failures
+    resetAllBreakers();
   });
 
   describe("checkGraphQLSupport", () => {

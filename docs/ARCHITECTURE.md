@@ -151,24 +151,33 @@ mcp/
 
 | Tool | Description |
 |------|-------------|
-| `project_brief` | Full project briefing |
-| `get_codebase` | Full manifest or single category |
+| `project_brief` | Full project briefing (auto-slims when context is large) |
+| `get_codebase` | Full manifest or single category with sparse field selection |
 | `query_codebase` | Dot-path field query |
 | `get_next_task` | Highest-priority open issue |
 | `get_blockers` | Current blockers |
 | `create_issue` | Create GitHub issue |
 | `close_issue` | Close issue with reason |
+| `update_issue` | Add/remove labels, set assignee |
+| `get_issue` | Full issue detail |
+| `get_pr` | Full PR detail |
+| `get_plan` | Read PLAN.md |
+| `update_plan` | Append to PLAN.md |
 | `rescan_project` | Trigger manifest refresh |
+| `refresh_status` | Refresh GitHub data only |
 | `list_commands` | List available slash commands |
+| `list_skills` | List installed skills |
+| `generate_handoff` | Generate HANDOFF.md |
+| `token_budget` | Token count, grade, per-section breakdown |
 
 ### 6. GitHub Integration (`src/github/`)
 
-Optional — only active when `gh` CLI is authenticated.
+Optional — only active when `gh` CLI is authenticated. Protected by circuit breaker.
 
 ```
 github/
   sync.ts               # fetch issues, PRs, milestones via GraphQL
-  graphql.ts            # GraphQL query builder
+  graphql.ts            # GraphQL query builder with retry + circuit breaker
   issues.ts             # create / close / comment issues
 ```
 
@@ -183,6 +192,18 @@ Installed into user projects by `codebase setup`. Enforces safe git practices at
     git-post.sh         # PostToolUse — PR reminder after feature branch push
   settings.json         # wires both hooks into Claude Code
   commands/             # slash commands copied from package commands/
+```
+
+### 8. Resilience Utilities (`src/utils/`)
+
+Fault-tolerance primitives used by GitHub API, MCP server, and scanner.
+
+```
+utils/
+  retry.ts              # exponential backoff with jitter, configurable retryable predicate
+  circuit-breaker.ts    # closed/open/half-open state machine, auto-recovery, fallback support
+  secrets.ts            # regex-based secret scanner (20+ patterns, never exposes values)
+  tokens.ts             # token estimation, grading (A-D), context budget management
 ```
 
 ## How `codebase setup` Works
@@ -217,7 +238,7 @@ The published npm package has **zero runtime dependencies**. Every production li
 
 - **Not an AI** — No LLM calls. Pure heuristic detection. Deterministic.
 - **Not docs** — Captures facts, not prose.
-- **Not a vulnerability scanner** — Detects stack, not CVEs.
+- **Not a CVE scanner** — Detects leaked secrets and license issues, not known vulnerabilities (use `npm audit` or Snyk for CVEs).
 - **Not a daemon** — Runs once, writes a file. Git hooks keep it fresh.
 
 ## Size Budget

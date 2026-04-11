@@ -9,8 +9,8 @@ One scan captures everything about your project into a compact file:
 | **Stack** | TypeScript, Next.js, Prisma, PostgreSQL, Vitest |
 | **Commands** | `npm run dev`, `npm test`, `npm run build` |
 | **Structure** | Where `src/` is, entry points, build output |
-| **Dependencies** | What's installed, what's outdated, what's notable |
-| **Config** | Which env vars exist, feature flags, CI setup |
+| **Dependencies** | What's installed, what's outdated, what's notable, license types |
+| **Config** | Which env vars exist, feature flags, CI setup, leaked secrets |
 | **Git** | Recent commits, active branches, uncommitted changes |
 | **Quality** | Test framework, linter, formatter, pre-commit hooks |
 | **GitHub** | Open issues by priority, PRs, milestones, releases |
@@ -30,6 +30,19 @@ Session start → reads .codebase.json (~500 tokens)
 ```
 
 **~95% fewer tokens. Instant context. Every session.**
+
+---
+
+## Resilience
+
+`codebase` handles failures gracefully so the loop keeps running:
+
+| Layer | Protection |
+|-------|-----------|
+| **GitHub API** | Circuit breaker opens after 5 failures, auto-recovers after 60s. Falls back to cached manifest. |
+| **Network** | Exponential backoff with jitter retries transient errors (rate limits, timeouts, connection resets). |
+| **Detectors** | `Promise.allSettled()` ensures individual detector failures don't crash the scan. Warnings collected in `_warnings`. |
+| **Context** | Token budget grading (A-D). `project_brief` auto-slims when manifest is too large. |
 
 ---
 

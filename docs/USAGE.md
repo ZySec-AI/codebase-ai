@@ -69,7 +69,7 @@ codebase init --sync                  # include GitHub data
 ```
 
 **What it does:**
-1. Scans project (stack, commands, structure, patterns)
+1. Scans project (stack, commands, structure, patterns, secrets)
 2. Syncs GitHub data (issues, PRs, milestones) if `gh` CLI is available
 3. Writes `.codebase.json`
 4. Injects into `CLAUDE.md` (commands, rules, maintenance, MCP tools)
@@ -217,7 +217,7 @@ codebase mcp                           # start stdio MCP server
 **MCP tools available:**
 | Tool | What it does |
 |------|--------------|
-| `project_brief` | Full project briefing (call first); `slim: true` for ~20-line brief |
+| `project_brief` | Full project briefing (call first); `slim: true` for ~20-line brief; auto-slims when context is too large |
 | `get_next_task` | Highest-priority task with body |
 | `get_blockers` | Issues blocked, PRs failing, merge conflicts |
 | `get_issue` | Full issue detail by number |
@@ -234,6 +234,7 @@ codebase mcp                           # start stdio MCP server
 | `get_codebase` | Get structured manifest data |
 | `query_codebase` | Query specific field by dot-path |
 | `generate_handoff` | Generate HANDOFF.md for session transfer |
+| `token_budget` | Token count estimate, grade (A-D), per-section breakdown, recommendations |
 
 `codebase init` writes `.mcp.json` automatically.
 
@@ -304,6 +305,21 @@ codebase fix                          # auto-repair everything
 - Injection block exceeds 80 lines
 - More than 3 MCP servers configured
 - Session-start hook is missing
+
+---
+
+## Resilience
+
+Built-in fault tolerance for production use:
+
+| Feature | How it works |
+|---------|-------------|
+| **Circuit breaker** | Opens after 5 consecutive GitHub API failures. Short-circuits to cached data. Auto-recovers after 60s. |
+| **Exponential backoff** | Transient network errors (rate limits, timeouts, connection resets) retry automatically with jitter. |
+| **Secret detection** | Scans `.env` and config files for 20+ credential patterns. Warns in manifest without exposing values. |
+| **Token awareness** | `token_budget` tool shows per-section token breakdown. `project_brief` auto-slims when manifest exceeds context budget. |
+| **License detection** | Flags copyleft dependencies (GPL, AGPL, etc.) that may require source disclosure. |
+| **Graceful degradation** | GitHub sync fails silently if `gh` CLI is missing. Individual detector failures don't crash the scan. |
 
 ---
 

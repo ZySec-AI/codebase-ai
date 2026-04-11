@@ -1,6 +1,24 @@
 import { execFile } from "node:child_process";
 import { warn } from "../utils/output.js";
 import { safe, MAX_TITLE_LEN, MAX_LABEL_LEN, MAX_LOGIN_LEN } from "../utils/safe.js";
+import { retry, isTransientError } from "../utils/retry.js";
+import { createCircuitBreaker } from "../utils/circuit-breaker.js";
+
+/**
+ * Circuit breaker for GitHub API — prevents hammering when API is down.
+ * Opens after 5 consecutive failures, auto-retries after 60s.
+ */
+const githubBreaker = createCircuitBreaker("github-api", {
+  threshold: 5,
+  resetTimeoutMs: 60_000,
+  onStateChange: (name, from, to) => {
+    if (to === "open") {
+      warn(
+        `Circuit breaker [${name}] opened — GitHub API calls will use cached data until it recovers`
+      );
+    }
+  },
+});
 
 /**
  * GraphQL client for GitHub API using gh CLI
@@ -17,14 +35,36 @@ interface GraphQLVariables {
 }
 
 /**
- * Execute a GraphQL query via gh CLI
+ * Execute a GraphQL query via gh CLI with retry and circuit breaker.
+ * Falls back to null when circuit is open or all retries fail.
  */
 async function graphqlQuery<T>(
   cwd: string,
   query: string,
   variables: GraphQLVariables = {}
 ): Promise<T | null> {
-  return new Promise((resolve) => {
+  return githubBreaker.execute(
+    // Primary: execute with retry
+    () =>
+      retry(() => executeGraphQL<T>(cwd, query, variables), {
+        maxAttempts: 2,
+        baseDelayMs: 1000,
+        retryable: (err) => isTransientError(err),
+      }).then((result) => result),
+    // Fallback: return null (cached data will be used by caller)
+    async () => null
+  );
+}
+
+/**
+ * Raw GraphQL execution via gh CLI.
+ */
+function executeGraphQL<T>(
+  cwd: string,
+  query: string,
+  variables: GraphQLVariables = {}
+): Promise<T | null> {
+  return new Promise((resolve, reject) => {
     const args = [
       "api",
       "graphql",
@@ -41,8 +81,7 @@ async function graphqlQuery<T>(
 
     execFile("gh", args, { cwd, timeout: 30_000 }, (err, stdout, _stderr) => {
       if (err) {
-        // Silently fail - caller should use fallback
-        resolve(null);
+        reject(err);
         return;
       }
 
@@ -50,8 +89,7 @@ async function graphqlQuery<T>(
         const response = JSON.parse(stdout.trim()) as GraphQLResponse<T>;
 
         if (response.errors && response.errors.length > 0) {
-          // Log but don't throw - allow fallback
-          // console.error('GraphQL errors:', response.errors);
+          // GraphQL-level errors are not transient — don't reject (avoid circuit break)
           resolve(null);
           return;
         }

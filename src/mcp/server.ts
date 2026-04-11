@@ -4,6 +4,8 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { execFile } from "node:child_process";
+import { estimateJsonTokens, gradeTokenBudget } from "../utils/tokens.js";
+import { retry, isTransientError } from "../utils/retry.js";
 import { queryPath } from "../utils/json-path.js";
 import { scan } from "../scanner/engine.js";
 import { generateBrief, generateSlimBrief } from "./brief.js";
@@ -281,6 +283,17 @@ const TOOL_DEFINITIONS = [
       },
     },
   },
+
+  // ─── Token Budget ──────────────────────────────────────────────
+  {
+    name: "token_budget",
+    description:
+      "Check the token budget for the current manifest. Returns estimated token count, grade (A-D), and recommendations for reducing context size. Call this when the session feels slow or you're approaching context limits.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
 ];
 
 export async function startMcpServer(root: string): Promise<void> {
@@ -343,9 +356,20 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
       case "project_brief": {
         const manifest = await loadOrScanManifest(root, true);
         const slim = args.slim as boolean | undefined;
-        const brief = slim ? generateSlimBrief(manifest) : generateBrief(manifest);
+
+        // Estimate manifest size and auto-slim if it would blow the context budget
+        const manifestTokens = estimateJsonTokens(manifest);
+        const grade = gradeTokenBudget(manifestTokens, { a: 2000, b: 4000, c: 8000 });
+        const shouldAutoSlim = !slim && grade === "D";
+
+        const brief =
+          slim || shouldAutoSlim ? generateSlimBrief(manifest) : generateBrief(manifest);
+
+        // Append token budget info so the AI knows context pressure
+        const budgetNote = `\n\n---\n_manifest: ${manifestTokens.toLocaleString()} tokens (grade ${grade})${shouldAutoSlim ? " — auto-slimmed to fit context" : ""}_`;
+
         return respond(req.id, {
-          content: [{ type: "text", text: brief }],
+          content: [{ type: "text", text: brief + budgetNote }],
         });
       }
 
@@ -684,6 +708,76 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
         });
       }
 
+      case "token_budget": {
+        const manifest = await loadOrScanManifest(root);
+        const totalTokens = estimateJsonTokens(manifest);
+        const grade = gradeTokenBudget(totalTokens, { a: 2000, b: 4000, c: 8000 });
+
+        // Per-category breakdown
+        const categories = [
+          "project",
+          "repo",
+          "structure",
+          "stack",
+          "commands",
+          "dependencies",
+          "config",
+          "git",
+          "quality",
+          "patterns",
+          "status",
+          "roadmap",
+          "decisions",
+        ];
+        const breakdown: Record<string, number> = {};
+        for (const cat of categories) {
+          const data = (manifest as unknown as Record<string, unknown>)[cat];
+          if (data) {
+            breakdown[cat] = estimateJsonTokens(data);
+          }
+        }
+
+        const recommendations: string[] = [];
+        if (grade === "D") {
+          recommendations.push("Use `project_brief` with `slim: true` to reduce context");
+          recommendations.push(
+            "Consider calling `get_codebase` with specific `category` and `fields` instead of full brief"
+          );
+        }
+        if (grade === "C") {
+          recommendations.push(
+            "Manifest is getting large — prefer targeted queries over full reads"
+          );
+        }
+        const sorted = Object.entries(breakdown).sort(([, a], [, b]) => b - a);
+        if (sorted.length > 0) {
+          recommendations.push(
+            `Largest sections: ${sorted
+              .slice(0, 3)
+              .map(([k, v]) => `${k} (${v.toLocaleString()} tokens)`)
+              .join(", ")}`
+          );
+        }
+
+        return respond(req.id, {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  total_tokens: totalTokens,
+                  grade,
+                  breakdown,
+                  recommendations: recommendations.length > 0 ? recommendations : undefined,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        });
+      }
+
       default:
         return {
           jsonrpc: "2.0",
@@ -867,15 +961,23 @@ function getBlockers(manifest: Manifest): Record<string, unknown> {
 }
 
 function ghExecArgs(cwd: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile("gh", args, { cwd, timeout: 30_000 }, (err, stdout, stderr) => {
-      if (err) {
-        reject(new Error(stderr || err.message));
-      } else {
-        resolve(stdout.trim());
-      }
-    });
-  });
+  return retry(
+    () =>
+      new Promise<string>((resolve, reject) => {
+        execFile("gh", args, { cwd, timeout: 30_000 }, (err, stdout, stderr) => {
+          if (err) {
+            reject(new Error(stderr || err.message));
+          } else {
+            resolve(stdout.trim());
+          }
+        });
+      }),
+    {
+      maxAttempts: 2,
+      baseDelayMs: 1000,
+      retryable: (err) => isTransientError(err),
+    }
+  );
 }
 
 async function ghCreateIssue(root: string, args: Record<string, unknown>): Promise<string> {
