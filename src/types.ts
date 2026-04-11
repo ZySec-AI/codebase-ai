@@ -121,6 +121,15 @@ export interface DependenciesData {
   dev_count: number;
   lock_file: string | null;
   notable: string[];
+  /** License analysis from package.json */
+  licenses?: {
+    /** Top-level package license */
+    project_license: string | null;
+    /** Count of deps by license type */
+    dependency_licenses: Record<string, number>;
+    /** Flags copyleft licenses that may require disclosure */
+    copyleft_flags?: string[];
+  };
 }
 
 export interface ConfigData {

@@ -50,6 +50,7 @@ const COMMANDS = new Set([
   "start",
   "sessions",
   "config",
+  "uninstall",
 ]);
 
 export function parseArgs(argv: string[]): CLIOptions {

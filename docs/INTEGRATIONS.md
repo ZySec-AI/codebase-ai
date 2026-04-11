@@ -44,15 +44,24 @@ codebase mcp    # starts MCP server
 
 | Tool | What it does |
 |------|-------------|
-| `project_brief` | Full project briefing — stack, commands, structure, issues |
-| `get_codebase` | Full manifest or single category |
+| `project_brief` | Full project briefing — stack, commands, structure, issues (auto-slims for large manifests) |
+| `get_codebase` | Full manifest or single category with sparse field selection |
 | `query_codebase` | Dot-path field query (e.g. `commands.test`) |
 | `get_next_task` | Highest-priority open issue |
 | `get_blockers` | Current blockers |
 | `create_issue` | Create a GitHub issue |
 | `close_issue` | Close a GitHub issue with reason |
+| `update_issue` | Add/remove labels, set assignee |
+| `get_issue` | Full issue detail by number |
+| `get_pr` | Full PR detail by number |
+| `get_plan` | Read PLAN.md (loop memory) |
+| `update_plan` | Append to PLAN.md |
 | `rescan_project` | Trigger manifest refresh |
+| `refresh_status` | Refresh GitHub data only (fast) |
 | `list_commands` | List available slash commands |
+| `list_skills` | List installed skills |
+| `generate_handoff` | Generate HANDOFF.md for session transfer |
+| `token_budget` | Token count estimate, grade, per-section breakdown |
 
 ## Claude Code Hooks
 

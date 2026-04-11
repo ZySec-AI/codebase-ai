@@ -1,4 +1,5 @@
 import type { Detector, ScanContext } from "../types.js";
+import { scanForSecrets, isScannableFile } from "../utils/secrets.js";
 
 const KNOWN_CONFIG_FILES = [
   // TypeScript / JavaScript
@@ -115,11 +116,15 @@ export const configDetector: Detector = {
 
     const envVars = await detectEnvVars(ctx);
 
+    // Secret detection — scan env files and config files for leaked credentials
+    const secretWarnings = await detectSecrets(ctx, [...envFiles, ...configFiles]);
+
     return {
       env_files: envFiles,
       config_files: configFiles,
       feature_flags: featureFlags,
       env_vars: envVars,
+      ...(secretWarnings.length > 0 ? { _secret_warnings: secretWarnings } : {}),
     };
   },
 };
@@ -212,4 +217,38 @@ function parseEnvFile(
       currentComment = ""; // Reset comment for next variable
     }
   }
+}
+
+/**
+ * Scan env files and config files for leaked secrets.
+ * Returns warnings without secret values (never leaks secrets into manifest).
+ */
+async function detectSecrets(
+  ctx: ScanContext,
+  candidateFiles: string[]
+): Promise<Array<{ type: string; file: string; line: number }>> {
+  const allFindings: Array<{ type: string; file: string; line: number }> = [];
+
+  // Only scan files that are likely to contain secrets
+  const scannable = candidateFiles.filter((f) => isScannableFile(f) && ctx.fileExists(f));
+
+  // Limit to 20 files max to avoid scanning entire project
+  const toScan = scannable.slice(0, 20);
+
+  for (const file of toScan) {
+    const content = await ctx.readFile(file);
+    if (!content) {
+      continue;
+    }
+
+    // Skip files over 100KB
+    if (content.length > 100_000) {
+      continue;
+    }
+
+    const findings = scanForSecrets(content, file);
+    allFindings.push(...findings);
+  }
+
+  return allFindings;
 }
