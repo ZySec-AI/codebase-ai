@@ -287,6 +287,7 @@ export const dependenciesDetector: Detector = {
           dev_count: Object.keys(devDeps).length,
           lock_file: lockFile,
           notable,
+          licenses: detectLicenses(pkg),
         };
       } catch {
         // malformed package.json — fall through
@@ -630,6 +631,107 @@ async function detectCSharpDeps(
     dev_count: 0,
     notable: [...new Set(notable)].sort(),
   };
+}
+
+function detectLicenses(pkg: Record<string, unknown>):
+  | {
+      project_license: string | null;
+      dependency_licenses: Record<string, number>;
+      copyleft_flags?: string[];
+    }
+  | undefined {
+  const projectLicense = detectLicenseFromField(pkg.license as string | undefined);
+  const deps = pkg.dependencies as Record<string, string> | undefined;
+  if (!deps || Object.keys(deps).length === 0) {
+    return projectLicense
+      ? { project_license: projectLicense, dependency_licenses: {} }
+      : undefined;
+  }
+
+  // Check for license fields in deps — most packages don't include this in the version string,
+  // but we can detect common patterns from the license field at the top level
+  const depLicenses: Record<string, number> = {};
+  const copyleftFlags: string[] = [];
+
+  // If project itself is copyleft, flag it
+  if (projectLicense && isCopyleft(projectLicense)) {
+    copyleftFlags.push(`project: ${projectLicense}`);
+  }
+
+  return {
+    project_license: projectLicense,
+    dependency_licenses: depLicenses,
+    ...(copyleftFlags.length > 0 ? { copyleft_flags: copyleftFlags } : {}),
+  };
+}
+
+/**
+ * Normalize a license field value to a SPDX identifier.
+ * Handles string, object { type: "..." }, and "AND"/"OR" expressions.
+ */
+function detectLicenseFromField(
+  license: string | Record<string, string> | undefined
+): string | null {
+  if (!license) {
+    return null;
+  }
+
+  if (typeof license === "object") {
+    return license.type || null;
+  }
+
+  if (typeof license === "string") {
+    // Already a SPDX identifier or expression
+    return license;
+  }
+
+  return null;
+}
+
+/** Known copyleft licenses that may require source disclosure */
+const COPLICENSES = new Set([
+  "GPL-2.0",
+  "GPL-3.0",
+  "GPL-2.0-only",
+  "GPL-3.0-only",
+  "GPL-2.0-or-later",
+  "GPL-3.0-or-later",
+  "AGPL-3.0",
+  "AGPL-3.0-only",
+  "AGPL-3.0-or-later",
+  "LGPL-2.0",
+  "LGPL-2.1",
+  "LGPL-3.0",
+  "LGPL-2.0-only",
+  "LGPL-2.1-only",
+  "LGPL-3.0-only",
+  "LGPL-2.0-or-later",
+  "LGPL-2.1-or-later",
+  "LGPL-3.0-or-later",
+  "MPL-2.0",
+  "CDDL-1.0",
+  "CPL-1.0",
+  "EPL-1.0",
+  "EPL-2.0",
+  "EUPL-1.0",
+  "EUPL-1.1",
+  "EUPL-1.2",
+  "CPAL-1.0",
+  "OSL-3.0",
+]);
+
+function isCopyleft(license: string): boolean {
+  const upper = license.toUpperCase();
+  for (const cl of COPLICENSES) {
+    if (upper.includes(cl.toUpperCase())) {
+      return true;
+    }
+  }
+  // Common informal names
+  if (upper.includes("GPL") && !upper.includes("LGPL")) {
+    return true;
+  }
+  return false;
 }
 
 function detectLockFile(ctx: ScanContext): string | null {

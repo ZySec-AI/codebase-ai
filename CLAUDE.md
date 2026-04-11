@@ -45,7 +45,7 @@ Registered detectors: `project`, `repo`, `structure`, `stack`, `commands`, `depe
 
 ### MCP Server (`src/mcp/`)
 
-JSON-RPC 2.0 over stdio. Exposes 17 tools including `project_brief` (supports `slim: true`), `get_next_task`, `create_issue`, `update_issue`, `get_issue`, `get_pr`, `list_skills`, `refresh_status`, `generate_handoff`. Entry: `src/mcp/server.ts`.
+JSON-RPC 2.0 over stdio. Exposes 18 tools including `project_brief` (supports `slim: true`, auto-slims when context is large), `get_next_task`, `create_issue`, `update_issue`, `get_issue`, `get_pr`, `token_budget`, `get_plan`, `update_plan`, `list_skills`, `refresh_status`, `generate_handoff`. Entry: `src/mcp/server.ts`.
 
 ### GitHub Integration (`src/github/`)
 
@@ -53,7 +53,7 @@ Optional — requires `gh` CLI. Fetches issues, PRs, milestones via GitHub Graph
 
 ### Utilities (`src/utils/`)
 
-CLI arg parser (`args.ts`), console output formatting with colors (`output.ts`), glob matching (`glob.ts`), dot-path JSON queries (`json-path.ts`), token estimation (`tokens.ts`). All zero-dependency.
+CLI arg parser (`args.ts`), console output formatting with colors (`output.ts`), glob matching (`glob.ts`), dot-path JSON queries (`json-path.ts`), token estimation (`tokens.ts`), exponential backoff retry (`retry.ts`), circuit breaker for external APIs (`circuit-breaker.ts`), secret scanning for 20+ credential patterns (`secrets.ts`). All zero-dependency.
 
 ## Key Conventions
 
