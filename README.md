@@ -13,7 +13,7 @@
 
 ---
 
-> **~95% fewer tokens.** Claude reads one 500-token snapshot instead of exploring thousands of files. Instant context, every session.
+> **~95% fewer tokens.** Claude reads one 500-token snapshot instead of exploring thousands of files. Instant context, every session. Secret detection, circuit breakers, and token-awareness built in.
 
 ---
 
@@ -44,6 +44,14 @@ That's it. Scans your project, picks a provider/model, and starts Claude Code wi
 - **Claude = execution.** Slash commands give AI a complete workflow: simulate real users, fix bugs, run tests, commit, ship.
 
 Multiple developers can jump into the same loop. Commit `.codebase.json` and `.claude/commands/` — everyone gets the same context and commands.
+
+### Built-in resilience
+
+- **Secret detection** — scans `.env` and config files for leaked AWS keys, GitHub tokens, private keys, and 20+ other credential patterns. Warns without exposing values.
+- **Circuit breaker** — stops hammering GitHub API when it's down. Auto-recovers after 60s cooldown. Falls back to cached data.
+- **Exponential backoff** — transient network errors retry automatically with jitter to avoid thundering herd.
+- **Token budget awareness** — auto-slims responses when the manifest is too large for context. Grade your context health with `codebase tokens`.
+- **License detection** — flags copyleft dependencies that may require source disclosure.
 
 ---
 
@@ -175,13 +183,25 @@ codebase mcp               # start MCP server (stdio)
 }
 ```
 
-Add to `.mcp.json` in your project root. Tools: `project_brief` (supports `slim: true`), `get_codebase`, `query_codebase`, `get_next_task`, `get_blockers`, `create_issue`, `close_issue`, `rescan_project`, `list_commands`, `generate_handoff`.
+Add to `.mcp.json` in your project root. 18 tools including `project_brief` (supports `slim: true`, auto-slims when context is large), `get_next_task`, `get_blockers`, `create_issue`, `close_issue`, `update_issue`, `get_issue`, `get_pr`, `get_plan`, `update_plan`, `token_budget`, `rescan_project`, `refresh_status`, `list_commands`, `list_skills`, `generate_handoff`, `get_codebase`, `query_codebase`.
 
 ---
 
 ## Team usage
 
 Commit `.codebase.json` and `.claude/commands/`. Every teammate with Claude Code gets the same context and slash commands. The loop is resumable — restart anytime, GitHub tracks state.
+
+---
+
+## Architecture
+
+<p align="center">
+  <img src="assets/architecture.svg" alt="codebase architecture" width="800"/>
+</p>
+
+→ [Full feature reference with commands → tools → implementation mapping](docs/FEATURES.md)
+
+---
 
 ---
 
@@ -201,6 +221,12 @@ No. Scan runs in ~200ms.
 
 **What does "autonomous" mean — will it break my code?**
 All AI commits go to `develop`. Nothing reaches `main` until `/launch` passes quality gates.
+
+**What happens when GitHub API goes down?**
+Circuit breaker kicks in after 5 failures. Falls back to cached manifest data. Auto-recovers after 60 seconds. You'll see a warning but the loop keeps running.
+
+**Does it scan for leaked secrets?**
+Yes. `codebase scan` checks `.env` files and config files for 20+ credential patterns (AWS keys, GitHub tokens, Stripe keys, private keys, etc.). Findings appear as warnings — values are never written to the manifest.
 
 → [Full how-it-works docs](docs/HOW-IT-WORKS.md)
 

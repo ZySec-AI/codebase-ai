@@ -301,6 +301,19 @@ const HELP: Record<string, CommandHelp> = {
     seeAlso: ["start"],
   },
 
+  uninstall: {
+    description: "Remove all codebase artifacts from the project",
+    usage: "codebase uninstall --force",
+    examples: [
+      {
+        command: "codebase uninstall --force",
+        description: "Remove all codebase files, hooks, and configs",
+      },
+    ],
+    options: [{ flag: "--force", description: "Required — confirms removal of all artifacts" }],
+    seeAlso: ["doctor", "fix"],
+  },
+
   start: {
     description: "Launch Claude Code with smart model routing (default command when no args given)",
     usage: "codebase start [options]",
@@ -408,6 +421,7 @@ ${bold("HUMAN COMMANDS")}
   ${command("codebase fix")}               Auto-repair issues found by doctor
   ${command("codebase tokens")}            Token budget report (A/B/C/D grades)
   ${command("codebase sessions")}          Recent Claude Code session log (provider, model, duration)
+  ${command("codebase uninstall --force")} Remove all codebase artifacts
 
 ${bold("PROVIDER SETUP")}
   ${command("codebase config")}            Show stored keys and effective env vars

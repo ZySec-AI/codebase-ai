@@ -259,6 +259,7 @@ export async function runStart(options: CLIOptions): Promise<void> {
       selectedModel = savedModel || POPULAR_MODELS[0].id;
     } else if (hasZai) {
       providerMode = "zai";
+      selectedModel = savedModel || "";
     } else if (hasCustom) {
       providerMode = "custom";
     } else {
@@ -515,6 +516,12 @@ async function promptModeSelection(
   if (chosen.mode === "openrouter") {
     const model = await promptModelSelection(openrouterKey);
     return { mode: "openrouter", model };
+  }
+
+  if (chosen.mode === "zai") {
+    const cfg = resolveProviderConfig();
+    const model = await promptCustomModelSelection(ZAI_BASE_URL, cfg.zaiKey);
+    return { mode: "zai", model };
   }
 
   if (chosen.mode === "custom") {
@@ -917,7 +924,13 @@ async function runFirstRunWizard(
     log("");
     success("z.ai key saved to config.");
     log("");
-    return { provider: "zai", model: "" };
+    const zaiModel = await promptCustomModelSelection(ZAI_BASE_URL, key);
+    const cfgZai = loadConfig();
+    if (zaiModel) {
+      cfgZai.lastModel = zaiModel;
+    }
+    saveConfig(cfgZai);
+    return { provider: "zai", model: zaiModel };
   }
 
   if (chosen.mode === "custom") {

@@ -21,6 +21,7 @@ import { runContext } from "./commands/context.js";
 import { runStart, runSessions } from "./commands/start.js";
 import { runConfig } from "./commands/config.js";
 import { startServer } from "./server/index.js";
+import { runUninstall } from "./commands/uninstall.js";
 import type { CLIOptions } from "./types.js";
 
 const options = parseArgs(process.argv.slice(2));
@@ -60,6 +61,7 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
     return Promise.resolve();
   },
   config: runConfig,
+  uninstall: runUninstall,
   serve: (opts: CLIOptions) => {
     startServer(opts.path, opts.port ?? 3000);
     return Promise.resolve();
@@ -67,6 +69,21 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
   // Keep "scan-only" for hooks that just want manifest refresh
   "scan-only": runScan,
 };
+
+// ─── Global error handlers ────────────────────────────────────────
+process.on("uncaughtException", (err: Error) => {
+  error(`Uncaught exception: ${err.message}`);
+  if (err.stack) {
+    info(err.stack.split("\n").slice(1, 4).join("\n"));
+  }
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason: unknown) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  error(`Unhandled promise rejection: ${msg}`);
+  process.exit(1);
+});
 
 // Non-blocking update check — runs in background, shows prompt if outdated
 checkForUpdate().catch(() => {});
