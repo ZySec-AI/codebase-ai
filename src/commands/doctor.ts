@@ -584,7 +584,7 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
 
 // ─── Check helpers ──────────────────────────────────────────────
 
-function checkInjection(root: string): boolean {
+export function checkInjection(root: string): boolean {
   const filePath = join(root, "CLAUDE.md");
   if (!existsSync(filePath)) {
     return false;
@@ -606,7 +606,7 @@ function checkMcpConfig(root: string): boolean {
   }
 }
 
-function checkHook(root: string, hookName: string): boolean {
+export function checkHook(root: string, hookName: string): boolean {
   const hookPath = join(root, ".git", "hooks", hookName);
   if (!existsSync(hookPath)) {
     return false;
@@ -624,7 +624,7 @@ function checkCommitMsgHook(root: string): boolean {
   return content.includes("codebase-branch-check");
 }
 
-function checkPreCommitHook(root: string): boolean {
+export function checkPreCommitHook(root: string): boolean {
   const hookPath = join(root, ".git", "hooks", "pre-commit");
   if (!existsSync(hookPath)) {
     return false;
@@ -633,7 +633,7 @@ function checkPreCommitHook(root: string): boolean {
   return content.includes("codebase-pre-commit");
 }
 
-function checkHookSync(root: string): boolean {
+export function checkHookSync(root: string): boolean {
   const hookPath = join(root, ".git", "hooks", "post-commit");
   if (!existsSync(hookPath)) {
     return false;

@@ -71,6 +71,9 @@ export interface Manifest {
   quality?: QualityData;
   patterns?: PatternsData;
 
+  // Call/import graph (built by `codebase graph build`)
+  graph?: GraphData;
+
   // Project awareness (GitHub via `gh` CLI)
   status?: StatusData;
   roadmap?: RoadmapData;
@@ -158,6 +161,18 @@ export interface PatternsData {
   state_management: string | null;
   api_style: string | null;
   key_modules: Record<string, string>;
+}
+
+export interface GraphData {
+  available: boolean;
+  nodes?: number;
+  edges?: number;
+  languages?: string[];
+  built_at?: string;
+  stale?: boolean;
+  size_bytes?: number;
+  path: string;
+  hint?: string;
 }
 
 // ─── GitHub / Project Awareness ──────────────────────────────────

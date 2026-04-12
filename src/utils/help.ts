@@ -142,6 +142,36 @@ const HELP: Record<string, CommandHelp> = {
     options: [{ flag: "--force", description: "Plain text output (no JSON)" }],
   },
 
+  graph: {
+    description: "Build and query the persistent call/import graph (.codebase/graph.json)",
+    usage: "codebase graph <subcommand> [args]",
+    examples: [
+      { command: "codebase graph build", description: "Full graph build for this project" },
+      { command: "codebase graph update", description: "Incremental update (changed files only)" },
+      {
+        command: "codebase graph impact src/mcp/server.ts",
+        description: "Blast radius for a file",
+      },
+      { command: "codebase graph impact --pr 42", description: "Blast radius for PR #42 changes" },
+      {
+        command: "codebase graph query callers src/graph/engine.ts",
+        description: "Files that import engine.ts",
+      },
+      { command: "codebase graph query symbol runGraph", description: "Find nodes named runGraph" },
+      { command: "codebase graph query entrypoints", description: "Detected entry points" },
+      { command: "codebase graph stats", description: "Node/edge counts per language" },
+    ],
+    options: [
+      { flag: "build", description: "Full rebuild" },
+      { flag: "update", description: "Incremental rebuild (diff by content hash)" },
+      { flag: "impact <file...>", description: "Transitive callers + covering tests + risk score" },
+      { flag: "impact --pr <N>", description: "Impact for PR's changed files (requires gh CLI)" },
+      { flag: "query callers|callees|symbol|entrypoints", description: "Graph queries" },
+      { flag: "stats", description: "Language breakdown of nodes and edges" },
+    ],
+    seeAlso: ["scan", "brief"],
+  },
+
   issue: {
     description: "Manage GitHub issues",
     usage: "codebase issue <subcommand> [args]",

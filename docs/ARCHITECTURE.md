@@ -11,6 +11,7 @@ Scan once, read many. Convert expensive filesystem traversal into a cheap JSON r
                               │         codebase CLI            │
                               │  scan | setup | brief | next    │
                               │  query | status | mcp | release │
+                              │  graph (build|update|impact|..) │
                               └──────────────┬──────────────────┘
                                              │
                               ┌──────────────▼──────────────────┐
@@ -18,19 +19,19 @@ Scan once, read many. Convert expensive filesystem traversal into a cheap JSON r
                               │  parallel detector orchestrator  │
                               └──────────────┬──────────────────┘
                                              │
-               ┌─────────┬──────────┬────────┼────────┬──────────┬─────────┐
-               ▼          ▼          ▼        ▼        ▼          ▼         ▼
-            ┌──────┐ ┌────────┐ ┌───────┐ ┌──────┐ ┌──────┐ ┌───────┐ ┌────────┐
-            │ repo │ │ stack  │ │  cmds │ │ deps │ │  git │ │quality│ │patterns│
-            └──┬───┘ └───┬────┘ └──┬────┘ └──┬───┘ └──┬───┘ └──┬────┘ └───┬────┘
-               └─────────┴────────┴─────┬────┴────────┴────────┴──────────┘
-                                        ▼
-                              ┌──────────────────────┐
-                              │   .codebase.json     │
-                              └──────────┬───────────┘
-                                         │
-                    ┌────────────┬────────┼────────┬────────────┐
-                    ▼            ▼        ▼        ▼            ▼
+          ┌──────┬──────────┬────────────────┼────────┬──────────┬─────────┐
+          ▼       ▼          ▼                ▼        ▼          ▼         ▼
+       ┌──────┐ ┌────────┐ ┌───────┐ ┌───────────┐ ┌──────┐ ┌───────┐ ┌────────┐
+       │ repo │ │ stack  │ │  cmds │ │   graph   │ │  git │ │quality│ │patterns│
+       └──┬───┘ └───┬────┘ └──┬────┘ └─────┬─────┘ └──┬───┘ └──┬────┘ └───┬────┘
+          └─────────┴─────────┴────────┬────┴──────────┴────────┴──────────┘
+                                       ▼
+                              ┌──────────────────────┐    ┌──────────────────────┐
+                              │   .codebase.json     │    │ .codebase/graph.json │
+                              └──────────┬───────────┘    └──────────┬───────────┘
+                                         │                            │
+                    ┌────────────┬────────┼────────┬──────────────────┘
+                    ▼            ▼        ▼        ▼
               ┌──────────┐ ┌────────┐ ┌──────┐ ┌──────────┐ ┌──────┐
               │ MCP tool │ │CLAUDE  │ │ CLI  │ │git hooks │ │ pipe │
               │ (stdio)  │ │  .md   │ │query │ │auto-sync │ │  jq  │
@@ -57,6 +58,7 @@ src/
     issue.ts            # create/close/comment/list GitHub issues
     mcp.ts              # MCP server over stdio
     release.ts          # gate check → tag → merge → GitHub release
+    graph.ts            # call/import graph: build | update | impact | query | stats
     doctor.ts           # health check
     fix.ts              # auto-repair
 ```
@@ -88,6 +90,7 @@ detectors/
   quality.ts            # test framework, linter, CI, hooks
   patterns.ts           # architecture style, state mgmt, modules
   api-docs.ts           # OpenAPI / AsyncAPI detection
+  graph.ts              # slim graph metadata slice (nodes/edges/languages/built_at)
 ```
 
 **Detector interface:**
@@ -147,7 +150,7 @@ mcp/
   brief.ts              # generates human-readable brief from manifest
 ```
 
-**Tools exposed:**
+**Tools exposed (22 tools):**
 
 | Tool | Description |
 |------|-------------|
@@ -169,8 +172,40 @@ mcp/
 | `list_skills` | List installed skills |
 | `generate_handoff` | Generate HANDOFF.md |
 | `token_budget` | Token count, grade, per-section breakdown |
+| `get_impact_radius` | Blast radius for changed files/PR — transitive callers + covering tests + risk score |
+| `get_review_context` | Token-budgeted minimal file set for reviewing a diff |
+| `query_graph` | Callers / callees / imports / tests / entrypoints for a symbol or file |
+| `rebuild_graph` | Full or incremental graph rebuild, returns node/edge counts |
 
-### 6. GitHub Integration (`src/github/`)
+### 6. Graph Module (`src/graph/`)
+
+Persistent call/import graph stored at `.codebase/graph.json` (gitignored). Regex AST-lite parsers — zero tree-sitter dep, zero new runtime deps.
+
+```
+graph/
+  index.ts          # public API: buildGraph, updateGraph, loadGraph, queryGraph
+  types.ts          # GraphNode, GraphEdge, Graph, ImpactResult, ParseResult
+  engine.ts         # walk files → parse → nodes + edges → atomic JSON write
+  incremental.ts    # SHA-256 content hash diff → re-parse only changed files
+  query.ts          # getImpactRadius (BFS), getCoveringTests, getCallers, getCallees, getEntrypoints
+  entrypoints.ts    # entry-point detection: Next.js routes, __main__, go main, Rust main/lib.rs
+  parse/
+    index.ts        # dispatcher by extension + shared toRelFile helper
+    ts.ts           # TS/JS: imports, exports, functions, classes, call sites
+    python.ts       # Python: import/from, def/class, stdlib filter, test_covers edges
+    go.ts           # Go: import blocks, func/struct/interface, go.mod module path
+    rust.ts         # Rust: use/mod, fn/struct/enum/trait/impl, #[test] detection
+```
+
+**Languages supported (v1):** TypeScript, JavaScript, Python, Go, Rust
+
+**Storage:** `.codebase/graph.json` — separate from the <10KB manifest. No size limit.
+
+**Incremental:** re-parses only files whose SHA-256 hash changed since last build. Sub-second on typical repos.
+
+**No config required** — `codebase graph build` auto-discovers files; detector slice appears in manifest automatically after next scan.
+
+### 7. GitHub Integration (`src/github/`)
 
 Optional — only active when `gh` CLI is authenticated. Protected by circuit breaker.
 

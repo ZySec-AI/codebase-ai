@@ -10,6 +10,7 @@ import { gitDetector } from "./git.js";
 import { qualityDetector } from "./quality.js";
 import { patternsDetector } from "./patterns.js";
 import { apiDocsDetector } from "./api-docs.js";
+import { graphDetector } from "./graph.js";
 
 export const detectors: Detector[] = [
   projectDetector,
@@ -23,4 +24,5 @@ export const detectors: Detector[] = [
   qualityDetector,
   patternsDetector,
   apiDocsDetector,
+  graphDetector,
 ];

@@ -13,7 +13,7 @@
 | GitHub-only refresh | `codebase scan --sync` | `--sync` | `refresh_status` | `src/github/sync.ts` |
 | First-time setup | `codebase init` | `--sync` | — | `src/commands/init.ts` |
 
-### Detectors (11 parallel, zero-dependency)
+### Detectors (12 parallel, zero-dependency)
 
 | Detector | Category | What it detects | Source files |
 |----------|----------|----------------|-------------|
@@ -28,6 +28,7 @@
 | `quality` | Quality tools | Test frameworks, linters, CI/CD (20+ platforms) | `src/detectors/quality.ts` |
 | `patterns` | Architecture | Architecture style, state management, API style, modules | `src/detectors/patterns.ts` |
 | `api-docs` | API specs | OpenAPI, GraphQL schemas, gRPC protos, Postman | `src/detectors/api-docs.ts` |
+| `graph` | Call graph | Node/edge counts, languages, staleness of `.codebase/graph.json` | `src/detectors/graph.ts` |
 
 ---
 
@@ -184,7 +185,31 @@ Skills extend `/review` with stack-specific analysis. Installed to `~/.claude/sk
 
 ---
 
-## 10. Cleanup
+## 10. Call/Import Graph
+
+Persistent blast-radius analysis. Zero new runtime deps — regex AST-lite parsers for TS/JS, Python, Go, Rust. Graph stored at `.codebase/graph.json` (gitignored, separate from the 10KB manifest).
+
+| Capability | Command | MCP Tool | Implementation |
+|-----------|---------|----------|----------------|
+| Full graph build | `codebase graph build` | `rebuild_graph` | `src/graph/engine.ts` |
+| Incremental update | `codebase graph update` | `rebuild_graph { incremental: true }` | `src/graph/incremental.ts` |
+| Blast radius (files) | `codebase graph impact <file...>` | `get_impact_radius { files }` | `src/graph/query.ts` |
+| Blast radius (PR) | `codebase graph impact --pr N` | `get_impact_radius { pr }` | `src/graph/query.ts` |
+| Callers of a symbol | `codebase graph query callers <sym>` | `query_graph { kind: "callers" }` | `src/graph/query.ts` |
+| Tests covering a file | `codebase graph query tests <file>` | `query_graph { kind: "tests" }` | `src/graph/query.ts` |
+| Entry points | `codebase graph query entrypoints` | `query_graph { kind: "entrypoints" }` | `src/graph/entrypoints.ts` |
+| Graph statistics | `codebase graph stats` | — | `src/commands/graph.ts` |
+| Minimal review context | — | `get_review_context { files, token_budget }` | `src/mcp/server.ts` |
+
+**Languages:** TypeScript, JavaScript, Python, Go, Rust
+
+**`/review` integration:** Phase 0 uses `get_review_context` to scope PR reviews; Phase 2b uses `query_graph` for dead-code detection; Phase 5 enriches issues with caller/test counts; Phase 7 blocks unsafe auto-fix if callers are outside scope.
+
+**No configuration required.** Run `codebase graph build` once. The `graph` detector includes slim metadata in the manifest automatically on next scan.
+
+---
+
+## 11. Cleanup
 
 | Capability | Command | Flags | What it removes |
 |-----------|---------|-------|----------------|
@@ -220,28 +245,41 @@ codebase config               # Show/set config
 codebase sessions             # Session history
 codebase mcp                  # MCP server (stdio)
 codebase release              # Gate → release → merge
+codebase graph build          # Build call/import graph → .codebase/graph.json
+codebase graph update         # Incremental graph update (hash-diff)
+codebase graph impact <file>  # Blast radius: callers + covering tests + risk score
+codebase graph impact --pr N  # Blast radius for PR N's changed files
+codebase graph query callers <sym>     # Callers of a symbol
+codebase graph query callees <sym>     # Callees of a symbol
+codebase graph query tests <file>      # Tests covering a file
+codebase graph query entrypoints       # All detected entry points
+codebase graph stats          # Node/edge counts per language
 codebase uninstall --force    # Remove all artifacts
 ```
 
-## Complete MCP Tool Reference (18 tools)
+## Complete MCP Tool Reference (22 tools)
 
 ```
-project_brief     — Full briefing (slim: true for compact, auto-slims when large)
-get_codebase      — Category read with sparse field selection
-query_codebase    — Dot-path field query
-get_next_task     — Highest-priority issue
-get_blockers      — Current blockers
-create_issue      — Create GitHub issue
-close_issue       — Close with reason
-update_issue      — Labels, assignee
-get_issue         — Issue detail
-get_pr            — PR detail
-get_plan          — Read PLAN.md
-update_plan       — Append to PLAN.md
-rescan_project    — Full rescan
-refresh_status    — GitHub data refresh (fast)
-list_commands     — Slash commands
-list_skills       — Installed skills
-generate_handoff  — HANDOFF.md
-token_budget      — Token count, grade, breakdown, recommendations
+project_brief       — Full briefing (slim: true for compact, auto-slims when large)
+get_codebase        — Category read with sparse field selection
+query_codebase      — Dot-path field query
+get_next_task       — Highest-priority issue
+get_blockers        — Current blockers
+create_issue        — Create GitHub issue
+close_issue         — Close with reason
+update_issue        — Labels, assignee
+get_issue           — Issue detail
+get_pr              — PR detail
+get_plan            — Read PLAN.md
+update_plan         — Append to PLAN.md
+rescan_project      — Full rescan
+refresh_status      — GitHub data refresh (fast)
+list_commands       — Slash commands
+list_skills         — Installed skills
+generate_handoff    — HANDOFF.md
+token_budget        — Token count, grade, breakdown, recommendations
+get_impact_radius   — Blast radius: transitive callers + covering tests + risk score (files or --pr N)
+get_review_context  — Token-budgeted minimal file set for a diff (used by /review Phase 0)
+query_graph         — callers | callees | imports | tests | entrypoints for a symbol/file
+rebuild_graph       — Full or incremental graph rebuild; returns node/edge counts + duration
 ```

@@ -22,6 +22,7 @@ import { runStart, runSessions } from "./commands/start.js";
 import { runConfig } from "./commands/config.js";
 import { startServer } from "./server/index.js";
 import { runUninstall } from "./commands/uninstall.js";
+import { runGraph } from "./commands/graph.js";
 import type { CLIOptions } from "./types.js";
 
 const options = parseArgs(process.argv.slice(2));
@@ -62,6 +63,7 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
   },
   config: runConfig,
   uninstall: runUninstall,
+  graph: runGraph,
   serve: (opts: CLIOptions) => {
     startServer(opts.path, opts.port ?? 3000);
     return Promise.resolve();

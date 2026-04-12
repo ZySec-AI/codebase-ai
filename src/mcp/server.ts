@@ -294,6 +294,92 @@ const TOOL_DEFINITIONS = [
       properties: {},
     },
   },
+
+  // ─── Graph / Blast Radius ──────────────────────────────────────
+  {
+    name: "get_impact_radius",
+    description:
+      "Compute the blast radius of a set of changed files — returns direct importers, transitive callers up to N hops, covering test files, and a 0-100 risk score. Use this before reviewing or auto-fixing a PR to scope the review to only the files that matter. Requires `.codebase/graph.json` (run `codebase graph build` first).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        files: {
+          type: "array" as const,
+          items: { type: "string" as const },
+          description: "Relative file paths that changed (e.g. ['src/mcp/server.ts'])",
+        },
+        pr: {
+          type: "number" as const,
+          description: "PR number — fetch changed files from GitHub instead of supplying manually",
+        },
+        hops: {
+          type: "number" as const,
+          description: "Transitive hop limit (default: 2)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_review_context",
+    description:
+      "Return the minimal set of files needed to review a change — the changed files plus their direct callers and covering tests, trimmed to a token budget. Use this in /review Phase 0 to produce a focused, token-efficient review scope.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        files: {
+          type: "array" as const,
+          items: { type: "string" as const },
+          description: "Changed files (relative paths)",
+        },
+        pr: {
+          type: "number" as const,
+          description: "PR number — fetch changed files from GitHub",
+        },
+        token_budget: {
+          type: "number" as const,
+          description: "Max tokens to include (default: 20000)",
+        },
+      },
+    },
+  },
+  {
+    name: "query_graph",
+    description:
+      "Query the call/import graph. Supports callers (who imports this file), callees (what this file imports), symbol search, entrypoints (files with no importers), and tests (test files covering a given file).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        kind: {
+          type: "string" as const,
+          description: "Query type: callers | callees | symbol | entrypoints | tests",
+        },
+        file: {
+          type: "string" as const,
+          description: "Relative file path (required for callers/callees/tests)",
+        },
+        symbol: {
+          type: "string" as const,
+          description: "Symbol name substring (required for symbol queries)",
+        },
+      },
+      required: ["kind"],
+    },
+  },
+  {
+    name: "rebuild_graph",
+    description:
+      "Build or rebuild the call/import graph (.codebase/graph.json). Use `incremental: true` for a fast update after small changes, `incremental: false` (default) for a full rebuild. Returns node/edge counts and build duration.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        incremental: {
+          type: "boolean" as const,
+          description:
+            "If true, re-parse only files whose content hash changed (faster). Default: false.",
+        },
+      },
+    },
+  },
 ];
 
 export async function startMcpServer(root: string): Promise<void> {
@@ -769,6 +855,167 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
                   grade,
                   breakdown,
                   recommendations: recommendations.length > 0 ? recommendations : undefined,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        });
+      }
+
+      case "get_impact_radius": {
+        const { loadGraph, getImpactRadius } = await import("../graph/index.js");
+        const graph = await loadGraph(root);
+        if (!graph) {
+          return respond(req.id, {
+            content: [{ type: "text", text: "No graph found. Run: codebase graph build" }],
+            isError: true,
+          });
+        }
+        let files = (args.files as string[] | undefined) ?? [];
+        if (!files.length && args.pr) {
+          const raw = await ghExecArgs(root, [
+            "pr",
+            "view",
+            String(args.pr as number),
+            "--json",
+            "files",
+          ]);
+          const data = JSON.parse(raw) as { files: Array<{ path: string }> };
+          files = data.files.map((f) => f.path);
+        }
+        const hops = (args.hops as number | undefined) ?? 2;
+        const result = getImpactRadius(graph, files, hops);
+        return respond(req.id, {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        });
+      }
+
+      case "get_review_context": {
+        const { loadGraph, getImpactRadius } = await import("../graph/index.js");
+        const { estimateTokens } = await import("../utils/tokens.js");
+        const { readFile: readFileFn } = await import("node:fs/promises");
+        const graph = await loadGraph(root);
+        if (!graph) {
+          return respond(req.id, {
+            content: [{ type: "text", text: "No graph found. Run: codebase graph build" }],
+            isError: true,
+          });
+        }
+        let files = (args.files as string[] | undefined) ?? [];
+        if (!files.length && args.pr) {
+          const raw = await ghExecArgs(root, [
+            "pr",
+            "view",
+            String(args.pr as number),
+            "--json",
+            "files",
+          ]);
+          const data = JSON.parse(raw) as { files: Array<{ path: string }> };
+          files = data.files.map((f) => f.path);
+        }
+        const tokenBudget = (args.token_budget as number | undefined) ?? 20_000;
+        const impact = getImpactRadius(graph, files, 1);
+        const candidates = [
+          ...files.map((f) => ({ path: f, reason: "changed" })),
+          ...impact.direct_callers.map((f) => ({ path: f, reason: "direct caller" })),
+          ...impact.covering_tests.map((f) => ({ path: f, reason: "covering test" })),
+        ];
+        const result: Array<{ path: string; reason: string; bytes: number }> = [];
+        let totalTokens = 0;
+        for (const c of candidates) {
+          try {
+            const content = await readFileFn(join(root, c.path), "utf-8");
+            const tokens = estimateTokens(content);
+            if (totalTokens + tokens > tokenBudget) {
+              break;
+            }
+            result.push({ path: c.path, reason: c.reason, bytes: content.length });
+            totalTokens += tokens;
+          } catch {
+            /* file not readable — skip */
+          }
+        }
+        return respond(req.id, {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ files: result, total_tokens: totalTokens, impact }, null, 2),
+            },
+          ],
+        });
+      }
+
+      case "query_graph": {
+        const { loadGraph, getCallers, getCallees, querySymbol, getEntrypoints, getCoveringTests } =
+          await import("../graph/index.js");
+        const graph = await loadGraph(root);
+        if (!graph) {
+          return respond(req.id, {
+            content: [{ type: "text", text: "No graph found. Run: codebase graph build" }],
+            isError: true,
+          });
+        }
+        const kind = args.kind as string;
+        const file = args.file as string | undefined;
+        const symbol = args.symbol as string | undefined;
+        let queryResult: unknown;
+        switch (kind) {
+          case "callers":
+            queryResult = getCallers(graph, file ?? "");
+            break;
+          case "callees":
+            queryResult = getCallees(graph, file ?? "");
+            break;
+          case "symbol":
+            queryResult = querySymbol(graph, symbol ?? "");
+            break;
+          case "entrypoints":
+            queryResult = getEntrypoints(graph);
+            break;
+          case "tests":
+            queryResult = getCoveringTests(graph, file ? [file] : []);
+            break;
+          default:
+            return respond(req.id, {
+              content: [
+                {
+                  type: "text",
+                  text: `Unknown query kind: ${kind}. Use: callers | callees | symbol | entrypoints | tests`,
+                },
+              ],
+              isError: true,
+            });
+        }
+        return respond(req.id, {
+          content: [{ type: "text", text: JSON.stringify(queryResult, null, 2) }],
+        });
+      }
+
+      case "rebuild_graph": {
+        const { buildGraph, updateGraph, saveGraph } = await import("../graph/index.js");
+        const incremental = args.incremental === true;
+        const start = Date.now();
+        const graph = incremental
+          ? await updateGraph(root)
+          : await (async () => {
+              const g = await buildGraph(root);
+              await saveGraph(root, g);
+              return g;
+            })();
+        const ms = Date.now() - start;
+        return respond(req.id, {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  nodes: graph.nodes.length,
+                  edges: graph.edges.length,
+                  built_at: graph.built_at,
+                  ms,
+                  incremental,
                 },
                 null,
                 2
