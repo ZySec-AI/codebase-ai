@@ -37,6 +37,9 @@ git remote get-url origin || { echo "ERROR: No git remote."; exit 1; }
 
 ```bash
 npx codebase brief 2>/dev/null > /tmp/cb-brief.json || true
+if [ ! -s /tmp/cb-brief.json ]; then
+  echo "WARNING: codebase brief failed or returned empty — proceeding with defaults"
+fi
 ```
 
 Read `/tmp/cb-brief.json`. Extract:
@@ -214,7 +217,11 @@ git push origin develop
 Close the issue:
 ```bash
 gh issue close [N] --comment "Implemented in $(git rev-parse --short HEAD)."
-npx codebase issue close [N] --reason "Implemented in $(git rev-parse --short HEAD)" 2>/dev/null || true
+```
+
+Also close via MCP tool: `close_issue { number: N, comment: "Implemented in <sha>" }`
+```bash
+npx codebase issue close [N] --comment "Implemented in $(git rev-parse --short HEAD)" 2>/dev/null || true
 ```
 
 Refresh manifest:

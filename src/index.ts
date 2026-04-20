@@ -23,6 +23,8 @@ import { runConfig } from "./commands/config.js";
 import { startServer } from "./server/index.js";
 import { runUninstall } from "./commands/uninstall.js";
 import { runGraph } from "./commands/graph.js";
+import { runStats } from "./commands/stats.js";
+import { runDefault } from "./commands/default.js";
 import type { CLIOptions } from "./types.js";
 
 const options = parseArgs(process.argv.slice(2));
@@ -70,6 +72,13 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
   },
   // Keep "scan-only" for hooks that just want manifest refresh
   "scan-only": runScan,
+  stats: (opts: CLIOptions) =>
+    runStats({
+      quiet: opts.quiet,
+      session: opts.positionals.includes("--session"),
+      weekly: opts.positionals.includes("--weekly"),
+      positionals: opts.positionals,
+    }),
 };
 
 // ─── Global error handlers ────────────────────────────────────────
@@ -100,32 +109,41 @@ if (major < 20) {
   process.exit(1);
 }
 
-const handler = commands[options.command];
-if (!handler) {
-  error(`Unknown command: ${options.command}`);
-  info(`Run ${bold("codebase --help")} to see all commands.`);
-  process.exit(1);
-}
-
-handler(options).catch((err: Error) => {
-  error(`Error: ${err.message}`);
-
-  // Show helpful suggestions based on error message
-  const msg = err.message.toLowerCase();
-  if (msg.includes("not a git repository")) {
-    info(`Initialize git first: ${bold("git init")}`);
-  } else if (msg.includes("permission denied")) {
-    info("Check file permissions or run with appropriate access");
-  } else if (msg.includes("enoent") && msg.includes("gh")) {
-    info(
-      `GitHub CLI (gh) is not installed. Install it: ${bold("brew install gh && gh auth login")}`
-    );
-  } else if (msg.includes("no such file")) {
-    info("Check that the path is correct");
-  } else if (msg.includes("github")) {
-    info(`Ensure GitHub CLI is installed: ${bold("gh --version")}`);
-    info(`Authenticate: ${bold("gh auth login")}`);
+// No-args default: show smart status instead of help
+const isNoArgs = process.argv.slice(2).filter((a) => !a.startsWith("-")).length === 0;
+if (options.command === "start" && isNoArgs) {
+  runDefault(options.path).catch((err: Error) => {
+    error(`Error: ${err.message}`);
+    process.exit(1);
+  });
+} else {
+  const handler = commands[options.command];
+  if (!handler) {
+    error(`Unknown command: ${options.command}`);
+    info(`Run ${bold("codebase --help")} to see all commands.`);
+    process.exit(1);
   }
 
-  process.exit(1);
-});
+  handler(options).catch((err: Error) => {
+    error(`Error: ${err.message}`);
+
+    // Show helpful suggestions based on error message
+    const msg = err.message.toLowerCase();
+    if (msg.includes("not a git repository")) {
+      info(`Initialize git first: ${bold("git init")}`);
+    } else if (msg.includes("permission denied")) {
+      info("Check file permissions or run with appropriate access");
+    } else if (msg.includes("enoent") && msg.includes("gh")) {
+      info(
+        `GitHub CLI (gh) is not installed. Install it: ${bold("brew install gh && gh auth login")}`
+      );
+    } else if (msg.includes("no such file")) {
+      info("Check that the path is correct");
+    } else if (msg.includes("github")) {
+      info(`Ensure GitHub CLI is installed: ${bold("gh --version")}`);
+      info(`Authenticate: ${bold("gh auth login")}`);
+    }
+
+    process.exit(1);
+  });
+}

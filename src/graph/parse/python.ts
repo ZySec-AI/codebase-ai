@@ -212,6 +212,21 @@ function isStdlib(module: string): boolean {
   return STDLIB_MODULES.has(top);
 }
 
+// ---- Module-level regex constants ----
+
+// import foo / import foo as bar / import foo.bar
+const simpleImportRe = /^\s*import\s+([\w.]+)(?:\s+as\s+\w+)?/;
+// from foo import bar / from .foo import bar / from ..foo import baz, qux
+const fromImportRe = /^\s*from\s+(\.+)([\w.]*)\s+import\s+(.+)/;
+const fromAbsImportRe = /^\s*from\s+([\w.]+)\s+import\s+(.+)/;
+// function and class declarations
+const funcRe = /^(\s*)(?:async\s+)?def\s+(\w+)\s*\(/;
+const classRe = /^(\s*)class\s+(\w+)/;
+// call sites
+const pyCallRe = /\b(\w+)\s*\(/g;
+// skip declaration lines in call scanning
+const pySkipLineRe = /^\s*(?:def|class|import|from)\s/;
+
 export function parsePython(filePath: string, content: string, root: string): ParseResult {
   const relFile = toRelFile(filePath, root);
   const nodes: GraphNode[] = [];
@@ -229,12 +244,6 @@ export function parsePython(filePath: string, content: string, root: string): Pa
   });
 
   // ---- Import detection ----
-
-  // import foo / import foo as bar / import foo.bar
-  const simpleImportRe = /^\s*import\s+([\w.]+)(?:\s+as\s+\w+)?/;
-  // from foo import bar / from .foo import bar / from ..foo import baz, qux
-  const fromImportRe = /^\s*from\s+(\.+)([\w.]*)\s+import\s+(.+)/;
-  const fromAbsImportRe = /^\s*from\s+([\w.]+)\s+import\s+(.+)/;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -277,9 +286,6 @@ export function parsePython(filePath: string, content: string, root: string): Pa
   }
 
   // ---- Declaration detection ----
-
-  const funcRe = /^(\s*)(?:async\s+)?def\s+(\w+)\s*\(/;
-  const classRe = /^(\s*)class\s+(\w+)/;
 
   const localSymbols = new Set<string>();
 
@@ -345,13 +351,13 @@ export function parsePython(filePath: string, content: string, root: string): Pa
   }
 
   // ---- Call site detection ----
-  const callRe = /\b(\w+)\s*\(/g;
   for (const line of lines) {
-    if (/^\s*(?:def|class|import|from)\s/.test(line)) {
+    if (pySkipLineRe.test(line)) {
       continue;
     }
+    pyCallRe.lastIndex = 0;
     let cm: RegExpExecArray | null;
-    while ((cm = callRe.exec(line)) !== null) {
+    while ((cm = pyCallRe.exec(line)) !== null) {
       const callee = cm[1];
       if (localSymbols.has(callee)) {
         edges.push({ from: relFile, to: `${relFile}:${callee}`, kind: "calls" });

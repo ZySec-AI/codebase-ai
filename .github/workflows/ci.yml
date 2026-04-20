@@ -43,6 +43,12 @@ jobs:
           test -f dist/index.js
           test -x dist/index.js
 
+      - name: Verify MCP tool count in README
+        run: |
+          ACTUAL=$(grep -c "^    name:" src/mcp/server.ts)
+          README_COUNT=$(grep -Eo '[0-9]+( tools)' README.md | grep -Eo '^[0-9]+' | head -1)
+          [ "$ACTUAL" = "$README_COUNT" ] || { echo "README says $README_COUNT MCP tools, found $ACTUAL in TOOL_DEFINITIONS"; exit 1; }
+
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest

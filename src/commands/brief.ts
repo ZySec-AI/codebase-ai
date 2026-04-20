@@ -1,9 +1,11 @@
 import { resolve, join } from "node:path";
 import { readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { createHash } from "node:crypto";
 import type { CLIOptions, Manifest } from "../types.js";
 import { generateBrief, generateSlimBrief } from "../mcp/brief.js";
-import { error, warn } from "../utils/output.js";
+import { warn, printFriendlyError } from "../utils/output.js";
 
 /**
  * `codebase brief` — outputs a complete project briefing for AI consumption.
@@ -23,7 +25,7 @@ export async function runBrief(options: CLIOptions): Promise<void> {
   const manifestPath = join(root, ".codebase.json");
 
   if (!existsSync(manifestPath)) {
-    console.error("No manifest found. Run 'codebase init' to set up this project first.");
+    printFriendlyError("No .codebase.json found", "Project not scanned yet", "Run: codebase setup");
     process.exit(1);
   }
 
@@ -32,8 +34,36 @@ export async function runBrief(options: CLIOptions): Promise<void> {
     const content = await readFile(manifestPath, "utf-8");
     manifest = JSON.parse(content);
   } catch {
-    error("No .codebase.json found (or it's corrupted). Run `npx codebase` first.");
+    printFriendlyError("No .codebase.json found", "Project not scanned yet", "Run: codebase setup");
     process.exit(1);
+  }
+
+  // Check for skill version drift and show banner if stale skills exist
+  if (!options.quiet) {
+    try {
+      const manifestUrl = new URL("../../skills/manifest.json", import.meta.url);
+      const skillManifest = JSON.parse(readFileSync(manifestUrl, "utf-8")) as {
+        skills: Array<{ name: string; sha256: string }>;
+      };
+      const globalSkillsDir = join(homedir(), ".claude", "skills");
+      const stale: string[] = [];
+      for (const skill of skillManifest.skills) {
+        const installed = join(globalSkillsDir, `${skill.name}.skill`);
+        if (existsSync(installed)) {
+          const hash = createHash("sha256").update(readFileSync(installed)).digest("hex");
+          if (hash !== skill.sha256) {
+            stale.push(skill.name);
+          }
+        }
+      }
+      if (stale.length > 0) {
+        console.log(
+          `  ⚡  ${stale.length} skill(s) updated — run \`codebase fix --skills\` to install`
+        );
+      }
+    } catch {
+      /* manifest not available — skip */
+    }
   }
 
   // Warn if GitHub data is absent

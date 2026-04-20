@@ -20,6 +20,36 @@ function resolveImport(specifier: string, fromFile: string, root: string): strin
   return rel;
 }
 
+// ---- Module-level regex constants ----
+
+// static import/export-from: import ... from 'specifier'
+const staticImportRe =
+  /^\s*(?:import|export)\s+(?:(?:type\s+)?(?:\*\s+as\s+\w+|\{[^}]*\}|\w+)(?:\s*,\s*(?:\{[^}]*\}|\w+))*\s+from\s+)?['"]([^'"]+)['"]/;
+// export { x } from './foo'
+const reExportRe = /^\s*export\s+\{[^}]*\}\s+from\s+['"]([^'"]+)['"]/;
+// require('./foo')
+const requireRe = /(?:^|[^.\w])require\s*\(\s*['"]([^'"]+)['"]\s*\)/;
+// dynamic import('./foo')
+const dynamicImportRe = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/;
+// export function / export async function / export default function
+const exportFnRe = /^\s*export\s+(?:default\s+)?(?:async\s+)?function\s+(\w+)/;
+// plain function
+const plainFnRe = /^\s*(?:async\s+)?function\s+(\w+)/;
+// export class / class
+const exportClassRe = /^\s*(export\s+)?(?:abstract\s+)?class\s+(\w+)/;
+// export const/let foo = / export const foo = (
+const exportVarRe = /^\s*export\s+(?:const|let|var)\s+(\w+)\s*(?::[^=]+)?=/;
+// unexported const/let (top-level arrow functions)
+const unexportedVarRe = /^\s*(?:const|let|var)\s+(\w+)\s*(?::[^=]+)?=/;
+// top-level const/let/var guard
+const topLevelVarRe = /^(?:const|let|var)\s/;
+// import alias: import * as X / import { a, b } / import Def from
+const aliasRe = /^\s*import\s+(?:(?:\*\s+as\s+(\w+)|\{([^}]*)\}|(\w+)))\s+from\s+['"]([^'"]+)['"]/;
+// call site: identifier(
+const callRe = /\b(\w+)\s*\(/g;
+// skip import/export lines in call scanning
+const importExportLineRe = /^\s*(import|export)\s/;
+
 /**
  * Parse a TypeScript or JavaScript file and return nodes + edges.
  */
@@ -39,16 +69,6 @@ export function parseTs(filePath: string, content: string, root: string): ParseR
   const lines = content.split("\n");
 
   // ---- Import detection ----
-
-  // static import/export-from: import ... from 'specifier'
-  const staticImportRe =
-    /^\s*(?:import|export)\s+(?:(?:type\s+)?(?:\*\s+as\s+\w+|\{[^}]*\}|\w+)(?:\s*,\s*(?:\{[^}]*\}|\w+))*\s+from\s+)?['"]([^'"]+)['"]/;
-  // export { x } from './foo'
-  const reExportRe = /^\s*export\s+\{[^}]*\}\s+from\s+['"]([^'"]+)['"]/;
-  // require('./foo')
-  const requireRe = /(?:^|[^.\w])require\s*\(\s*['"]([^'"]+)['"]\s*\)/;
-  // dynamic import('./foo')
-  const dynamicImportRe = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -87,17 +107,6 @@ export function parseTs(filePath: string, content: string, root: string): ParseR
   }
 
   // ---- Declaration detection ----
-
-  // export function / export async function / export default function
-  const exportFnRe = /^\s*export\s+(?:default\s+)?(?:async\s+)?function\s+(\w+)/;
-  // plain function
-  const plainFnRe = /^\s*(?:async\s+)?function\s+(\w+)/;
-  // export class / class
-  const exportClassRe = /^\s*(export\s+)?(?:abstract\s+)?class\s+(\w+)/;
-  // export const/let foo = / export const foo = (
-  const exportVarRe = /^\s*export\s+(?:const|let|var)\s+(\w+)\s*(?::[^=]+)?=/;
-  // unexported const/let (top-level arrow functions)
-  const unexportedVarRe = /^\s*(?:const|let|var)\s+(\w+)\s*(?::[^=]+)?=/;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -166,7 +175,7 @@ export function parseTs(filePath: string, content: string, root: string): ParseR
     }
 
     // top-level unexported const/let (only at column 0 to avoid inner scope noise)
-    if (/^(?:const|let|var)\s/.test(line)) {
+    if (topLevelVarRe.test(line)) {
       const uvMatch = unexportedVarRe.exec(line);
       if (uvMatch) {
         nodes.push({
@@ -197,8 +206,6 @@ export function parseTs(filePath: string, content: string, root: string): ParseR
   const importedAliases = new Map<string, string>(); // alias -> resolved file or specifier
 
   // Re-scan for import aliases
-  const aliasRe =
-    /^\s*import\s+(?:(?:\*\s+as\s+(\w+)|\{([^}]*)\}|(\w+)))\s+from\s+['"]([^'"]+)['"]/;
   for (const line of lines) {
     const m = aliasRe.exec(line);
     if (!m) {
@@ -227,12 +234,12 @@ export function parseTs(filePath: string, content: string, root: string): ParseR
 
   // Detect call sites: identifier(
   if (importedAliases.size > 0) {
-    const callRe = /\b(\w+)\s*\(/g;
     for (const line of lines) {
       // skip import/export lines
-      if (/^\s*(import|export)\s/.test(line)) {
+      if (importExportLineRe.test(line)) {
         continue;
       }
+      callRe.lastIndex = 0;
       let cm: RegExpExecArray | null;
       while ((cm = callRe.exec(line)) !== null) {
         const callee = cm[1];

@@ -10,6 +10,7 @@ export interface ScanOptions {
   categories?: string[];
   incremental?: boolean;
   quiet?: boolean;
+  verbose?: boolean;
   sync?: boolean;
 }
 
@@ -29,35 +30,74 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Man
     activeDetectors = detectors.filter((d) => options.categories!.includes(d.category));
   }
 
-  // Run all detectors in parallel
+  const scanStart = performance.now();
+
+  // Run all detectors in parallel, recording timing for each
   const results = await Promise.allSettled(
-    activeDetectors.map(async (d) => ({
-      category: d.category,
-      data: await d.detect(ctx),
-    }))
+    activeDetectors.map(async (d) => {
+      const t0 = performance.now();
+      const data = await d.detect(ctx);
+      const elapsedMs = performance.now() - t0;
+      return { name: d.name, category: d.category, data, elapsedMs };
+    })
   );
 
+  const now = new Date().toISOString();
   const manifest: Manifest = {
     version: "1.0",
-    generated_at: new Date().toISOString(),
+    generated_at: now,
+    last_scan_time: now,
+    manifest_version: "0.5.0",
   };
 
-  const warnings: string[] = [];
+  const warnings: Array<{ detector: string; category: string; error: string }> = [];
 
-  for (const result of results) {
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
     if (result.status === "fulfilled") {
       (manifest as unknown as Record<string, unknown>)[result.value.category] = result.value.data;
     } else {
-      const msg = `Detector failed: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
-      warnings.push(msg);
-      if (!options.quiet) {
-        warn(msg);
+      const d = activeDetectors[i];
+      const errorMsg =
+        result.reason instanceof Error ? result.reason.message : String(result.reason);
+      warnings.push({ detector: d.name, category: d.category, error: errorMsg });
+    }
+  }
+
+  // Print per-detector timings when CODEBASE_DEBUG=1 or verbose
+  if (process.env.CODEBASE_DEBUG === "1" || options.verbose === true) {
+    const totalScanMs = performance.now() - scanStart;
+    const timings: Array<{ category: string; elapsedMs: number }> = [];
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        timings.push({ category: result.value.category, elapsedMs: result.value.elapsedMs });
       }
     }
+    timings.sort((a, b) => b.elapsedMs - a.elapsedMs);
+    const maxMs = timings.length > 0 ? timings[0].elapsedMs : 0;
+    const maxCatLen = timings.reduce((m, t) => Math.max(m, t.category.length), 0);
+    const lines: string[] = ["  \u23F1  Detector timings:"];
+    for (const t of timings) {
+      const padded = t.category.padEnd(maxCatLen);
+      const ms = `${Math.round(t.elapsedMs)}ms`;
+      const slowest = t.elapsedMs === maxMs && timings.length > 1 ? "  \u2190 slowest" : "";
+      lines.push(`     ${padded}  ${ms}${slowest}`);
+    }
+    lines.push(`  total scan: ${Math.round(totalScanMs)}ms  |  files: ${ctx.files.length}`);
+    process.stderr.write(lines.join("\n") + "\n");
   }
 
   if (warnings.length > 0) {
     manifest._warnings = warnings;
+    if (!options.quiet) {
+      if (options.verbose) {
+        for (const w of warnings) {
+          warn(`[${w.detector}] ${w.category}: ${w.error}`);
+        }
+      } else {
+        warn(`${warnings.length} warning(s) — run with --verbose to see details`);
+      }
+    }
   }
 
   // GitHub sync (optional, requires `gh` CLI)
@@ -155,8 +195,9 @@ export function summarizeCategory(category: string, data: Record<string, unknown
     }
     case "git": {
       const commits = data.recent_commits as string[];
-      const changes = data.uncommitted_changes as boolean;
-      return `${commits?.length || 0} recent commits${changes ? ", uncommitted changes" : ""}`;
+      const changes = data.uncommitted_changes as boolean | string[];
+      const hasChanges = Array.isArray(changes) ? changes.length > 0 : !!changes;
+      return `${commits?.length || 0} recent commits${hasChanges ? ", uncommitted changes" : ""}`;
     }
     case "quality": {
       const parts: string[] = [];

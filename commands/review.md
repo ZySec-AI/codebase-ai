@@ -40,6 +40,9 @@ git remote get-url origin || { echo "ERROR: No git remote."; exit 1; }
 
 ```bash
 npx codebase brief 2>/dev/null > /tmp/cb-brief.json || true
+if [ ! -s /tmp/cb-brief.json ]; then
+  echo "WARNING: codebase brief failed or returned empty — proceeding with defaults"
+fi
 ```
 
 Read the brief. Extract and use throughout:
@@ -102,7 +105,12 @@ If `GRAPH_AVAILABLE=yes`, call the `get_review_context` MCP tool (or `get_impact
 call get_review_context { pr: N, token_budget: 20000 }
 ```
 
-This returns a `{ files, total_tokens, impact }` object. Use the returned file list as the review scope for Phases 1–4 rather than the full codebase. Log the scope reduction in the scope banner (e.g. "Scoped to 12 files via graph blast-radius (was ~300)").
+`get_review_context` returns: `{ files: string[], total_tokens: number, hint: string }`
+
+Use the returned `files` list as the review scope for Phases 1–4 rather than the full codebase. Log the scope reduction in the scope banner (e.g. "Scoped to 12 files via graph blast-radius (was ~300)").
+
+For full transitive blast radius, call `get_impact_radius { files: [...], pr: N, hops: 2 }`.
+`get_impact_radius` returns: `{ changed_files: string[], callers: string[], callees: string[], tests: string[], risk_score: number }`
 
 If `GRAPH_AVAILABLE=no`, fall back to the full codebase review as before. Optionally suggest: "Run `codebase graph build` to enable blast-radius scoping in future reviews."
 

@@ -94,6 +94,12 @@ export function command(cmd: string): string {
   return `${colors.cyan}${cmd}${colors.reset}`;
 }
 
+export function printFriendlyError(what: string, cause: string, next: string): void {
+  console.error(`  ${colors.red}✗${colors.reset}  ${what}`);
+  console.error(`     Cause: ${cause}`);
+  console.error(`     Fix:   ${next}`);
+}
+
 // Progress indicator for long operations
 export class Progress {
   private current = 0;

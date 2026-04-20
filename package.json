@@ -9,13 +9,15 @@
     "url": "https://github.com/ZySec-AI/codebase.git"
   },
   "bin": {
-    "codebase": "./dist/index.js"
+    "codebase": "./dist/index.js",
+    "cb": "./dist/index.js"
   },
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js"
   },
   "scripts": {
+    "prebuild": "node scripts/gen-skill-manifest.cjs",
     "build": "tsup",
     "build:dev": "tsup --no-minify --sourcemap",
     "dev": "tsup --watch",
@@ -37,7 +39,8 @@
   "files": [
     "dist",
     "commands",
-    "skills"
+    "skills",
+    "skills/manifest.json"
   ],
   "keywords": [
     "codebase",

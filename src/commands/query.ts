@@ -3,14 +3,14 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import type { CLIOptions } from "../types.js";
 import { queryPath } from "../utils/json-path.js";
-import { error } from "../utils/output.js";
+import { error, printFriendlyError } from "../utils/output.js";
 
 export async function runQuery(options: CLIOptions): Promise<void> {
   const root = resolve(options.path);
   const manifestPath = join(root, ".codebase.json");
 
   if (!existsSync(manifestPath)) {
-    console.error("No manifest found. Run 'codebase init' to set up this project first.");
+    printFriendlyError("No .codebase.json found", "Project not scanned yet", "Run: codebase setup");
     process.exit(1);
   }
 
@@ -19,7 +19,7 @@ export async function runQuery(options: CLIOptions): Promise<void> {
     const content = await readFile(manifestPath, "utf-8");
     manifest = JSON.parse(content);
   } catch {
-    error("No .codebase.json found (or it's corrupted). Run `npx codebase` first.");
+    printFriendlyError("No .codebase.json found", "Project not scanned yet", "Run: codebase setup");
     process.exit(1);
   }
   const path = options.positionals[0];

@@ -1,6 +1,14 @@
 import { createInterface } from "node:readline";
 import { readFile, writeFile, rename } from "node:fs/promises";
-import { existsSync, readdirSync } from "node:fs";
+import {
+  existsSync,
+  readdirSync,
+  appendFileSync,
+  mkdirSync,
+  statSync,
+  renameSync,
+  unlinkSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { execFile } from "node:child_process";
@@ -11,6 +19,37 @@ import { scan } from "../scanner/engine.js";
 import { generateBrief, generateSlimBrief } from "./brief.js";
 import { rankIssues, syncGitHub } from "../github/sync.js";
 import type { Manifest } from "../types.js";
+
+// ─── MCP response cache ────────────────────────────────────────
+
+interface MCPCache {
+  mtimeMs: number;
+  manifestPath: string;
+  responses: Map<string, unknown>;
+}
+const mcpCache: MCPCache = {
+  mtimeMs: 0,
+  manifestPath: "",
+  responses: new Map(),
+};
+
+function getCachedResponse(manifestPath: string, key: string): unknown | undefined {
+  try {
+    const mtime = statSync(manifestPath).mtimeMs;
+    if (mtime !== mcpCache.mtimeMs || manifestPath !== mcpCache.manifestPath) {
+      mcpCache.mtimeMs = mtime;
+      mcpCache.manifestPath = manifestPath;
+      mcpCache.responses.clear();
+    }
+  } catch {
+    mcpCache.responses.clear();
+  }
+  return mcpCache.responses.get(key);
+}
+
+function setCachedResponse(key: string, value: unknown): void {
+  mcpCache.responses.set(key, value);
+}
 
 interface JsonRpcRequest {
   jsonrpc: string;
@@ -48,7 +87,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "get_codebase",
     description:
-      "Get codebase data by category with optional sparse field selection. Use the 'fields' array to request only specific fields (e.g. fields: ['languages', 'frameworks'] from category: 'stack'). For single dot-path lookups use query_codebase instead.",
+      "Read a broad slice of the project manifest by category (stack, commands, structure, git, quality, etc). Use for category-level overviews. For deep nested paths, use query_codebase instead.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -69,7 +108,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "query_codebase",
     description:
-      "Query a specific field using dot-path notation. Handles both targeted dot-path queries (e.g. 'stack.languages') and full category reads (e.g. 'stack'). Examples: 'stack.languages', 'commands.test', 'status.kanban.in_progress', 'roadmap.milestones'.",
+      "Query a specific nested path in the manifest using dot-notation (e.g. 'status.kanban.in_progress', 'stack.languages'). Use for targeted data retrieval. For broad category overviews, use get_codebase instead.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -299,7 +338,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "get_impact_radius",
     description:
-      "Compute the blast radius of a set of changed files — returns direct importers, transitive callers up to N hops, covering test files, and a 0-100 risk score. Use this before reviewing or auto-fixing a PR to scope the review to only the files that matter. Requires `.codebase/graph.json` (run `codebase graph build` first).",
+      "Full N-hop transitive call/import graph analysis for changed files. Returns callers, callees, tests, and a risk score. Use for blast-radius analysis before merging. Returns: { changed_files, callers, callees, tests, risk_score }.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -322,7 +361,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "get_review_context",
     description:
-      "Return the minimal set of files needed to review a change — the changed files plus their direct callers and covering tests, trimmed to a token budget. Use this in /review Phase 0 to produce a focused, token-efficient review scope.",
+      "Token-budgeted minimal scope for PR code review — changed files + their direct tests only. More focused than get_impact_radius. Returns: { files, total_tokens, hint }.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -368,7 +407,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "rebuild_graph",
     description:
-      "Build or rebuild the call/import graph (.codebase/graph.json). Use `incremental: true` for a fast update after small changes, `incremental: false` (default) for a full rebuild. Returns node/edge counts and build duration.",
+      "Build or rebuild the call/import graph (.codebase/graph.json). Use `incremental: true` for a fast update after small changes, `incremental: false` (default) for a full rebuild. Returns { nodes: number, edges: number, duration_ms: number } on completion.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -381,6 +420,48 @@ const TOOL_DEFINITIONS = [
     },
   },
 ];
+
+// ─── Session logging ──────────────────────────────────────────────
+
+const LOG_MAX_BYTES = 1024 * 1024; // 1 MB
+
+function appendSessionLog(root: string, entry: object): void {
+  const dir = join(root, ".codebase");
+  const logFile = join(dir, "session-log.jsonl");
+  try {
+    mkdirSync(dir, { recursive: true });
+    // Weekly rotation: if log > 1MB, rename to session-log-YYYY-WW.jsonl
+    if (existsSync(logFile)) {
+      const { size } = statSync(logFile);
+      if (size > LOG_MAX_BYTES) {
+        const now = new Date();
+        const week = `${now.getFullYear()}-${String(getISOWeek(now)).padStart(2, "0")}`;
+        const rotated = join(dir, `session-log-${week}.jsonl`);
+        try {
+          // If rotated file already exists, just delete the old one to start fresh
+          if (!existsSync(rotated)) {
+            renameSync(logFile, rotated);
+          } else {
+            unlinkSync(logFile);
+          }
+        } catch {
+          /* non-critical */
+        }
+      }
+    }
+    appendFileSync(logFile, JSON.stringify(entry) + "\n");
+  } catch {
+    /* non-critical */
+  }
+}
+
+function getISOWeek(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
 
 export async function startMcpServer(root: string): Promise<void> {
   const rl = createInterface({ input: process.stdin, terminal: false });
@@ -437,9 +518,35 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
   const toolName = params.name as string;
   const args = (params.arguments || {}) as Record<string, unknown>;
 
+  const result = await dispatchToolCall(req, root, toolName, args);
+  // Fire-and-forget session log
+  const resultStr = JSON.stringify(result);
+  appendSessionLog(root, {
+    ts: new Date().toISOString(),
+    session_id: process.env.CLAUDE_SESSION_ID ?? process.pid.toString(),
+    tool: toolName,
+    result_bytes: resultStr.length,
+    tokens_est: Math.round(resultStr.length / 3.8),
+    cache_hit: false,
+  });
+  return result;
+}
+
+async function dispatchToolCall(
+  req: JsonRpcRequest,
+  root: string,
+  toolName: string,
+  args: Record<string, unknown>
+): Promise<JsonRpcResponse> {
   try {
     switch (toolName) {
       case "project_brief": {
+        const manifestPath = join(root, ".codebase.json");
+        const cacheKey = `project_brief:${JSON.stringify(args)}`;
+        const cached = getCachedResponse(manifestPath, cacheKey);
+        if (cached !== undefined) {
+          return respond(req.id, cached);
+        }
         const manifest = await loadOrScanManifest(root, true);
         const slim = args.slim as boolean | undefined;
 
@@ -454,15 +561,22 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
         // Append token budget info so the AI knows context pressure
         const budgetNote = `\n\n---\n_manifest: ${manifestTokens.toLocaleString()} tokens (grade ${grade})${shouldAutoSlim ? " — auto-slimmed to fit context" : ""}_`;
 
-        return respond(req.id, {
-          content: [{ type: "text", text: brief + budgetNote }],
-        });
+        const briefResult = { content: [{ type: "text", text: brief + budgetNote }] };
+        setCachedResponse(cacheKey, briefResult);
+        return respond(req.id, briefResult);
       }
 
       case "get_codebase": {
+        const manifestPath = join(root, ".codebase.json");
+        const cacheKey = `get_codebase:${JSON.stringify(args)}`;
+        const cached = getCachedResponse(manifestPath, cacheKey);
+        if (cached !== undefined) {
+          return respond(req.id, cached);
+        }
         const manifest = await loadOrScanManifest(root);
         const category = args.category as string | undefined;
         const fields = args.fields as string[] | undefined;
+        let getCodebaseResult: { content: Array<{ type: string; text: string }> };
         if (category) {
           const data = (manifest as unknown as Record<string, unknown>)[category];
           if (fields?.length && data && typeof data === "object" && data !== null) {
@@ -470,20 +584,30 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
             for (const f of fields) {
               sparse[f] = (data as Record<string, unknown>)[f];
             }
-            return respond(req.id, {
+            getCodebaseResult = {
               content: [{ type: "text", text: JSON.stringify(sparse, null, 2) }],
-            });
+            };
+          } else {
+            getCodebaseResult = {
+              content: [{ type: "text", text: JSON.stringify(data ?? null, null, 2) }],
+            };
           }
-          return respond(req.id, {
-            content: [{ type: "text", text: JSON.stringify(data ?? null, null, 2) }],
-          });
+        } else {
+          getCodebaseResult = {
+            content: [{ type: "text", text: JSON.stringify(manifest, null, 2) }],
+          };
         }
-        return respond(req.id, {
-          content: [{ type: "text", text: JSON.stringify(manifest, null, 2) }],
-        });
+        setCachedResponse(cacheKey, getCodebaseResult);
+        return respond(req.id, getCodebaseResult);
       }
 
       case "query_codebase": {
+        const manifestPath = join(root, ".codebase.json");
+        const cacheKey = `query_codebase:${JSON.stringify(args)}`;
+        const cached = getCachedResponse(manifestPath, cacheKey);
+        if (cached !== undefined) {
+          return respond(req.id, cached);
+        }
         const manifest = await loadOrScanManifest(root);
         const path = args.path as string;
         const fields = args.fields as string[] | undefined;
@@ -501,9 +625,11 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
           }
           value = sparse;
         }
-        return respond(req.id, {
+        const queryResult = {
           content: [{ type: "text", text: JSON.stringify(value ?? null, null, 2) }],
-        });
+        };
+        setCachedResponse(cacheKey, queryResult);
+        return respond(req.id, queryResult);
       }
 
       case "get_next_task": {
@@ -547,6 +673,12 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
       }
 
       case "list_commands": {
+        const manifestPath = join(root, ".codebase.json");
+        const cacheKey = `list_commands:{}`;
+        const cachedCmd = getCachedResponse(manifestPath, cacheKey);
+        if (cachedCmd !== undefined) {
+          return respond(req.id, cachedCmd);
+        }
         const projectCommandsDir = join(root, ".claude", "commands");
         const globalCommandsDir = join(homedir(), ".claude", "commands");
 
@@ -564,24 +696,33 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
           }
         }
 
+        let listCommandsResult: { content: Array<{ type: string; text: string }> };
         if (allFiles.length === 0) {
-          return respond(req.id, {
+          listCommandsResult = {
             content: [{ type: "text", text: "No slash commands installed. Run: codebase setup" }],
-          });
+          };
+        } else {
+          const names = allFiles.map((f) => "/" + f.replace(/\.md$/, "")).join(", ");
+          listCommandsResult = {
+            content: [
+              {
+                type: "text",
+                text: `Installed commands (${allFiles.length}): ${names}\n\nLoop: /simulate → /build → /launch`,
+              },
+            ],
+          };
         }
-
-        const names = allFiles.map((f) => "/" + f.replace(/\.md$/, "")).join(", ");
-        return respond(req.id, {
-          content: [
-            {
-              type: "text",
-              text: `Installed commands (${allFiles.length}): ${names}\n\nLoop: /simulate → /build → /launch`,
-            },
-          ],
-        });
+        setCachedResponse(cacheKey, listCommandsResult);
+        return respond(req.id, listCommandsResult);
       }
 
       case "list_skills": {
+        const manifestPathSkills = join(root, ".codebase.json");
+        const cacheKeySkills = `list_skills:{}`;
+        const cachedSkills = getCachedResponse(manifestPathSkills, cacheKeySkills);
+        if (cachedSkills !== undefined) {
+          return respond(req.id, cachedSkills);
+        }
         const globalSkillsDir = join(homedir(), ".claude", "skills");
         const projectSkillsDir = join(root, ".claude", "skills");
 
@@ -646,9 +787,9 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
           )
         );
 
-        return respond(req.id, {
-          content: [{ type: "text", text: JSON.stringify(skills, null, 2) }],
-        });
+        const skillsResult = { content: [{ type: "text", text: JSON.stringify(skills, null, 2) }] };
+        setCachedResponse(cacheKeySkills, skillsResult);
+        return respond(req.id, skillsResult);
       }
 
       case "get_plan": {
@@ -795,6 +936,12 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
       }
 
       case "token_budget": {
+        const manifestPathBudget = join(root, ".codebase.json");
+        const cacheKeyBudget = `token_budget:{}`;
+        const cachedBudget = getCachedResponse(manifestPathBudget, cacheKeyBudget);
+        if (cachedBudget !== undefined) {
+          return respond(req.id, cachedBudget);
+        }
         const manifest = await loadOrScanManifest(root);
         const totalTokens = estimateJsonTokens(manifest);
         const grade = gradeTokenBudget(totalTokens, { a: 2000, b: 4000, c: 8000 });
@@ -845,7 +992,7 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
           );
         }
 
-        return respond(req.id, {
+        const budgetResult = {
           content: [
             {
               type: "text",
@@ -861,7 +1008,9 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
               ),
             },
           ],
-        });
+        };
+        setCachedResponse(cacheKeyBudget, budgetResult);
+        return respond(req.id, budgetResult);
       }
 
       case "get_impact_radius": {

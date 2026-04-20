@@ -2,7 +2,7 @@ import { resolve, join } from "node:path";
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { CLIOptions } from "../types.js";
-import { log, success, warn, error, heading, info } from "../utils/output.js";
+import { log, success, warn, error, heading, info, printFriendlyError } from "../utils/output.js";
 
 export async function runRelease(options: CLIOptions): Promise<void> {
   const root = resolve(options.path);
@@ -14,7 +14,7 @@ export async function runRelease(options: CLIOptions): Promise<void> {
   // ── Prerequisites ─────────────────────────────────────────────
   const ghOk = await checkGhAuth();
   if (!ghOk) {
-    error("gh CLI not authenticated. Run: gh auth login");
+    printFriendlyError("GitHub sync skipped", "gh not authenticated", "Run: gh auth login");
     process.exit(1);
   }
   const hasRemote = await execGitStr(root, "remote", "get-url", "origin");

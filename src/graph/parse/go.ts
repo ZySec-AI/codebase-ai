@@ -31,6 +31,25 @@ function isTestFile(relPath: string): boolean {
   return relPath.endsWith("_test.go");
 }
 
+// ---- Module-level regex constants ----
+
+// Single: import "pkg/path" / import alias "pkg/path"
+const singleImportRe = /^\s*import\s+(?:(\w+)\s+)?["']([^"']+)["']/;
+// Block import
+const importBlockStartRe = /^\s*import\s*\(/;
+const importBlockEndRe = /^\s*\)/;
+const blockImportLineRe = /^\s*(?:(\w+)\s+)?["']([^"']+)["']/;
+// func FooBar( / func (r *Receiver) FooBar(
+const goFuncRe = /^func\s+(?:\([^)]*\)\s+)?(\w+)\s*\(/;
+// type FooBar struct
+const goStructRe = /^type\s+(\w+)\s+struct\b/;
+// type FooBar interface
+const goInterfaceRe = /^type\s+(\w+)\s+interface\b/;
+// call sites
+const goCallRe = /\b(\w+)\s*\(/g;
+// skip declaration lines in call scanning
+const goSkipLineRe = /^(?:func|type|import)\s/;
+
 export function parseGo(filePath: string, content: string, root: string): ParseResult {
   const relFile = toRelFile(filePath, root);
   const nodes: GraphNode[] = [];
@@ -49,12 +68,6 @@ export function parseGo(filePath: string, content: string, root: string): ParseR
   });
 
   // ---- Import detection ----
-  // Single: import "pkg/path" / import alias "pkg/path"
-  const singleImportRe = /^\s*import\s+(?:(\w+)\s+)?["']([^"']+)["']/;
-  // Block import
-  const importBlockStartRe = /^\s*import\s*\(/;
-  const importBlockEndRe = /^\s*\)/;
-  const blockImportLineRe = /^\s*(?:(\w+)\s+)?["']([^"']+)["']/;
 
   let inImportBlock = false;
 
@@ -102,18 +115,11 @@ export function parseGo(filePath: string, content: string, root: string): ParseR
 
   // ---- Declaration detection ----
 
-  // func FooBar( / func (r *Receiver) FooBar(
-  const funcRe = /^func\s+(?:\([^)]*\)\s+)?(\w+)\s*\(/;
-  // type FooBar struct
-  const structRe = /^type\s+(\w+)\s+struct\b/;
-  // type FooBar interface
-  const interfaceRe = /^type\s+(\w+)\s+interface\b/;
-
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lineNo = i + 1;
 
-    const funcMatch = funcRe.exec(line);
+    const funcMatch = goFuncRe.exec(line);
     if (funcMatch) {
       const name = funcMatch[1];
       const exported = /^[A-Z]/.test(name);
@@ -136,7 +142,7 @@ export function parseGo(filePath: string, content: string, root: string): ParseR
       continue;
     }
 
-    const structMatch = structRe.exec(line);
+    const structMatch = goStructRe.exec(line);
     if (structMatch) {
       const name = structMatch[1];
       const exported = /^[A-Z]/.test(name);
@@ -152,7 +158,7 @@ export function parseGo(filePath: string, content: string, root: string): ParseR
       continue;
     }
 
-    const ifaceMatch = interfaceRe.exec(line);
+    const ifaceMatch = goInterfaceRe.exec(line);
     if (ifaceMatch) {
       const name = ifaceMatch[1];
       const exported = /^[A-Z]/.test(name);
@@ -175,13 +181,13 @@ export function parseGo(filePath: string, content: string, root: string): ParseR
     nodes.filter((n) => n.symbol !== undefined).map((n) => n.symbol as string)
   );
 
-  const callRe = /\b(\w+)\s*\(/g;
   for (const line of lines) {
-    if (/^(?:func|type|import)\s/.test(line)) {
+    if (goSkipLineRe.test(line)) {
       continue;
     }
+    goCallRe.lastIndex = 0;
     let cm: RegExpExecArray | null;
-    while ((cm = callRe.exec(line)) !== null) {
+    while ((cm = goCallRe.exec(line)) !== null) {
       const callee = cm[1];
       if (localSymbols.has(callee)) {
         edges.push({ from: relFile, to: `${relFile}:${callee}`, kind: "calls" });

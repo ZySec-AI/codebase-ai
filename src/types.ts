@@ -4,6 +4,7 @@ export interface ScanContext {
   root: string;
   files: string[];
   readFile(path: string): Promise<string>;
+  readFileRaw(path: string): Promise<{ ok: boolean; content: string; error?: string }>;
   fileExists(path: string): boolean;
   glob(pattern: string): string[];
   /**
@@ -54,8 +55,12 @@ export type ManifestCategory =
 export interface Manifest {
   version: string;
   generated_at: string;
+  /** ISO timestamp of when this manifest was last generated */
+  last_scan_time?: string;
+  /** Manifest schema version for forward compat */
+  manifest_version?: string;
   /** Warnings from detectors that failed or returned partial data. AI tools should inspect this. */
-  _warnings?: string[];
+  _warnings?: Array<{ detector: string; category: string; error: string }>;
 
   // Project identity
   project?: ProjectData;
@@ -145,7 +150,8 @@ export interface ConfigData {
 export interface GitData {
   recent_commits: string[];
   last_committers: string[];
-  uncommitted_changes: boolean;
+  /** true if uncommitted changes exist; array of changed file paths when available */
+  uncommitted_changes: boolean | string[];
 }
 
 export interface QualityData {
@@ -169,6 +175,7 @@ export interface GraphData {
   edges?: number;
   languages?: string[];
   built_at?: string;
+  /** true when the graph is older than the current manifest and may be out of date */
   stale?: boolean;
   size_bytes?: number;
   path: string;

@@ -1,6 +1,8 @@
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { existsSync, readFileSync, statSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
 import { checkGhDetailed } from "./init.js";
 import { setQuiet, log, success, heading, dim, bold } from "../utils/output.js";
@@ -112,7 +114,11 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
     const warnings = (manifest as unknown as Record<string, unknown>)._warnings;
     if (Array.isArray(warnings) && warnings.length > 0) {
       for (const w of warnings) {
-        results.push({ label: "Detector Warning", ok: false, detail: `(non-fatal) ${w}` });
+        const detail =
+          typeof w === "object" && w !== null
+            ? `(non-fatal) [${(w as { detector: string }).detector}] ${(w as { category: string }).category}: ${(w as { error: string }).error}`
+            : `(non-fatal) ${w}`;
+        results.push({ label: "Detector Warning", ok: false, detail });
       }
     }
   }
@@ -273,30 +279,115 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
     });
   }
 
-  // ─── 10c-ii. Claude Skills ─────────────────────────────────
-  const skillsDir = join(homedir(), ".claude", "skills");
-  if (existsSync(skillsDir)) {
-    const skillFiles = readdirSync(skillsDir).filter((f) => f.endsWith(".skill"));
-    if (skillFiles.length > 0) {
-      const names = skillFiles.map((f) => f.replace(/\.skill$/, "")).join(", ");
-      results.push({
-        label: "Claude Skills",
-        ok: true,
-        detail: `${skillFiles.length} skill${skillFiles.length > 1 ? "s" : ""} installed: ${names}`,
-      });
-    } else {
-      results.push({
-        label: "Claude Skills",
-        ok: false,
-        detail: "No skills installed — run: codebase setup",
-      });
+  // ─── 10c-ii. Claude Skills (per-skill integrity check) ────
+  {
+    const globalSkillsDir = join(homedir(), ".claude", "skills");
+    const projectSkillsDir = join(root, ".claude", "skills");
+
+    // Try to load skills/manifest.json from the npm package
+    let skillManifest: Array<{
+      name: string;
+      sha256: string;
+      depends_on: string[];
+    }> | null = null;
+    try {
+      const manifestUrl = new URL("../../../skills/manifest.json", import.meta.url);
+      skillManifest = JSON.parse(readFileSync(manifestUrl, "utf-8")).skills;
+    } catch {
+      /* manifest not available in dev mode — fall back to simple check */
     }
-  } else {
-    results.push({
-      label: "Claude Skills",
-      ok: false,
-      detail: "No skills installed — run: codebase setup",
-    });
+
+    if (skillManifest) {
+      const failures: string[] = [];
+      const missingDeps: string[] = [];
+      let verified = 0;
+
+      for (const skill of skillManifest) {
+        const globalInstalled = existsSync(join(globalSkillsDir, `${skill.name}.skill`));
+        const projectInstalled = existsSync(join(projectSkillsDir, `${skill.name}.skill`));
+        const installed = globalInstalled || projectInstalled;
+
+        if (!installed) {
+          failures.push(`${skill.name} (not installed)`);
+          continue;
+        }
+
+        // SHA-256 integrity check against whichever location is present
+        const installedPath = globalInstalled
+          ? join(globalSkillsDir, `${skill.name}.skill`)
+          : join(projectSkillsDir, `${skill.name}.skill`);
+        try {
+          const buf = readFileSync(installedPath);
+          const hash = createHash("sha256").update(buf).digest("hex");
+          if (hash !== skill.sha256) {
+            failures.push(`${skill.name} (stale — run \`codebase fix --skills\`)`);
+            continue;
+          }
+        } catch {
+          failures.push(`${skill.name} (unreadable)`);
+          continue;
+        }
+
+        // Check depends_on binaries
+        for (const dep of skill.depends_on) {
+          try {
+            execFileSync("which", [dep], { timeout: 3_000, stdio: "ignore" });
+          } catch {
+            missingDeps.push(`${dep} (required by ${skill.name})`);
+          }
+        }
+
+        verified++;
+      }
+
+      const total = skillManifest.length;
+      if (failures.length === 0 && missingDeps.length === 0) {
+        results.push({
+          label: "Claude Skills",
+          ok: true,
+          detail: `${verified}/${total} verified`,
+        });
+      } else {
+        const parts: string[] = [];
+        if (failures.length > 0) {
+          parts.push(`failures: ${failures.join(", ")}`);
+        }
+        if (missingDeps.length > 0) {
+          parts.push(`missing deps: ${missingDeps.join(", ")}`);
+        }
+        results.push({
+          label: "Claude Skills",
+          ok: false,
+          detail: `${verified}/${total} verified — ${parts.join("; ")} — run \`codebase fix\``,
+        });
+      }
+    } else {
+      // Fallback: simple existence check when manifest unavailable
+      const skillsDir = existsSync(globalSkillsDir) ? globalSkillsDir : projectSkillsDir;
+      if (existsSync(skillsDir)) {
+        const skillFiles = readdirSync(skillsDir).filter((f) => f.endsWith(".skill"));
+        if (skillFiles.length > 0) {
+          const names = skillFiles.map((f) => f.replace(/\.skill$/, "")).join(", ");
+          results.push({
+            label: "Claude Skills",
+            ok: true,
+            detail: `${skillFiles.length} skill${skillFiles.length > 1 ? "s" : ""} installed: ${names}`,
+          });
+        } else {
+          results.push({
+            label: "Claude Skills",
+            ok: false,
+            detail: "No skills installed — run: codebase setup",
+          });
+        }
+      } else {
+        results.push({
+          label: "Claude Skills",
+          ok: false,
+          detail: "No skills installed — run: codebase setup",
+        });
+      }
+    }
   }
 
   // ─── 10d. Claude Code hooks ────────────────────────────────

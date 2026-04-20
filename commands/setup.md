@@ -56,7 +56,7 @@ Stop if any prerequisite is missing. Do not proceed until all are resolved.
 Run the full codebase setup to generate `.codebase.json`, wire AI tools, and install git hooks:
 
 ```bash
-npx codebase setup --sync 2>/dev/null || npx codebase init --sync
+npx codebase setup --sync 2>/dev/null
 ```
 
 This installs:
@@ -270,6 +270,9 @@ Use `codebase brief` as the primary source of project intelligence:
 
 ```bash
 npx codebase brief 2>/dev/null > /tmp/cb-brief.json || true
+if [ ! -s /tmp/cb-brief.json ]; then
+  echo "WARNING: codebase brief failed or returned empty — proceeding with defaults"
+fi
 ```
 
 Read the brief. If `docs/PRODUCT.md` exists and `--refresh` not passed: show diff of stale sections, ask user to confirm updates.
@@ -281,9 +284,11 @@ Otherwise generate `docs/PRODUCT.md` from (note: filename is all-caps `PRODUCT.m
 - Route/page file scan → infer User Roles
 - `repo.url` → links
 
-Mark genuinely unknown sections with `[INFERRED: ...]`.
+Mark sections as follows:
+- `[INFERRED: ...]` = detected from codebase scan, may need verification
+- `[TODO: ...]` = genuinely unknown, needs human input
 
-**Never hardcode example industries, roles, or countries** — infer from codebase or ask the user.
+**Never hardcode example industries, roles, or countries** — infer from codebase or mark as `[TODO: ...]`.
 
 ---
 
@@ -334,7 +339,7 @@ Commands: `open <url>`, `snapshot -i` (→ `@e1`/`@e2` refs), `click @e1`, `fill
 After writing CLAUDE.md, re-run the codebase injection to ensure the context block is up to date:
 
 ```bash
-npx codebase init --quiet 2>/dev/null || true
+npx codebase setup --quiet 2>/dev/null || true
 ```
 
 ---
