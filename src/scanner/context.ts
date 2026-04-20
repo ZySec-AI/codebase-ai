@@ -43,16 +43,29 @@ export async function createScanContext(
   const ignoreSet = new Set([...DEFAULT_IGNORE, ...(options.ignore ?? [])]);
   const files = await walkDirectory(root, root, ignoreSet, options.depth ?? 10);
   const fileSet = new Set(files);
+  const readCache = new Map<string, Promise<string>>();
+  const globCache = new Map<string, string[]>();
 
   return {
     root,
     files,
 
-    async readFile(path: string): Promise<string> {
+    readFile(path: string): Promise<string> {
+      const cached = readCache.get(path);
+      if (cached) {
+        return cached;
+      }
+      const p = fsReadFile(join(root, path), "utf-8").catch(() => "");
+      readCache.set(path, p);
+      return p;
+    },
+
+    async readFileRaw(path: string): Promise<{ ok: boolean; content: string; error?: string }> {
       try {
-        return await fsReadFile(join(root, path), "utf-8");
-      } catch {
-        return "";
+        const content = await fsReadFile(join(root, path), "utf-8");
+        return { ok: true, content };
+      } catch (err) {
+        return { ok: false, content: "", error: String(err) };
       }
     },
 
@@ -66,7 +79,13 @@ export async function createScanContext(
     },
 
     glob(pattern: string): string[] {
-      return globFilter(files, pattern);
+      const cached = globCache.get(pattern);
+      if (cached) {
+        return cached;
+      }
+      const result = globFilter(files, pattern);
+      globCache.set(pattern, result);
+      return result;
     },
 
     exec(cmd: string, args: string[]): Promise<string> {

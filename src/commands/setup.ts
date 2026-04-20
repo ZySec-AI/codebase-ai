@@ -8,6 +8,7 @@ import {
   readdirSync,
   copyFileSync,
   rmSync,
+  renameSync,
 } from "node:fs";
 import { execFile, execFileSync } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
@@ -16,6 +17,23 @@ import { claudeIntegration } from "../integrations/claude.js";
 import { updateGitignore } from "../integrations/gitignore.js";
 import { installHooks } from "../integrations/githook.js";
 import { log, success, info, warn, heading } from "../utils/output.js";
+
+// ─── Typed hook interfaces ───────────────────────────────────────
+
+interface ClaudeHookEntry {
+  type: string;
+  command: string;
+}
+
+interface ClaudeHookMatcher {
+  matcher: string;
+  hooks: ClaudeHookEntry[];
+}
+
+interface ClaudeSettings {
+  hooks?: Record<string, ClaudeHookMatcher[]>;
+  [key: string]: unknown;
+}
 
 // ─── Vibekit labels ──────────────────────────────────────────────
 const VIBEKIT_LABELS = [
@@ -120,7 +138,7 @@ export async function runSetup(options: CLIOptions): Promise<void> {
   const productPath = join(docsDir, "PRODUCT.md");
   if (!existsSync(productPath)) {
     generateProductMd(root, productPath);
-    success("docs/PRODUCT.md generated — review and fill in [INFERRED] sections");
+    success("docs/PRODUCT.md generated — review and fill in [INFERRED] and [TODO] sections");
   } else {
     info("docs/PRODUCT.md already exists — skipping (delete to regenerate)");
   }
@@ -219,25 +237,79 @@ export function installClaudeSkillsForFix(root: string): void {
   installClaudeSkills(root);
 }
 
-function unzipSkill(skillPath: string, targetDir: string): boolean {
-  const name = skillPath
-    .split("/")
-    .pop()!
-    .replace(/\.skill$/, "");
-  const unzipDir = join(targetDir, name);
-  try {
-    // Remove old unzipped dir if it exists so we get a clean extraction
-    if (existsSync(unzipDir)) {
-      rmSync(unzipDir, { recursive: true, force: true });
+/** Install a single skill zip to destDir with staging + retry (3 attempts, 500ms backoff).
+ *  Stages to destDir/.staging/<name>/ first, then renames on success.
+ *  Returns true on success, false if all attempts fail.
+ */
+async function installSkillWithRetry(
+  src: string,
+  destDir: string,
+  skillName: string
+): Promise<boolean> {
+  const stagingBase = join(destDir, ".staging");
+  const stagingDir = join(stagingBase, skillName);
+  const finalSkillZip = join(destDir, `${skillName}.skill`);
+  const finalUnzipDir = join(destDir, skillName);
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      // Clean up any previous staging attempt
+      if (existsSync(stagingDir)) {
+        rmSync(stagingDir, { recursive: true, force: true });
+      }
+      mkdirSync(stagingBase, { recursive: true });
+
+      // Copy zip to staging area
+      const stagingZip = join(stagingBase, `${skillName}.skill`);
+      copyFileSync(src, stagingZip);
+
+      // Unzip into staging
+      execFileSync("unzip", ["-o", "-q", stagingZip, "-d", stagingDir], { timeout: 30_000 });
+
+      // Verify SKILL.md exists in unzipped output
+      const unzippedSkillDir = join(stagingDir, skillName);
+      const skillMdExists =
+        existsSync(join(unzippedSkillDir, "SKILL.md")) || existsSync(join(stagingDir, "SKILL.md"));
+      if (!skillMdExists) {
+        throw new Error("SKILL.md not found after unzip");
+      }
+
+      // Commit: move zip and unzipped dir to final locations
+      copyFileSync(src, finalSkillZip);
+      if (existsSync(finalUnzipDir)) {
+        rmSync(finalUnzipDir, { recursive: true, force: true });
+      }
+      renameSync(unzippedSkillDir, finalUnzipDir);
+
+      // Clean up staging
+      rmSync(stagingBase, { recursive: true, force: true });
+
+      return true;
+    } catch {
+      // Clean up failed staging attempt
+      try {
+        if (existsSync(stagingDir)) {
+          rmSync(stagingDir, { recursive: true, force: true });
+        }
+      } catch {
+        /* ignore cleanup errors */
+      }
+
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 500 * attempt));
+      }
     }
-    execFileSync("unzip", ["-o", "-q", skillPath, "-d", targetDir], { timeout: 30_000 });
-    return existsSync(unzipDir);
-  } catch {
-    return false;
   }
+  return false;
 }
 
 function installClaudeSkills(root: string): void {
+  installClaudeSkillsAsync(root).catch(() => {
+    warn("Skills installation encountered errors — run `codebase fix --skills` to retry");
+  });
+}
+
+async function installClaudeSkillsAsync(root: string): Promise<void> {
   // skills/ is always a sibling of dist/ in the npm package (dist/commands/ → dist/ → package root → skills/)
   const skillsSource = join(dirname(new URL(import.meta.url).pathname), "../..", "skills");
 
@@ -267,37 +339,45 @@ function installClaudeSkills(root: string): void {
     let installed = 0;
     let updated = 0;
     let skipped = 0;
+    const failed: string[] = [];
 
     for (const file of files) {
       const src = join(skillsSource, file);
       const dest = join(dir, file);
-      let needsUnzip = false;
+      const skillName = file.replace(/\.skill$/, "");
+      let needsInstall = false;
+      let isNew = false;
+
       if (existsSync(dest)) {
         const srcBuf = readFileSync(src);
         const destBuf = readFileSync(dest);
         if (!srcBuf.equals(destBuf)) {
-          copyFileSync(src, dest);
-          needsUnzip = true;
+          needsInstall = true;
           updated++;
         } else {
           // Check if unzipped dir exists — if not, we need to unzip even if .skill unchanged
-          const name = file.replace(/\.skill$/, "");
-          if (!existsSync(join(dir, name, "SKILL.md"))) {
-            needsUnzip = true;
+          if (!existsSync(join(dir, skillName, "SKILL.md"))) {
+            needsInstall = true;
           } else {
             skipped++;
           }
         }
       } else {
-        copyFileSync(src, dest);
-        needsUnzip = true;
-        installed++;
+        needsInstall = true;
+        isNew = true;
       }
 
-      if (needsUnzip) {
-        const ok = unzipSkill(dest, dir);
-        if (!ok) {
-          warn(`Failed to unzip ${file} — skill may not work until manually extracted`);
+      if (needsInstall) {
+        const ok = await installSkillWithRetry(src, dir, skillName);
+        if (ok) {
+          if (isNew) {
+            installed++;
+          } else {
+            updated++;
+          }
+        } else {
+          failed.push(skillName);
+          warn(`✗ ${skillName}: install failed — try: npm install -g codebase@latest`);
         }
       }
     }
@@ -312,11 +392,17 @@ function installClaudeSkills(root: string): void {
     if (skipped > 0) {
       parts.push(`${skipped} unchanged`);
     }
+    if (failed.length > 0) {
+      parts.push(`${failed.length} failed`);
+    }
 
+    const label2 = label;
     if (installed > 0 || updated > 0) {
-      success(`Skills → ${label} (${parts.join(", ")})`);
+      success(`Skills → ${label2} (${parts.join(", ")})`);
+    } else if (failed.length > 0) {
+      warn(`Skills → ${label2} (${parts.join(", ")})`);
     } else {
-      info(`Skills up to date → ${label}`);
+      info(`Skills up to date → ${label2}`);
     }
 
     totalInstalled += installed;
@@ -375,15 +461,15 @@ MANIFEST=".codebase.json"
 # Read session_id from stdin JSON (Claude Code passes hook data as JSON)
 # Fall back to a hash of cwd if jq/python unavailable
 STDIN_DATA=$(cat)
-SESSION_ID=$(echo "\$STDIN_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('session_id',''))" 2>/dev/null || true)
+SESSION_ID=$(echo "\$STDIN_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('session_id',''))" 2>/dev/null || python -c "import sys,json; d=json.load(sys.stdin); print(d.get('session_id',''))" 2>/dev/null || true)
 
 if [ -z "\$SESSION_ID" ]; then
   # Fallback: use stable hash of cwd (one injection per directory per day)
   SESSION_ID=$(echo "\$(pwd)\$(date +%Y%m%d)" | md5sum 2>/dev/null | cut -c1-12 || echo "\$(pwd)\$(date +%Y%m%d)" | md5 2>/dev/null | cut -c1-12 || echo "default")
 fi
 
-HASH=$(echo "\$(pwd)" | md5sum 2>/dev/null | cut -c1-8 || echo "\$(pwd)" | md5 2>/dev/null | cut -c1-8 || echo "proj")
-SENTINEL="/tmp/.codebase-ctx-\${HASH}-\${SESSION_ID}"
+PROJ_HASH=$(echo "\$PWD" | od -An -tx1 | tr -d ' \n' | head -c 16 || echo "proj")
+SENTINEL="/tmp/.codebase-ctx-\${PROJ_HASH}-\${SESSION_ID}"
 
 # Not first prompt of this session — check if manifest was refreshed
 if [ -f "\$SENTINEL" ]; then
@@ -401,7 +487,8 @@ touch "\$SENTINEL"
 if [ -f "\$MANIFEST" ]; then
   # Re-scan if manifest is older than CODEBASE_HOOK_TTL_MINUTES (default 30)
   TTL_MINUTES=\${CODEBASE_HOOK_TTL_MINUTES:-30}
-  AGE_SECONDS=$(( \$(date +%s) - \$(stat -f %m "\$MANIFEST" 2>/dev/null || stat -c %Y "\$MANIFEST" 2>/dev/null || echo 0) ))
+  MTIME=$(stat -f %m "\$MANIFEST" 2>/dev/null || stat -c %Y "\$MANIFEST" 2>/dev/null || date +%s)
+  AGE_SECONDS=$(( \$(date +%s) - MTIME ))
   if [ "\$AGE_SECONDS" -gt \$(( TTL_MINUTES * 60 )) ]; then
     npx --yes codebase scan-only --quiet 2>/dev/null || true
   fi
@@ -415,17 +502,17 @@ npx --yes codebase context --quiet 2>/dev/null || true
 
   // Wire into .claude/settings.json as UserPromptSubmit hook
   const settingsPath = join(root, ".claude", "settings.json");
-  let settings: Record<string, unknown> = {};
+  let settings: ClaudeSettings = {};
   if (existsSync(settingsPath)) {
     try {
-      settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+      settings = JSON.parse(readFileSync(settingsPath, "utf-8")) as ClaudeSettings;
     } catch {
       /* ignore */
     }
   }
 
-  const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
-  const promptHooks = (hooks["UserPromptSubmit"] as unknown[]) ?? [];
+  const hooks: Record<string, ClaudeHookMatcher[]> = settings.hooks ?? {};
+  const promptHooks: ClaudeHookMatcher[] = hooks["UserPromptSubmit"] ?? [];
   const hasContextHook = JSON.stringify(promptHooks).includes("context-inject");
   if (!hasContextHook) {
     promptHooks.push({
@@ -434,11 +521,35 @@ npx --yes codebase context --quiet 2>/dev/null || true
     });
   }
   hooks["UserPromptSubmit"] = promptHooks;
+
+  // SessionStart — inject brief before first user prompt (fires earlier than UserPromptSubmit)
+  const sessionStartHooks: ClaudeHookMatcher[] = hooks["SessionStart"] ?? [];
+  const hasSessionStartHook = JSON.stringify(sessionStartHooks).includes("session-start");
+  if (!hasSessionStartHook) {
+    sessionStartHooks.push({
+      matcher: "",
+      hooks: [{ type: "command", command: `bash .claude/hooks/session-start.sh` }],
+    });
+  }
+  hooks["SessionStart"] = sessionStartHooks;
+
+  // PostCompact — re-inject brief after context compaction
+  const postCompactHooks: ClaudeHookMatcher[] = hooks["PostCompact"] ?? [];
+  const hasPostCompact = JSON.stringify(postCompactHooks).includes("context-inject");
+  if (!hasPostCompact) {
+    postCompactHooks.push({
+      matcher: "",
+      hooks: [{ type: "command", command: `bash .claude/hooks/context-inject.sh` }],
+    });
+  }
+  hooks["PostCompact"] = postCompactHooks;
+
   settings.hooks = hooks;
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
   success(
-    ".claude/hooks/context-inject.sh (UserPromptSubmit — auto-inject slim brief on session start)"
+    ".claude/hooks/context-inject.sh (UserPromptSubmit + PostCompact — auto-inject slim brief)"
   );
+  success(".claude/hooks/session-start.sh (SessionStart — fires before first prompt)");
 }
 
 function installClaudeHooks(root: string): void {
@@ -452,7 +563,7 @@ function installClaudeHooks(root: string): void {
 # Reads Claude tool input JSON from stdin, enforces git safety rules.
 
 INPUT=$(cat)
-CMD=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('command',''))" 2>/dev/null || echo "")
+CMD=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('command',''))" 2>/dev/null || python -c "import sys,json; d=json.load(sys.stdin); print(d.get('command',''))" 2>/dev/null || echo "")
 
 if [ -z "$CMD" ]; then exit 0; fi
 
@@ -484,6 +595,15 @@ if echo "$CMD" | grep -qE "git push.*(origin )?(main|master|prod|production)(\s|
   echo ""
   echo "  BLOCKED: Direct push to protected branch is not allowed."
   echo "  Use /launch to release to main."
+  echo ""
+  exit 2
+fi
+
+# ── Rule 2b: No bulk push variants ───────────────────────────
+if echo "$CMD" | grep -qE "git push.*(--all|--force-all)"; then
+  echo ""
+  echo "  BLOCKED: git push --all and --force-all are not allowed."
+  echo "  Push specific branches only."
   echo ""
   exit 2
 fi
@@ -527,13 +647,14 @@ exit 0
 # Reads Claude tool input JSON from stdin. Reminds to raise PR after branch push.
 
 INPUT=$(cat)
-CMD=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('command',''))" 2>/dev/null || echo "")
+CMD=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('command',''))" 2>/dev/null || python -c "import sys,json; d=json.load(sys.stdin); print(d.get('command',''))" 2>/dev/null || echo "")
 
 if [ -z "$CMD" ]; then exit 0; fi
 
 # ── Remind to raise PR after pushing a non-develop/main branch ──
 if echo "$CMD" | grep -qE "git push origin [a-zA-Z0-9/_-]+"; then
-  PUSHED_BRANCH=$(echo "$CMD" | grep -oE "git push origin [a-zA-Z0-9/_-]+" | awk '{print $4}')
+  PUSHED_BRANCH=$(echo "$CLAUDE_TOOL_INPUT_COMMAND" | grep -oP '(?<=origin )\S+' | head -1)
+  [ -z "$PUSHED_BRANCH" ] && PUSHED_BRANCH=$(echo "$CMD" | grep -oE "git push origin [a-zA-Z0-9/_-]+" | grep -oE "[a-zA-Z0-9/_-]+$")
   if [[ -n "$PUSHED_BRANCH" ]] && \
      [[ "$PUSHED_BRANCH" != "main" ]] && \
      [[ "$PUSHED_BRANCH" != "master" ]] && \
@@ -554,24 +675,49 @@ exit 0
   chmodSync(postPath, 0o755);
   success(".claude/hooks/git-post.sh (PostToolUse — PR reminder after branch push)");
 
+  // ── post-edit.sh (PostToolUse: Edit|Write) ─────────────────────
+  const postEditPath = join(hooksDir, "post-edit.sh");
+  const postEditScript = `#!/bin/bash
+# Trigger incremental rescan after file edits so next MCP call has current state
+DEBOUNCE_FILE="/tmp/.codebase-rescan-$$"
+[ -f "$DEBOUNCE_FILE" ] && exit 0
+touch "$DEBOUNCE_FILE"
+(sleep 5; rm -f "$DEBOUNCE_FILE"; npx --yes codebase scan-only --incremental --quiet 2>/dev/null) &
+`;
+  writeFileSync(postEditPath, postEditScript, "utf-8");
+  chmodSync(postEditPath, 0o755);
+  success(".claude/hooks/post-edit.sh (PostToolUse:Edit|Write — incremental rescan)");
+
+  // ── session-end.sh (Stop) ──────────────────────────────────────
+  const sessionEndPath = join(hooksDir, "session-end.sh");
+  const sessionEndScript = `#!/bin/bash
+# codebase session-end hook — shows value summary after each Claude response
+# Only runs if there have been meaningful MCP calls
+[ "\${CODEBASE_QUIET:-0}" = "1" ] && exit 0
+npx --yes codebase stats --session --quiet 2>/dev/null || true
+`;
+  writeFileSync(sessionEndPath, sessionEndScript, "utf-8");
+  chmodSync(sessionEndPath, 0o755);
+  success(".claude/hooks/session-end.sh (Stop — session stats summary)");
+
   // ── .claude/settings.json ─────────────────────────────────────
   const settingsPath = join(root, ".claude", "settings.json");
-  let settings: Record<string, unknown> = {};
+  let settings: ClaudeSettings = {};
   if (existsSync(settingsPath)) {
     try {
-      settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+      settings = JSON.parse(readFileSync(settingsPath, "utf-8")) as ClaudeSettings;
     } catch {
       /* ignore */
     }
   }
 
-  const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
+  const hooks: Record<string, ClaudeHookMatcher[]> = settings.hooks ?? {};
 
   const guardCmd = `bash .claude/hooks/git-guard.sh`;
   const postCmd = `bash .claude/hooks/git-post.sh`;
 
   // PreToolUse — add guard if not already present
-  const preHooks = (hooks["PreToolUse"] as unknown[]) ?? [];
+  const preHooks: ClaudeHookMatcher[] = hooks["PreToolUse"] ?? [];
   const hasGuard = JSON.stringify(preHooks).includes("git-guard");
   if (!hasGuard) {
     preHooks.push({
@@ -581,8 +727,8 @@ exit 0
   }
   hooks["PreToolUse"] = preHooks;
 
-  // PostToolUse — add post if not already present
-  const postHooks = (hooks["PostToolUse"] as unknown[]) ?? [];
+  // PostToolUse — add git-post if not already present
+  const postHooks: ClaudeHookMatcher[] = hooks["PostToolUse"] ?? [];
   const hasPost = JSON.stringify(postHooks).includes("git-post");
   if (!hasPost) {
     postHooks.push({
@@ -590,11 +736,30 @@ exit 0
       hooks: [{ type: "command", command: postCmd }],
     });
   }
+  // PostToolUse — add post-edit if not already present
+  const hasPostEdit = JSON.stringify(postHooks).includes("post-edit");
+  if (!hasPostEdit) {
+    postHooks.push({
+      matcher: "Edit|Write|MultiEdit",
+      hooks: [{ type: "command", command: `bash .claude/hooks/post-edit.sh` }],
+    });
+  }
   hooks["PostToolUse"] = postHooks;
+
+  // Stop — session-end stats
+  const stopHooks: ClaudeHookMatcher[] = hooks["Stop"] ?? [];
+  const hasStopHook = JSON.stringify(stopHooks).includes("session-end");
+  if (!hasStopHook) {
+    stopHooks.push({
+      matcher: "",
+      hooks: [{ type: "command", command: `bash .claude/hooks/session-end.sh` }],
+    });
+  }
+  hooks["Stop"] = stopHooks;
 
   settings.hooks = hooks;
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
-  success(".claude/settings.json (PreToolUse + PostToolUse hooks registered)");
+  success(".claude/settings.json (PreToolUse + PostToolUse + Stop hooks registered)");
 }
 
 // ─── Session-start hook ───────────────────────────────────────────
@@ -605,15 +770,24 @@ function installSessionStartHook(root: string): void {
 
   const hookPath = join(hooksDir, "session-start.sh");
   const hookScript = `#!/bin/bash
-# codebase session-start — fires once per Claude Code session
-# Keeps .codebase.json fresh without blocking Claude startup.
-npx --yes codebase scan-only --quiet 2>/dev/null || true
+# codebase session-start hook
+MANIFEST=".codebase.json"
+npx --yes codebase scan-only --quiet 2>/dev/null && echo "codebase: context ready" || echo "codebase: WARNING scan failed"
+
+# Weekly summary (once per calendar week)
+WEEK=$(date +%Y-%V)
+SENTINEL=".codebase/.last-weekly"
+LAST_WEEK=$(cat "\$SENTINEL" 2>/dev/null || echo "")
+if [ "\$WEEK" != "\$LAST_WEEK" ]; then
+  echo "\$WEEK" > "\$SENTINEL"
+  npx --yes codebase stats --weekly --quiet 2>/dev/null || true
+fi
 `;
   writeFileSync(hookPath, hookScript, "utf-8");
   chmodSync(hookPath, 0o755);
 
-  // Wire into .claude/settings.json as a PreToolUse hook on the first Bash call,
-  // using a sentinel file so it only fires once per session.
+  // The SessionStart event is registered in installContextInjectHook.
+  // session-start.sh is also registered as PreToolUse for backward compat.
   const settingsPath = join(root, ".claude", "settings.json");
   let settings: Record<string, unknown> = {};
   if (existsSync(settingsPath)) {
@@ -636,7 +810,7 @@ npx --yes codebase scan-only --quiet 2>/dev/null || true
   hooks["PreToolUse"] = preHooks;
   settings.hooks = hooks;
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
-  success(".claude/hooks/session-start.sh (PreToolUse — auto-refresh manifest on session start)");
+  success(".claude/hooks/session-start.sh (PreToolUse + SessionStart — weekly banner + rescan)");
 }
 
 // ─── commit-msg hook: block commits directly to main/master ─────
@@ -846,7 +1020,9 @@ function generateProductMd(root: string, outputPath: string): void {
     outputPath,
     `# PRODUCT.md — ${name}
 
-> Auto-generated by \`codebase setup\`. Fill in any [INFERRED] sections.
+> Auto-generated by \`codebase setup\`.
+> - \`[INFERRED: ...]\` = detected from codebase scan, may need verification
+> - \`[TODO: ...]\` = genuinely unknown, needs human input
 
 ## Summary
 
@@ -854,28 +1030,28 @@ ${description}
 
 ## ICP (Ideal Customer Profile)
 
-- **Company size:** [INFERRED: e.g. 10–500 employees]
-- **Industry:** [INFERRED: e.g. SaaS, FinTech, DevTools]
-- **Geography:** [INFERRED: e.g. North America, Europe]
-- **Buyer role:** [INFERRED: e.g. CTO, Engineering Manager]
+- **Company size:** [TODO: e.g. 10–500 employees]
+- **Industry:** [TODO: e.g. SaaS, FinTech, DevTools]
+- **Geography:** [TODO: e.g. North America, Europe]
+- **Buyer role:** [TODO: e.g. CTO, Engineering Manager]
 
 ## User Roles
 
 | Role | Description | Primary Use Cases |
 |------|-------------|------------------|
-| [Role 1] | [INFERRED] | [INFERRED] |
-| [Role 2] | [INFERRED] | [INFERRED] |
+| [TODO: Role 1] | [TODO: description] | [TODO: use cases] |
+| [TODO: Role 2] | [TODO: description] | [TODO: use cases] |
 
 ## Pain Points
 
-1. [INFERRED: primary pain point]
-2. [INFERRED: secondary pain point]
-3. [INFERRED: tertiary pain point]
+1. [TODO: primary pain point]
+2. [TODO: secondary pain point]
+3. [TODO: tertiary pain point]
 
 ## Competitive Context
 
-- **Alternatives:** [INFERRED: what users do without this product]
-- **Key differentiators:** [INFERRED: why we win]
+- **Alternatives:** [TODO: what users do without this product]
+- **Key differentiators:** [TODO: why we win]
 
 ## Tech Stack (auto-detected)
 
@@ -888,11 +1064,11 @@ ${description}
 ## Dev Credentials
 
 - **Default seed creds:** \`{role}@dev.local\` / \`<your-seed-password>\`
-- **Dev login path:** [INFERRED: e.g. /dev-login or /auth/login]
+- **Dev login path:** [TODO: e.g. /dev-login or /auth/login]
 
 ## Known Constraints
 
-- [INFERRED: e.g. multi-tenant, RBAC, GDPR]
+- [TODO: e.g. multi-tenant, RBAC, GDPR]
 `,
     "utf-8"
   );

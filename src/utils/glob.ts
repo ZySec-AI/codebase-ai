@@ -2,6 +2,9 @@
  * Minimal glob matcher — zero dependencies.
  * Supports: * (any chars except /), ** (any chars including /), ? (single char)
  */
+
+const regexCache = new Map<string, RegExp>();
+
 export function globMatch(pattern: string, filepath: string): boolean {
   const regex = globToRegex(pattern);
   return regex.test(filepath);
@@ -12,7 +15,11 @@ export function globFilter(files: string[], pattern: string): string[] {
   return files.filter((f) => regex.test(f));
 }
 
-function globToRegex(pattern: string): RegExp {
+export function globToRegex(pattern: string): RegExp {
+  const cached = regexCache.get(pattern);
+  if (cached) {
+    return cached;
+  }
   let result = "^";
   let i = 0;
 
@@ -55,7 +62,9 @@ function globToRegex(pattern: string): RegExp {
   }
 
   result += "$";
-  return new RegExp(result);
+  const regex = new RegExp(result);
+  regexCache.set(pattern, regex);
+  return regex;
 }
 
 function escapeRegex(str: string): string {

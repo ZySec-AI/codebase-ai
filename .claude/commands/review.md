@@ -40,6 +40,9 @@ git remote get-url origin || { echo "ERROR: No git remote."; exit 1; }
 
 ```bash
 npx codebase brief 2>/dev/null > /tmp/cb-brief.json || true
+if [ ! -s /tmp/cb-brief.json ]; then
+  echo "WARNING: codebase brief failed or returned empty — proceeding with defaults"
+fi
 ```
 
 Read the brief. Extract and use throughout:
@@ -65,15 +68,15 @@ gh label create "review" --color "6f42c1" --description "From a /review audit" 2
 
 Follow the complete `/vb-review` workflow across all phases:
 
-- **Phase 0** — Scope (`--pr N` or full codebase)
+- **Phase 0** — Scope (`--pr N` → graph blast-radius; otherwise full codebase)
 - **Phase 1** — Security Review (OWASP top 10, CVEs, secrets, auth/authz)
 - **Phase 2** — Quality Review (CLAUDE.md conventions, dead code, lint, complexity, defensive programming, minimal code)
-- **Phase 2b** — Dead Code Declutter (stack-aware — runs `/py-declutter` for Python, `/nextjs-declutter` for Next.js)
+- **Phase 2b** — Dead Code Declutter (graph-aware — uses shared `.codebase/graph.json` first, falls back to `/py-declutter` / `/nextjs-declutter` if graph absent)
 - **Phase 3** — Dependency Health (outdated, vulnerable, alternatives)
 - **Phase 4** — UI/Accessibility (contrast, ARIA, keyboard, responsive)
-- **Phase 5** — Consolidate & prioritize
+- **Phase 5** — Consolidate & prioritize (enrich issue bodies with blast-radius data)
 - **Phase 6** — Create GitHub Issues (one per finding, labeled `review,[severity],[dimension]`)
-- **Phase 7** — Auto-fix (if `--fix`) + commit
+- **Phase 7** — Auto-fix (if `--fix`) + commit (validate blast radius before committing)
 - **Phase 8** — Summary
 
 ### codebase integration points
@@ -89,7 +92,54 @@ LINTER=$(node -e "try{const b=require('/tmp/cb-brief.json');console.log(b.qualit
 
 # Get dependency count for scope estimate:
 DEPS=$(node -e "try{const b=require('/tmp/cb-brief.json');console.log(b.dependencies?.direct_count||0)}catch{}" 2>/dev/null)
+
+# Check if graph is available:
+GRAPH_AVAILABLE=$(node -e "try{const b=require('/tmp/cb-brief.json');console.log(b.graph?.available?'yes':'no')}catch{console.log('no')}" 2>/dev/null)
 ```
+
+**Graph-aware Phase 0 scoping (when `--pr N` is supplied):**
+
+If `GRAPH_AVAILABLE=yes`, call the `get_review_context` MCP tool (or `get_impact_radius`) to compute the blast radius:
+
+```
+call get_review_context { pr: N, token_budget: 20000 }
+```
+
+`get_review_context` returns: `{ files: string[], total_tokens: number, hint: string }`
+
+Use the returned `files` list as the review scope for Phases 1–4 rather than the full codebase. Log the scope reduction in the scope banner (e.g. "Scoped to 12 files via graph blast-radius (was ~300)").
+
+For full transitive blast radius, call `get_impact_radius { files: [...], pr: N, hops: 2 }`.
+`get_impact_radius` returns: `{ changed_files: string[], callers: string[], callees: string[], tests: string[], risk_score: number }`
+
+If `GRAPH_AVAILABLE=no`, fall back to the full codebase review as before. Optionally suggest: "Run `codebase graph build` to enable blast-radius scoping in future reviews."
+
+**Graph-aware Phase 2b (dead-code declutter):**
+
+If `GRAPH_AVAILABLE=yes`, use `query_graph { kind: "entrypoints" }` to get all reachable entry points, then check which files/symbols have no inbound edges (callers=0, not an entrypoint, not a test). These are dead-code candidates. Confirm unreachability with `get_impact_radius` for each candidate.
+
+This replaces the one-shot per-skill graph build — the shared graph is already built and accurate. After analysis, still emit findings via the same GitHub Issues flow (labeled `review,quality,dead-code`). If the graph is absent, fall back to the existing `/py-declutter` / `/nextjs-declutter` skill dispatch.
+
+**Graph-enriched Phase 5 (issue bodies):**
+
+When creating GitHub Issues for findings, include blast-radius context if graph is available:
+
+```
+## Impact
+- Downstream callers: N files
+- Covering tests: [list or "none"]
+- Risk score: X/100
+```
+
+Fetch this via `get_impact_radius { files: ["<changed file>"] }` before creating the issue.
+
+**Graph safety rail in Phase 7 (auto-fix):**
+
+Before committing a `--fix` branch, run:
+```
+call get_impact_radius { files: ["<files you edited>"] }
+```
+If `direct_callers` contains files **outside** the current fix scope, abort auto-fix for that finding and create an issue instead — flag it as "requires manual review: editing this file affects N callers outside scope". This prevents silent breakage of callers the AI didn't inspect.
 
 **Issue creation** — after creating a GitHub Issue, also track in codebase:
 ```bash

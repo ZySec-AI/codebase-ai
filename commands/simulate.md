@@ -42,6 +42,9 @@ gh label list --limit 1 --json name --jq '.[0].name' 2>/dev/null | grep -q "sim"
 
 ```bash
 npx codebase brief 2>/dev/null > /tmp/cb-brief.json || true
+if [ ! -s /tmp/cb-brief.json ]; then
+  echo "WARNING: codebase brief failed or returned empty — proceeding with defaults"
+fi
 ```
 
 Read `/tmp/cb-brief.json`. Extract and hold in context:
@@ -83,7 +86,11 @@ If none respond, use `commands.dev` from codebase brief:
 DEV_CMD=$(node -e "try{const b=require('/tmp/cb-brief.json');console.log(b.commands?.dev||'')}catch{}" 2>/dev/null)
 ```
 
-Node projects: use detected package manager from brief. Python: `uv run dev` or `uv run uvicorn main:app`.
+Node projects: use detected package manager from brief:
+```bash
+PKG_MGR=$(node -e "try{const b=require('/tmp/cb-brief.json');console.log(b.stack?.package_manager||'npm')}catch{}" 2>/dev/null || echo "npm")
+```
+Python: `uv run dev` or `uv run uvicorn main:app`.
 
 ### Detect login mechanism
 

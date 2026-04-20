@@ -8,7 +8,7 @@ export const gitDetector: Detector = {
     const [commits, committers, uncommitted] = await Promise.all([
       getRecentCommits(ctx),
       getLastCommitters(ctx),
-      hasUncommittedChanges(ctx),
+      getUncommittedChanges(ctx),
     ]);
 
     return {
@@ -38,7 +38,18 @@ async function getLastCommitters(ctx: ScanContext): Promise<string[]> {
     .filter(Boolean);
 }
 
-async function hasUncommittedChanges(ctx: ScanContext): Promise<boolean> {
+async function getUncommittedChanges(ctx: ScanContext): Promise<boolean | string[]> {
   const output = await ctx.exec("git", ["status", "--porcelain"]);
-  return output.length > 0;
+  if (!output || output.trim().length === 0) {
+    return false;
+  }
+  const files = output
+    .split("\n")
+    .map((line) => line.slice(3).trim())
+    .filter(Boolean);
+  // If too many changed files, just return true to keep the manifest compact
+  if (files.length > 20) {
+    return true;
+  }
+  return files;
 }

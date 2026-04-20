@@ -35,8 +35,14 @@ interface CacheData {
   manifest: Manifest;
 }
 
-async function getGitSha(root: string): Promise<string | null> {
-  return new Promise((resolve) => {
+const gitShaCache = new Map<string, Promise<string | null>>();
+
+function getGitSha(root: string): Promise<string | null> {
+  const cached = gitShaCache.get(root);
+  if (cached) {
+    return cached;
+  }
+  const p = new Promise<string | null>((resolve) => {
     execFile("git", ["rev-parse", "HEAD"], { cwd: root, timeout: 5_000 }, (err, stdout) => {
       if (err) {
         resolve(null);
@@ -45,6 +51,8 @@ async function getGitSha(root: string): Promise<string | null> {
       resolve(stdout.trim());
     });
   });
+  gitShaCache.set(root, p);
+  return p;
 }
 
 export function loadCache(root: string): CacheData | null {

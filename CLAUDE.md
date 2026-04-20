@@ -35,9 +35,9 @@ Commands are registered in `src/index.ts` as a `Record<string, handler>` map and
 
 ### Detectors (`src/detectors/`)
 
-11 parallel detectors implement the `Detector` interface (`src/types.ts`). Each receives a `ScanContext` (filesystem abstraction from `src/scanner/context.ts`) and returns a slice of the manifest. The scanner engine (`src/scanner/engine.ts`) runs all detectors via `Promise.all()` and merges results.
+12 parallel detectors implement the `Detector` interface (`src/types.ts`). Each receives a `ScanContext` (filesystem abstraction from `src/scanner/context.ts`) and returns a slice of the manifest. The scanner engine (`src/scanner/engine.ts`) runs all detectors via `Promise.all()` and merges results.
 
-Registered detectors: `project`, `repo`, `structure`, `stack`, `commands`, `dependencies`, `config`, `git`, `quality`, `patterns`, `api-docs`
+Registered detectors: `project`, `repo`, `structure`, `stack`, `commands`, `dependencies`, `config`, `git`, `quality`, `patterns`, `api-docs`, `graph`
 
 ### Integrations (`src/integrations/`)
 
@@ -45,7 +45,11 @@ Registered detectors: `project`, `repo`, `structure`, `stack`, `commands`, `depe
 
 ### MCP Server (`src/mcp/`)
 
-JSON-RPC 2.0 over stdio. Exposes 18 tools including `project_brief` (supports `slim: true`, auto-slims when context is large), `get_next_task`, `create_issue`, `update_issue`, `get_issue`, `get_pr`, `token_budget`, `get_plan`, `update_plan`, `list_skills`, `refresh_status`, `generate_handoff`. Entry: `src/mcp/server.ts`.
+JSON-RPC 2.0 over stdio. Exposes 22 tools including `project_brief` (supports `slim: true`, auto-slims when context is large), `get_next_task`, `create_issue`, `update_issue`, `get_issue`, `get_pr`, `token_budget`, `get_plan`, `update_plan`, `list_skills`, `refresh_status`, `generate_handoff`, plus 4 graph tools: `get_impact_radius`, `get_review_context`, `query_graph`, `rebuild_graph`. Entry: `src/mcp/server.ts`.
+
+### Graph Module (`src/graph/`)
+
+Persistent call/import graph at `.codebase/graph.json`. Regex AST-lite parsers for TS/JS, Python, Go, Rust — zero new runtime deps. Supports incremental rebuild (SHA-256 content hash diff). Powers blast-radius analysis in `/review` and 4 MCP tools. No configuration required — `codebase graph build` to initialize.
 
 ### GitHub Integration (`src/github/`)
 
@@ -145,6 +149,10 @@ Returns: project identity, tech stack, commands, structure, current status, next
 | `codebase handoff`                        | Generate HANDOFF.md — session transfer for next agent     |
 | `codebase tokens`                         | Show token budget report for this project                 |
 | `codebase sessions`                       | Recent session log: provider, model, duration per project |
+| `codebase graph build`                    | Build call/import graph → `.codebase/graph.json`          |
+| `codebase graph impact --pr N`            | Blast radius for PR N: callers + tests + risk score       |
+| `codebase graph query callers <symbol>`   | Who calls this symbol?                                    |
+| `codebase graph stats`                    | Node/edge counts per language                             |
 
 ### Maintenance
 
@@ -178,4 +186,5 @@ Returns: project identity, tech stack, commands, structure, current status, next
 - Vibekit loop: see `.claude/commands/` for /simulate, /build, /launch
 - MCP tools: call `list_commands` or `list_skills` via MCP server
 - Browser automation: see `~/.claude/skills/simulate/SKILL.md`
+- Call graph: `codebase graph build` then `get_impact_radius` / `query_graph` via MCP
 <!-- codebase:end -->

@@ -47,38 +47,36 @@ jobs:
 
       - name: Check allowed merge flow
         run: |
+          SRC="${{ github.head_ref }}"
+          DST="${{ github.base_ref }}"
+
           echo "Source Branch: $SRC"
           echo "Target Branch: $DST"
+
+          is_otherbranch() {
             [[ "$1" != "develop" && "$1" != "release" ]]
           }
-            echo "✅ Allowed: $SRC → develop"
-          fi
 
+          # Rule 1: any other branch -> develop
+          if is_otherbranch "$SRC" && [[ "$DST" == "develop" ]]; then
+            echo "✅ Allowed: $SRC → develop"
             exit 0
           fi
-          echo "❌ Invalid merge flow: $SRC → $DST"
-          echo ""
-          echo "  • feature/* → develop"
-          echo "  • bugfix/* → develop"
-          echo "  • task/* → develop"
-          echo "  • chore/* → develop"
-          echo "  • improve/* → develop"
-          echo "  • develop → release"
-          exit 1
-          echo "  • hotfix/* → develop"
-          echo "Allowed flows:"
 
           # Rule 2: develop -> release
           if [[ "$SRC" == "develop" && "$DST" == "release" ]]; then
             echo "✅ Allowed: develop → release"
             exit 0
-          if is_otherbranch "$SRC" && [[ "$DST" == "develop" ]]; then
-          # Rule 1: any other branch -> develop
+          fi
 
-          is_otherbranch() {
-
-
-          DST="${{ github.base_ref }}"
-          SRC="${{ github.head_ref }}"
-
-
+          echo "❌ Invalid merge flow: $SRC → $DST"
+          echo ""
+          echo "Allowed flows:"
+          echo "  • feature/* → develop"
+          echo "  • bugfix/* → develop"
+          echo "  • task/* → develop"
+          echo "  • chore/* → develop"
+          echo "  • improve/* → develop"
+          echo "  • hotfix/* → develop"
+          echo "  • develop → release"
+          exit 1

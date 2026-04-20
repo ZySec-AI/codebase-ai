@@ -2,7 +2,7 @@ import { resolve, join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import type { CLIOptions, Manifest } from "../types.js";
-import { error, log, bold } from "../utils/output.js";
+import { log, bold, printFriendlyError } from "../utils/output.js";
 import { rankIssues } from "../github/sync.js";
 
 function priorityReason(labels: string[]): string {
@@ -72,7 +72,7 @@ export async function runNext(options: CLIOptions): Promise<void> {
     const content = await readFile(join(root, ".codebase.json"), "utf-8");
     manifest = JSON.parse(content);
   } catch {
-    error("No .codebase.json found (or it's corrupted). Run `npx codebase` first.");
+    printFriendlyError("No .codebase.json found", "Project not scanned yet", "Run: codebase setup");
     process.exit(1);
   }
 

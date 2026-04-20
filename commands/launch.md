@@ -33,6 +33,9 @@ git remote get-url origin || { echo "ERROR: No git remote."; exit 1; }
 
 ```bash
 npx codebase brief 2>/dev/null > /tmp/cb-brief.json || true
+if [ ! -s /tmp/cb-brief.json ]; then
+  echo "WARNING: codebase brief failed or returned empty — proceeding with defaults"
+fi
 ```
 
 Read the brief. Extract: `project.name`, `project.description`, `commands.test`, `quality.test_framework`.
@@ -136,8 +139,7 @@ git push origin [version]
 
 gh release create [version] \
   --title "v[version]" \
-  --notes-file docs/RELEASE-NOTES.md \
-  --target develop
+  --notes-file docs/RELEASE-NOTES.md
 ```
 
 If `--dry-run`: print what would be created, skip.

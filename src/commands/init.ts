@@ -5,7 +5,7 @@ import { writeFile, rename } from "node:fs/promises";
 import { homedir } from "node:os";
 import type { CLIOptions, Integration } from "../types.js";
 import { scan, summarizeCategory } from "../scanner/engine.js";
-import { detectTools } from "../integrations/index.js";
+import { detectTools, integrations } from "../integrations/index.js";
 import { claudeIntegration } from "../integrations/claude.js";
 import { updateGitignore } from "../integrations/gitignore.js";
 import { installHooks } from "../integrations/githook.js";
@@ -266,7 +266,7 @@ export function checkGhDetailed(): Promise<GhStatus> {
 
 /**
  * Detect AI tools from global/system-level config files.
- * Checks if Claude Code is installed globally.
+ * Checks if Claude Code is installed globally, and any other known integrations.
  */
 export function detectGlobalTools(): Integration[] {
   const home = homedir();
@@ -274,6 +274,17 @@ export function detectGlobalTools(): Integration[] {
 
   if (existsSync(join(home, ".claude"))) {
     found.push(claudeIntegration);
+  }
+
+  // Also detect other integrations from their global config locations
+  for (const integration of integrations) {
+    if (integration.name === "claude") {
+      continue;
+    } // already handled above
+    // Try home directory detection
+    if (integration.detect(home)) {
+      found.push(integration);
+    }
   }
 
   return found;
@@ -303,23 +314,32 @@ export async function autoConfigureMcp(
   return configured;
 }
 
+interface McpServerEntry {
+  command: string;
+  args: string[];
+  cwd?: string;
+}
+
+interface McpConfig {
+  mcpServers?: Record<string, McpServerEntry>;
+}
+
 export async function configureMcpFile(
   filePath: string,
   serverName: string,
-  entry: Record<string, unknown>
+  entry: McpServerEntry
 ): Promise<boolean> {
-  let config: Record<string, unknown> = {};
+  let config: McpConfig = {};
 
   if (existsSync(filePath)) {
     try {
-      config = JSON.parse(readFileSync(filePath, "utf-8"));
+      config = JSON.parse(readFileSync(filePath, "utf-8")) as McpConfig;
     } catch {
       config = {};
     }
 
     // Already configured?
-    const servers = config.mcpServers as Record<string, unknown> | undefined;
-    if (servers && servers[serverName]) {
+    if (config.mcpServers && config.mcpServers[serverName]) {
       return false;
     }
   }
@@ -327,7 +347,7 @@ export async function configureMcpFile(
   if (!config.mcpServers) {
     config.mcpServers = {};
   }
-  (config.mcpServers as Record<string, unknown>)[serverName] = entry;
+  config.mcpServers[serverName] = entry;
 
   const tmpPath = `${filePath}.tmp`;
   await writeFile(tmpPath, JSON.stringify(config, null, 2) + "\n", "utf-8");

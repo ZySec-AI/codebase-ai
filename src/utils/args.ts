@@ -51,6 +51,8 @@ const COMMANDS = new Set([
   "sessions",
   "config",
   "uninstall",
+  "graph",
+  "stats",
 ]);
 
 export function parseArgs(argv: string[]): CLIOptions {
@@ -123,6 +125,21 @@ export function parseArgs(argv: string[]): CLIOptions {
       }
       if (key === "slim") {
         opts.slim = true;
+        continue;
+      }
+      if (key === "session") {
+        // handled as positional for stats command
+        opts.positionals = [...opts.positionals, "--session"];
+        continue;
+      }
+      if (key === "weekly") {
+        // handled as positional for stats command
+        opts.positionals = [...opts.positionals, "--weekly"];
+        continue;
+      }
+      if (key === "skills") {
+        // --skills flag for `codebase fix --skills` → only reinstall skills
+        opts.subcommand = "skills";
         continue;
       }
       if (key === "mine") {

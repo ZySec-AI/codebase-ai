@@ -5,11 +5,10 @@ import { writeFile } from "node:fs/promises";
 import type { CLIOptions } from "../types.js";
 import { scan } from "../scanner/engine.js";
 import { checkGhDetailed, autoConfigureMcp } from "./init.js";
+import { checkInjection, checkHook, checkHookSync, checkPreCommitHook } from "./doctor.js";
 import { installHooks } from "../integrations/githook.js";
 import { updateGitignore } from "../integrations/gitignore.js";
 import { setQuiet, log, success, heading, info } from "../utils/output.js";
-
-const HOOK_MARKER = "# codebase-auto-update";
 
 const NO_COLOR = !!process.env.NO_COLOR;
 const green = NO_COLOR ? "" : "\x1b[32m";
@@ -32,6 +31,16 @@ export async function runFix(options: CLIOptions): Promise<void> {
   let fixCount = 0;
 
   heading("codebase fix\n");
+
+  // ─── --skills only mode ────────────────────────────────────
+  if (options.subcommand === "skills") {
+    const { installClaudeSkillsForFix } = await import("./setup.js");
+    installClaudeSkillsForFix(root);
+    log("");
+    const elapsed = ((Date.now() - _start) / 1000).toFixed(1);
+    success(`Done  (${elapsed}s)`);
+    return;
+  }
 
   // ─── Check GitHub CLI (won't auto-fix) ─────────────────────
   const ghStatus = await checkGhDetailed();
@@ -155,14 +164,52 @@ export async function runFix(options: CLIOptions): Promise<void> {
   }
 
   // ─── 7b. Claude skills ────────────────────────────────────
-  const skillsDir = join(homedir(), ".claude", "skills");
-  const hasSkills =
-    existsSync(skillsDir) && readdirSync(skillsDir).some((f) => f.endsWith(".skill"));
-  if (!hasSkills) {
-    const { installClaudeSkillsForFix } = await import("./setup.js");
-    installClaudeSkillsForFix(root);
-    fixed("Installed Claude skills → ~/.claude/skills/");
-    fixCount++;
+  {
+    const globalSkillsDir = join(homedir(), ".claude", "skills");
+    const projectSkillsDir = join(root, ".claude", "skills");
+    const hasSkills =
+      (existsSync(globalSkillsDir) &&
+        readdirSync(globalSkillsDir).some((f) => f.endsWith(".skill"))) ||
+      (existsSync(projectSkillsDir) &&
+        readdirSync(projectSkillsDir).some((f) => f.endsWith(".skill")));
+
+    // Check for stale skills via manifest SHA-256 comparison
+    let hasStaleSkills = false;
+    if (hasSkills) {
+      try {
+        const { createHash } = await import("node:crypto");
+        const manifestUrl = new URL("../../skills/manifest.json", import.meta.url);
+        const manifest = JSON.parse(readFileSync(manifestUrl, "utf-8")) as {
+          skills: Array<{ name: string; sha256: string }>;
+        };
+        for (const skill of manifest.skills) {
+          for (const skillsDir of [globalSkillsDir, projectSkillsDir]) {
+            const installedPath = join(skillsDir, `${skill.name}.skill`);
+            if (existsSync(installedPath)) {
+              const hash = createHash("sha256").update(readFileSync(installedPath)).digest("hex");
+              if (hash !== skill.sha256) {
+                hasStaleSkills = true;
+                break;
+              }
+            }
+          }
+          if (hasStaleSkills) {
+            break;
+          }
+        }
+      } catch {
+        /* manifest unavailable — skip stale check */
+      }
+    }
+
+    if (!hasSkills || hasStaleSkills) {
+      const { installClaudeSkillsForFix } = await import("./setup.js");
+      installClaudeSkillsForFix(root);
+      fixed(
+        `${hasStaleSkills ? "Updated" : "Installed"} Claude skills → ~/.claude/skills/ + .claude/skills/`
+      );
+      fixCount++;
+    }
   }
 
   // ─── 8. Claude Code hooks ─────────────────────────────────
@@ -246,42 +293,4 @@ export async function runFix(options: CLIOptions): Promise<void> {
   log("");
   const elapsed = ((Date.now() - _start) / 1000).toFixed(1);
   success(`Done  (${elapsed}s)`);
-}
-
-// ─── Check helpers (duplicated from doctor for independence) ──
-
-function checkInjection(root: string): boolean {
-  const filePath = join(root, "CLAUDE.md");
-  if (!existsSync(filePath)) {
-    return false;
-  }
-  const content = readFileSync(filePath, "utf-8");
-  return content.includes("<!-- codebase:start -->");
-}
-
-function checkHook(root: string, hookName: string): boolean {
-  const hookPath = join(root, ".git", "hooks", hookName);
-  if (!existsSync(hookPath)) {
-    return false;
-  }
-  const content = readFileSync(hookPath, "utf-8");
-  return content.includes(HOOK_MARKER);
-}
-
-function checkHookSync(root: string): boolean {
-  const hookPath = join(root, ".git", "hooks", "post-commit");
-  if (!existsSync(hookPath)) {
-    return false;
-  }
-  const content = readFileSync(hookPath, "utf-8");
-  return content.includes("--sync");
-}
-
-function checkPreCommitHook(root: string): boolean {
-  const hookPath = join(root, ".git", "hooks", "pre-commit");
-  if (!existsSync(hookPath)) {
-    return false;
-  }
-  const content = readFileSync(hookPath, "utf-8");
-  return content.includes("codebase-pre-commit");
 }
