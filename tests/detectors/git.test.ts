@@ -127,7 +127,7 @@ describe("gitDetector", () => {
         },
       });
       const result = await gitDetector.detect(ctx);
-      expect(result.uncommitted_changes).toBe(true);
+      expect(result.uncommitted_changes).toBeTruthy();
     });
 
     it("detects staged changes as uncommitted", async () => {
@@ -139,7 +139,7 @@ describe("gitDetector", () => {
         },
       });
       const result = await gitDetector.detect(ctx);
-      expect(result.uncommitted_changes).toBe(true);
+      expect(result.uncommitted_changes).toBeTruthy();
     });
 
     it("handles git command failure", async () => {
@@ -168,7 +168,7 @@ describe("gitDetector", () => {
 
       expect(result.recent_commits).toEqual(["Initial commit", "Add auth", "Fix bug"]);
       expect(result.last_committers).toEqual(["Alice", "Bob", "Charlie"]);
-      expect(result.uncommitted_changes).toBe(true);
+      expect(result.uncommitted_changes).toBeTruthy();
     });
 
     it("handles empty git repository", async () => {

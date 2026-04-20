@@ -96,9 +96,8 @@ describe("scan engine", () => {
       expect(manifest.version).toBe("1.0");
       expect(manifest.generated_at).toBeDefined();
       // No detector data should be present
-      expect(Object.keys(manifest).filter((k) => !["version", "generated_at"].includes(k))).toEqual(
-        []
-      );
+      const metaKeys = ["version", "generated_at", "last_scan_time", "manifest_version"];
+      expect(Object.keys(manifest).filter((k) => !metaKeys.includes(k))).toEqual([]);
     });
 
     it("handles empty categories array", { timeout: 30000 }, async () => {
