@@ -51,6 +51,52 @@ const callRe = /\b(\w+)\s*\(/g;
 const importExportLineRe = /^\s*(import|export)\s/;
 
 /**
+ * Collapse multi-line braced import/export statements into one logical line so
+ * the single-line regexes (`staticImportRe`, `aliasRe`, `reExportRe`) match.
+ * Replaces newlines INSIDE `{ ... }` of an import/export with spaces. Newlines
+ * outside braces (and the actual EOL after the statement) are preserved so
+ * line indices for surrounding code don't shift.
+ */
+function collapseBracedImports(src: string): string {
+  let out = "";
+  let i = 0;
+  const n = src.length;
+  while (i < n) {
+    // Detect `import` or `export` at start of a line / after whitespace
+    const isStart = i === 0 || src[i - 1] === "\n";
+    if (isStart && (src.startsWith("import", i) || src.startsWith("export", i))) {
+      // Find first '{' or newline before any 'from'/';'
+      let j = i;
+      let braceStart = -1;
+      while (j < n && src[j] !== "\n" && src[j] !== ";") {
+        if (src[j] === "{") {
+          braceStart = j;
+          break;
+        }
+        j++;
+      }
+      if (braceStart !== -1) {
+        // Find matching '}' (no nesting in import lists)
+        let k = braceStart + 1;
+        while (k < n && src[k] !== "}") {
+          k++;
+        }
+        if (k < n) {
+          // Replace newlines in [braceStart..k] with spaces
+          out += src.slice(i, braceStart);
+          out += src.slice(braceStart, k + 1).replace(/\n/g, " ");
+          i = k + 1;
+          continue;
+        }
+      }
+    }
+    out += src[i];
+    i++;
+  }
+  return out;
+}
+
+/**
  * Parse a TypeScript or JavaScript file and return nodes + edges.
  */
 export function parseTs(filePath: string, content: string, root: string): ParseResult {
@@ -67,11 +113,16 @@ export function parseTs(filePath: string, content: string, root: string): ParseR
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const lines = content.split("\n");
+  // Build a parallel set of "import lines" with multi-line braced imports
+  // collapsed into one logical line, so the single-line regexes match.
+  // Used only for import/alias detection — declaration scanning still uses
+  // `lines` so reported line numbers stay accurate.
+  const importLines: string[] = collapseBracedImports(content).split("\n");
 
   // ---- Import detection ----
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (let i = 0; i < importLines.length; i++) {
+    const line = importLines[i];
 
     let specifier: string | null = null;
 
@@ -205,8 +256,8 @@ export function parseTs(filePath: string, content: string, root: string): ParseR
   // Build a set of imported aliases so we can detect call sites.
   const importedAliases = new Map<string, string>(); // alias -> resolved file or specifier
 
-  // Re-scan for import aliases
-  for (const line of lines) {
+  // Re-scan for import aliases (uses flattened import lines)
+  for (const line of importLines) {
     const m = aliasRe.exec(line);
     if (!m) {
       continue;

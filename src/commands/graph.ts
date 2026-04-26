@@ -13,6 +13,9 @@ import {
   getCallees,
   querySymbol,
   getEntrypoints,
+  getDeadCode,
+  getCycles,
+  getOrphans,
 } from "../graph/index.js";
 
 const execFileAsync = promisify(_execFile);
@@ -51,9 +54,109 @@ export async function runGraph(options: CLIOptions): Promise<void> {
     case "stats":
       await runStats(root);
       break;
+    case "dead":
+      await runDead(root);
+      break;
+    case "cycles":
+      await runCycles(root);
+      break;
+    case "orphans":
+      await runOrphans(root);
+      break;
     default:
       printUsage();
   }
+}
+
+// ─── dead / cycles / orphans ──────────────────────────────────────
+
+async function runDead(root: string): Promise<void> {
+  heading("codebase graph dead\n");
+  const graph = await loadGraph(root);
+  if (!graph) {
+    printError("No graph found. Run: codebase graph build");
+    process.exit(1);
+  }
+  const result = getDeadCode(graph, root);
+  log(`  Reachable: ${result.reachable_files}/${result.total_files} files`);
+  log(`  Entry points: ${result.entrypoints.length}`);
+  log(`\n  Dead files (${result.dead_files.length}):`);
+  if (result.dead_files.length === 0) {
+    dim("    (none)");
+  } else {
+    for (const f of result.dead_files) {
+      log(`    ${f}`);
+    }
+  }
+  const high = result.dead_exports.filter((e) => e.confidence === "high");
+  const low = result.dead_exports.filter((e) => e.confidence === "low");
+
+  log(`\n  Dead exports — high confidence (${high.length}):`);
+  if (high.length === 0) {
+    dim("    (none)");
+  } else {
+    for (const e of high) {
+      const where = e.line ? `${e.file}:${e.line}` : e.file;
+      log(`    ${where}  ${bold(e.symbol)} [${e.kind}]`);
+    }
+  }
+
+  log(`\n  Dead exports — low confidence (${low.length}):`);
+  dim("    (file is imported but no call edge — may be reached via property access)");
+  if (low.length === 0) {
+    dim("    (none)");
+  } else {
+    const shown = low.slice(0, 10);
+    for (const e of shown) {
+      const where = e.line ? `${e.file}:${e.line}` : e.file;
+      log(`    ${where}  ${bold(e.symbol)} [${e.kind}]`);
+    }
+    if (low.length > shown.length) {
+      dim(`    … and ${low.length - shown.length} more (use MCP get_dead_code for full list)`);
+    }
+  }
+  success("Done");
+}
+
+async function runCycles(root: string): Promise<void> {
+  heading("codebase graph cycles\n");
+  const graph = await loadGraph(root);
+  if (!graph) {
+    printError("No graph found. Run: codebase graph build");
+    process.exit(1);
+  }
+  const result = getCycles(graph);
+  log(`  Cycles found: ${bold(String(result.count))}`);
+  if (result.count === 0) {
+    dim("  (none)");
+  } else {
+    for (let i = 0; i < result.cycles.length; i++) {
+      log(`\n  Cycle ${i + 1} (${result.cycles[i].length} files):`);
+      for (const f of result.cycles[i]) {
+        log(`    ${f}`);
+      }
+    }
+  }
+  success("Done");
+}
+
+async function runOrphans(root: string): Promise<void> {
+  heading("codebase graph orphans\n");
+  const graph = await loadGraph(root);
+  if (!graph) {
+    printError("No graph found. Run: codebase graph build");
+    process.exit(1);
+  }
+  const result = getOrphans(graph, root);
+  log(`  Orphan files (${result.count}):`);
+  if (result.count === 0) {
+    dim("    (none)");
+  } else {
+    for (const f of result.orphans) {
+      log(`    ${f}`);
+    }
+  }
+  success("Done");
 }
 
 // ─── build ────────────────────────────────────────────────────────
@@ -307,5 +410,8 @@ function printUsage(): void {
   log("    query symbol <name>          Nodes matching the symbol name");
   log("    query entrypoints            Detected project entry points");
   log("    stats                        Node/edge counts per language");
+  log("    dead                         Unreachable files + dead exports");
+  log("    cycles                       Import cycles (strongly-connected components)");
+  log("    orphans                      Files with no importers and no imports");
   log("");
 }

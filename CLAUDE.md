@@ -45,11 +45,19 @@ Registered detectors: `project`, `repo`, `structure`, `stack`, `commands`, `depe
 
 ### MCP Server (`src/mcp/`)
 
-JSON-RPC 2.0 over stdio. Exposes 22 tools including `project_brief` (supports `slim: true`, auto-slims when context is large), `get_next_task`, `create_issue`, `update_issue`, `get_issue`, `get_pr`, `token_budget`, `get_plan`, `update_plan`, `list_skills`, `refresh_status`, `generate_handoff`, plus 4 graph tools: `get_impact_radius`, `get_review_context`, `query_graph`, `rebuild_graph`. Entry: `src/mcp/server.ts`.
+JSON-RPC 2.0 over stdio. Exposes 25 tools including `project_brief` (supports `slim: true`, auto-slims when context is large), `get_next_task`, `create_issue`, `update_issue`, `get_issue`, `get_pr`, `token_budget`, `get_plan`, `update_plan`, `list_skills`, `refresh_status`, `generate_handoff`, plus 7 graph tools: `get_impact_radius`, `get_review_context`, `query_graph`, `rebuild_graph`, `get_dead_code`, `get_cycles`, `get_orphans`. Entry: `src/mcp/server.ts`.
 
 ### Graph Module (`src/graph/`)
 
-Persistent call/import graph at `.codebase/graph.json`. Regex AST-lite parsers for TS/JS, Python, Go, Rust — zero new runtime deps. Supports incremental rebuild (SHA-256 content hash diff). Powers blast-radius analysis in `/review` and 4 MCP tools. No configuration required — `codebase graph build` to initialize.
+Persistent call/import graph at `.codebase/graph.json`. Regex AST-lite parsers for TS/JS, Python, Go, Rust — zero new runtime deps. Supports incremental rebuild (SHA-256 content hash diff). Powers blast-radius analysis in `/review`, dead-code/cycles/orphans detection, and 7 MCP tools. No configuration required — `codebase graph build` to initialize.
+
+Cleanup queries (post-build):
+
+- `getDeadCode(graph, root)` — entrypoint reachability BFS. Combines `detectEntrypoints()` with in-degree-0 files as seeds; reports unreachable files plus exported symbols inside reachable files that no other file calls. Each dead export carries a `confidence: "high" | "low"` flag — **high** = declaring file has zero importers (very likely dead), **low** = file is imported but no explicit `calls` edge resolved (may be reached via property-access dispatch the regex parser can't track, e.g. `mod.fn()` or `Record<string, handler>` lookups).
+- `getCycles(graph)` — iterative Tarjan SCC over file-level import edges. Returns each SCC of size >= 2 (or self-loop) as a sorted list of files.
+- `getOrphans(graph, root)` — files with zero in- and out-edges, excluding detected entry points.
+
+The TS/JS parser handles multi-line braced imports — `collapseBracedImports()` flattens `import { a, b, } from "x"` blocks into one logical line for the import-detection regex pass. Declaration line numbers are preserved by keeping the original `lines` array for declaration scanning.
 
 ### GitHub Integration (`src/github/`)
 
@@ -153,6 +161,9 @@ Returns: project identity, tech stack, commands, structure, current status, next
 | `codebase graph impact --pr N`            | Blast radius for PR N: callers + tests + risk score       |
 | `codebase graph query callers <symbol>`   | Who calls this symbol?                                    |
 | `codebase graph stats`                    | Node/edge counts per language                             |
+| `codebase graph dead`                     | Unreachable files + dead exports (BFS from entry points)  |
+| `codebase graph cycles`                   | Import cycles (Tarjan SCC) — refactor candidates          |
+| `codebase graph orphans`                  | Files with zero importers and zero imports                |
 
 ### Maintenance
 

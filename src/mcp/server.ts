@@ -405,6 +405,33 @@ const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: "get_dead_code",
+    description:
+      "Find unreachable code via entrypoint reachability BFS over the import/call graph. Returns dead files (never reached from any entry point) and dead exports (exported symbols inside reachable files that no other file calls). Use before refactors or to keep the codebase lean. Returns: { dead_files, dead_exports, entrypoints, reachable_files, total_files }.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "get_cycles",
+    description:
+      "Detect import cycles in the project using Tarjan's strongly-connected-components algorithm on the file-level import graph. Returns each cycle as a list of files. Cycles indicate refactor candidates — circular dependencies hurt build times, testability, and reasoning. Returns: { cycles: string[][], count }.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "get_orphans",
+    description:
+      "List orphan files — files with zero importers AND zero imports, excluding detected entry points and tests. These are often forgotten scratch files, abandoned experiments, or genuinely stale code. Returns: { orphans: string[], count }.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
     name: "rebuild_graph",
     description:
       "Build or rebuild the call/import graph (.codebase/graph.json). Use `incremental: true` for a fast update after small changes, `incremental: false` (default) for a full rebuild. Returns { nodes: number, edges: number, duration_ms: number } on completion.",
@@ -1139,6 +1166,51 @@ async function dispatchToolCall(
         }
         return respond(req.id, {
           content: [{ type: "text", text: JSON.stringify(queryResult, null, 2) }],
+        });
+      }
+
+      case "get_dead_code": {
+        const { loadGraph, getDeadCode } = await import("../graph/index.js");
+        const graph = await loadGraph(root);
+        if (!graph) {
+          return respond(req.id, {
+            content: [{ type: "text", text: "No graph found. Run: codebase graph build" }],
+            isError: true,
+          });
+        }
+        const result = getDeadCode(graph, root);
+        return respond(req.id, {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        });
+      }
+
+      case "get_cycles": {
+        const { loadGraph, getCycles } = await import("../graph/index.js");
+        const graph = await loadGraph(root);
+        if (!graph) {
+          return respond(req.id, {
+            content: [{ type: "text", text: "No graph found. Run: codebase graph build" }],
+            isError: true,
+          });
+        }
+        const result = getCycles(graph);
+        return respond(req.id, {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        });
+      }
+
+      case "get_orphans": {
+        const { loadGraph, getOrphans } = await import("../graph/index.js");
+        const graph = await loadGraph(root);
+        if (!graph) {
+          return respond(req.id, {
+            content: [{ type: "text", text: "No graph found. Run: codebase graph build" }],
+            isError: true,
+          });
+        }
+        const result = getOrphans(graph, root);
+        return respond(req.id, {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         });
       }
 
