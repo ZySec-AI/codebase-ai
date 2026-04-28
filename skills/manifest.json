@@ -1,17 +1,17 @@
 {
-  "generated_at": "2026-04-26T09:38:34.477Z",
-  "version": "0.6.0",
+  "generated_at": "2026-04-28T01:23:32.499Z",
+  "version": "0.6.1",
   "skills": [
     {
       "name": "arch-review",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "sha256": "aeddbc2cec961955f92027a015ba5b081e8acf46d925a2f43f1668fb1f606949",
       "depends_on": [],
       "required_scripts": []
     },
     {
       "name": "cx-review",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "sha256": "a7773093e2245cef9ae01de438932ec206973ce28ce748e0a232f0f9b6c1cafc",
       "depends_on": [
         "agent-browser"
@@ -20,28 +20,28 @@
     },
     {
       "name": "dx-review",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "sha256": "151453312c24b509067a5acbef4c5f39fcf9421203db4b2bb542cf272086915e",
       "depends_on": [],
       "required_scripts": []
     },
     {
       "name": "expert-panel",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "sha256": "f672411cf7cde7c2687a9cc4a00cbe0a14ce7e1d3407206df674d90425b263f5",
       "depends_on": [],
       "required_scripts": []
     },
     {
       "name": "nextjs-declutter",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "sha256": "8f577c933bbe969efe7307a363a64be9c1d3432c0d457d7723154edc436181c4",
       "depends_on": [],
       "required_scripts": []
     },
     {
       "name": "py-declutter",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "sha256": "57e53b90813ccf4f8a672fcfae22da2f8e1dd823ed3062da5936dd43c980ea69",
       "depends_on": [
         "python3"
@@ -50,28 +50,28 @@
     },
     {
       "name": "rust-review",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "sha256": "1879ac7e7470e90e072d9ec2a753c88e03e7a99048b638354d09b5c62804fd5d",
       "depends_on": [],
       "required_scripts": []
     },
     {
       "name": "security-review",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "sha256": "1cec3f259039942cca5467c4c9685e0a7d3c6d430ab4009cae333b3739456bcc",
       "depends_on": [],
       "required_scripts": []
     },
     {
       "name": "self-heal",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "sha256": "f304fc345361a2539551cd07f556362a9112a36cc1ee5f6ebcc0adef2c6b5e0c",
       "depends_on": [],
       "required_scripts": []
     },
     {
       "name": "simulate",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "sha256": "e7f49758f299024796ffb89e42c2c982daf4c2a315cc7b5644285c45d1171f54",
       "depends_on": [
         "agent-browser"
@@ -80,7 +80,7 @@
     },
     {
       "name": "vibeloop",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "sha256": "7fe52f65f929a63f83aa3d27674b3b5e24680cc7bfc9fec4327d9aa08950fcbb",
       "depends_on": [],
       "required_scripts": []

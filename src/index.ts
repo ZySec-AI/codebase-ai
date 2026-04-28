@@ -24,7 +24,6 @@ import { startServer } from "./server/index.js";
 import { runUninstall } from "./commands/uninstall.js";
 import { runGraph } from "./commands/graph.js";
 import { runStats } from "./commands/stats.js";
-import { runDefault } from "./commands/default.js";
 import type { CLIOptions } from "./types.js";
 
 const options = parseArgs(process.argv.slice(2));
@@ -109,10 +108,10 @@ if (major < 20) {
   process.exit(1);
 }
 
-// No-args default: show smart status instead of help
+// No-args default: launch Claude Code (same as `codebase start`)
 const isNoArgs = process.argv.slice(2).filter((a) => !a.startsWith("-")).length === 0;
 if (options.command === "start" && isNoArgs) {
-  runDefault(options.path).catch((err: Error) => {
+  runStart(options).catch((err: Error) => {
     error(`Error: ${err.message}`);
     process.exit(1);
   });
