@@ -218,16 +218,44 @@ github/
 
 ### 7. Claude Code Hooks (`.claude/hooks/`)
 
-Installed into user projects by `codebase setup`. Enforces safe git practices at the tool-call level.
+Installed into user projects by `codebase setup`. Enforces safe git practices and the traceability contract at the tool-call level.
 
 ```
 .claude/
   hooks/
     git-guard.sh        # PreToolUse — blocks commits to main, force push, commit if behind remote
     git-post.sh         # PostToolUse — PR reminder after feature branch push
-  settings.json         # wires both hooks into Claude Code
+    context-inject.sh   # UserPromptSubmit — slim brief on first prompt of session
+    prompt-capture.sh   # UserPromptSubmit — appends prompt to .codebase/prompts.jsonl + mirrors to issue refs
+    session-start.sh    # SessionStart — pre-warm context
+  settings.json         # wires hooks into Claude Code
   commands/             # slash commands copied from package commands/
 ```
+
+### 7b. Traceability Layer
+
+The traceability layer ensures every piece of agent work produces a complete audit chain `prompt → status → commits → close`. It spans three subsystems:
+
+**Capture** — `src/prompts/store.ts` is an append-only JSONL store at `.codebase/prompts.jsonl`. The `prompt-capture.sh` hook reads stdin (Claude Code's UserPromptSubmit JSON or raw text), invokes `codebase prompts capture`, and the CLI:
+
+1. Redacts secrets via `scanForSecrets()` (same patterns used by the scanner — `src/utils/secrets.ts`).
+2. Extracts issue references with regexes for `#N`, `GH-N`, `issue N`, and full GitHub issue URLs.
+3. Appends a `PromptRecord { id, ts, session_id, branch, cwd, prompt, issue_refs[], redacted }` to the log (rotates at 2 MB).
+4. If `gh` is authenticated and at least one issue is referenced, posts a `**Prompt @ <ts>** (id <short>, branch <b>) > <first 500 chars>` comment to each issue. Failures are silent — hooks must never block prompts.
+
+**Enforce** — MCP server (`src/mcp/server.ts`) tightens issue tools:
+
+- `close_issue` schema now requires `comment` and `reason` (enum). Optional `evidence` and `commits[]` are folded into a structured body via `buildCloseBody()` (`src/github/issues.ts`). The handler posts the body THEN closes — atomic from the caller's POV.
+- `comment_issue` is a new tool requiring a `kind` enum (`status | evidence | decision | close-reason | note`). All comments get the same trace footer: `---\n_<kind> via codebase MCP @ <ts> · branch <b> · prompt <id>_`.
+- `update_issue` accepts an optional `comment` so status flips are paired with a visible timeline entry.
+- `link_commits_to_issue` shells out to `git log`, filters subjects matching `#N | Refs #N | Closes #N | Fixes #N`, and posts a single consolidated `evidence` comment.
+- `get_prompt_history` returns filtered records from `prompts.jsonl` so Claude can recover the user's original intent at session resume.
+
+`appendSessionLog` (`.codebase/session-log.jsonl`) now records the active `prompt_id` on every MCP tool call, closing the loop: any tool call can be traced back to the prompt that motivated it.
+
+**Document** — every slash command (`.claude/commands/*.md`) carries a "Traceability contract" block at the top that names the exact MCP tools and forbids raw `gh issue close`. The project's `CLAUDE.md` enumerates the rules under "Traceability Contract".
+
+The chain is reconstructible from GitHub alone (timeline comments + footers) AND from local artifacts (`prompts.jsonl` + `session-log.jsonl`). The two views agree because every comment carries the same `prompt <id>` marker.
 
 ### 8. Resilience Utilities (`src/utils/`)
 

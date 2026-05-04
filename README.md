@@ -53,6 +53,20 @@ Multiple developers can jump into the same loop. Commit `.codebase.json` and `.c
 - **Token budget awareness** — auto-slims responses when the manifest is too large for context. Grade your context health with `codebase tokens`.
 - **License detection** — flags copyleft dependencies that may require source disclosure.
 
+### Traceability — every prompt, every close, audited
+
+`codebase setup` installs a `prompt-capture` hook that writes every user prompt to a project-local audit log (`.codebase/prompts.jsonl`, mode `0600`). The hook runs in a detached background subshell so it never blocks the prompt. Optional mirror to GitHub is **opt-in**: export `CODEBASE_PROMPT_MIRROR=1` (or pass `--mirror`) to have prompts that reference `#N` / `GH-N` / an issue URL surface as comments on that issue. Secrets (JWT, PEM blocks, prefixed cloud keys, bearer tokens) are redacted before write or mirror; if anything matched, the mirrored snippet is replaced with a generic placeholder.
+
+The MCP server enforces the audit chain in code, not just in prose:
+
+- `close_issue` requires a `comment` AND a `reason` (`fixed | wont-fix | duplicate | not-reproducible | obsolete`). It closes the issue first, then posts a structured comment with reason + evidence + commits + trace footer. If the comment post fails, the issue is still closed (recoverable via `comment_issue`) — the timeline can never show `Closed: …` on an issue that's still open.
+- `comment_issue` adds typed comments (`status | evidence | decision | close-reason | note`) with a stable trace footer.
+- `update_issue` posts a status comment alongside label/assignee changes so timeline flips are visible.
+- `link_commits_to_issue` finds commits referencing an issue and posts a single consolidated evidence comment.
+- `get_prompt_history` returns the captured prompts that triggered work on an issue, so resumed sessions know the user's original intent.
+
+You get a complete chain: **prompt → status comment → commits → close comment with reason + evidence**. The chain is reconstructible from GitHub alone. See `docs/ARCHITECTURE.md` § *Traceability layer* for the full design.
+
 ---
 
 ## The loop

@@ -598,6 +598,47 @@ export async function runDoctor(options: CLIOptions): Promise<void> {
     });
   }
 
+  // T6. Prompt-capture hook (UserPromptSubmit) — traceability layer
+  const promptHookPath = join(root, ".claude", "hooks", "prompt-capture.sh");
+  const promptHookInstalled = existsSync(promptHookPath);
+  const promptHookExecutable = promptHookInstalled
+    ? !!(statSync(promptHookPath).mode & 0o111)
+    : false;
+  const promptHookWired = (() => {
+    if (!existsSync(settingsFile)) {
+      return false;
+    }
+    try {
+      const s = JSON.parse(readFileSync(settingsFile, "utf-8"));
+      return JSON.stringify(s.hooks?.UserPromptSubmit ?? "").includes("prompt-capture");
+    } catch {
+      return false;
+    }
+  })();
+  const promptsLogPath = join(root, ".codebase", "prompts.jsonl");
+  const promptsLogPresent = existsSync(promptsLogPath);
+  if (promptHookInstalled && promptHookWired && promptHookExecutable) {
+    const detail = promptsLogPresent
+      ? "prompt-capture.sh installed + wired — prompts.jsonl present"
+      : "prompt-capture.sh installed + wired (log will appear on first prompt)";
+    results.push({ label: "Traceability Hook", ok: true, detail });
+  } else {
+    const missing: string[] = [];
+    if (!promptHookInstalled) {
+      missing.push("script");
+    } else if (!promptHookExecutable) {
+      missing.push("not executable (chmod +x)");
+    }
+    if (!promptHookWired) {
+      missing.push("UserPromptSubmit wiring");
+    }
+    results.push({
+      label: "Traceability Hook",
+      ok: false,
+      detail: `Missing: ${missing.join(", ")} — run \`codebase fix\``,
+    });
+  }
+
   // ─── 11. Gitignore ────────────────────────────────────────
   const gitignorePath = join(root, ".gitignore");
   if (existsSync(gitignorePath)) {

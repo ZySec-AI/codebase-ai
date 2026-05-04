@@ -11,6 +11,11 @@ Simulate real customers via agent-browser, perform a deep UX audit, fix everythi
 
 Runs indefinitely (Ctrl+C to stop). Branch: always `develop`. All inline fixes go directly to `develop` as atomic commits (one commit per fix).
 
+> **Traceability contract** (applies to every issue this command touches):
+> - Use MCP `create_issue` for new findings — include `## Triggering Prompt` and `## Acceptance` sections in the body. Pull the prompt via `get_prompt_history { since: "1h", limit: 5 }` if needed.
+> - Use MCP `comment_issue { kind: "evidence" }` to attach screenshots, journey logs, before/after.
+> - Never close an issue with raw `gh issue close`. If `/simulate` resolved a bug inline, close it via `close_issue { reason: "fixed", comment, evidence, commits }`.
+
 ---
 
 ## Arguments
@@ -178,23 +183,36 @@ git push origin develop
 npx codebase scan-only --incremental --quiet --sync
 ```
 
-**Create GitHub issues** for everything found:
-```bash
-gh issue create --title "[Sim] [severity]: [description]" \
-  --label "bug,[severity],sim" \
-  --body "## Bug Report
-**Cycle:** [N]
-**Customer:** [name] ([role] at [company])
-**Page:** [route]
-**Steps to reproduce:**
-1. [step]
-2. [step]
+**Create GitHub issues** for everything found — use the MCP `create_issue` tool, NOT raw `gh issue create`. The MCP path threads the trace footer + prompt id, so the audit chain stays intact.
 
-**Expected:** [what should happen]
-**Actual:** [what happened]
-**Screenshot:** [attached or described]
-**Fixed inline:** [yes/no — if yes, commit SHA]"
 ```
+create_issue {
+  title: "[Sim] <severity>: <description>",
+  labels: ["bug", "<severity>", "sim"],
+  body: `## Bug Report
+**Cycle:** <N>
+**Customer:** <name> (<role> at <company>)
+**Page:** <route>
+
+## Triggering Prompt
+<paste the prompt id and snippet from get_prompt_history { since: "1h", limit: 5 }>
+
+## Acceptance
+- [ ] <observable outcome that proves the fix>
+- [ ] <regression test or screenshot diff>
+
+**Steps to reproduce:**
+1. <step>
+2. <step>
+
+**Expected:** <what should happen>
+**Actual:** <what happened>
+**Screenshot:** <attached or described>
+**Fixed inline:** <yes/no — if yes, commit SHA>`
+}
+```
+
+If you fixed the bug inline in this same `/simulate` run, follow up with `link_commits_to_issue { number: <N> }` and then `close_issue { number: <N>, reason: "fixed", comment, evidence, commits }`. Never call `gh issue close` directly.
 
 ### 1c. Session log
 
@@ -265,17 +283,19 @@ Skip creating any issue whose title matches an existing open issue (fuzzy — sa
 
 ### 5a. Create cycle parent issue
 
-```bash
-gh issue create \
-  --title "[Sim] Cycle [N] — [date]" \
-  --label "cycle,sim" \
-  --body "## Simulation Cycle [N]
+Use MCP `create_issue` so the parent issue carries the trace footer:
 
-**Date:** [ISO date]
-**Customers:** [count]
-**Bugs found:** [N] (critical: [N], high: [N], medium: [N], low: [N])
-**Fixed inline:** [N]
-**Issues created:** [list of #numbers]
+```
+create_issue {
+  title: "[Sim] Cycle <N> — <date>",
+  labels: ["cycle", "sim"],
+  body: `## Simulation Cycle <N>
+
+**Date:** <ISO date>
+**Customers:** <count>
+**Bugs found:** <N> (critical: <N>, high: <N>, medium: <N>, low: <N>)
+**Fixed inline:** <N>
+**Issues created:** <list of #numbers>
 
 ### UX Audit Scores
 | Dimension | Score |
@@ -292,10 +312,11 @@ gh issue create \
 | **Average** | **[N]/10** |
 
 ### Highlights
-[Notable positive findings — things working well]
+<Notable positive findings — things working well>
 
 ### Session Logs
-[Links to .vibekit/sessions/ HTML files]"
+<Links to .vibekit/sessions/ HTML files>`
+}
 ```
 
 ### 5b. Update Highlights Index

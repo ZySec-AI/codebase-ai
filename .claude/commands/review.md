@@ -11,6 +11,8 @@ Security, quality, dependency health, accessibility review + test generation. Ev
 
 Branch: `develop` for read-only review. For `--fix`: use a `fix/<slug>` branch → PR → merge to develop.
 
+> **Traceability contract**: every finding becomes a `create_issue` call (not a freeform comment). Findings on existing issues post via `comment_issue { kind: "evidence" }`. Reviewer decisions (e.g. "downgraded to P3 because…") post via `comment_issue { kind: "decision" }`. Never close-silently to clear backlog — if a finding is invalid, `close_issue` with `reason: "wont-fix"` and a comment explaining why.
+
 ## Arguments
 
 ```

@@ -76,6 +76,23 @@ CLI arg parser (`args.ts`), console output formatting with colors (`output.ts`),
 - Detectors are self-contained and run in parallel — no cross-detector dependencies.
 - File walking uses recursive traversal with depth limit (default 10), ignoring common dirs (node_modules, .git, dist, etc.).
 
+## Traceability Contract
+
+Every piece of agent work in this project — and every project that runs `codebase setup` — must produce a complete audit chain `prompt → status → commits → close`. This is enforced in code, not just documented.
+
+**Capture layer** — `src/prompts/store.ts` writes every user prompt to `.codebase/prompts.jsonl` (mode 0o600, owner-only). The `prompt-capture.sh` UserPromptSubmit hook (installed by `setup`) runs in a detached background subshell so it never blocks the prompt. Optional GitHub mirror is **opt-in**: enable by exporting `CODEBASE_PROMPT_MIRROR=1` or passing `--mirror`. Token-precise redaction (JWT, PEM blocks, prefixed cloud keys, bearer-style tokens) runs over a 256 KB cap before write *or* mirror; if anything matches, the mirrored snippet is replaced with a generic notice rather than partial content.
+
+**Enforce layer** — MCP `close_issue` requires `comment` + `reason` (one of `fixed | wont-fix | duplicate | not-reproducible | obsolete`). It composes a structured comment (reason + comment + evidence + commits + trace footer) and **closes the issue first, then posts the comment**. If the comment post fails the issue is still closed (recoverable via `comment_issue`); the timeline can never show `Closed: …` on an issue that's still open. `comment_issue` requires a `kind` (`status | evidence | decision | close-reason | note`) and adds the same trace footer. `update_issue` accepts a `comment` so status flips are visible. `link_commits_to_issue` scans recent commits for `#N` refs (with an allowlisted `since` arg) and posts a consolidated evidence comment. Every MCP tool call writes a `prompt_id` into `.codebase/session-log.jsonl`, closing the loop.
+
+**Document layer** — every slash command (`/build`, `/simulate`, `/review`, `/launch`, `/vibeloop`) carries a "Traceability contract" block at the top that names the exact MCP tools to call and forbids raw `gh issue close`.
+
+**Rules for Claude in this repo:**
+1. Never call `gh issue close` directly — always go through MCP `close_issue`.
+2. Post a `status` comment via `update_issue` or `comment_issue` when starting work.
+3. Use `link_commits_to_issue` between implementation and close.
+4. When in doubt about user intent, call `get_prompt_history { issue: N }` to see what triggered the work.
+5. The trace footer (`---\n_<kind> via codebase MCP @ <ts> · branch <b> · prompt <id>_`) is the canonical audit marker — don't edit or remove it on existing comments.
+
 ### Browser Automation
 
 `/simulate` uses [agent-browser](https://github.com/vercel-labs/agent-browser) for headless browser automation. Installed automatically by `codebase setup`.

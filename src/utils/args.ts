@@ -53,6 +53,7 @@ const COMMANDS = new Set([
   "uninstall",
   "graph",
   "stats",
+  "prompts",
 ]);
 
 export function parseArgs(argv: string[]): CLIOptions {
@@ -206,6 +207,8 @@ export function parseArgs(argv: string[]): CLIOptions {
         "get",
         "unset",
         "path",
+        "show",
+        "capture",
       ].includes(sub)
     ) {
       opts.subcommand = positionals.shift()!;

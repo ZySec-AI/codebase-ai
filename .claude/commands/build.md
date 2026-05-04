@@ -127,7 +127,14 @@ If queue is empty: print "No arch/vibekit issues found. Nothing to build." and e
 
 ## Phase 2 — Implement (per issue)
 
-For each issue in the plan, execute this sequence:
+For each issue in the plan, execute this sequence.
+
+> **Traceability contract — every issue must follow this:**
+> 1. **Start** with `update_issue` (add `status:in-progress`) AND a `comment` so the timeline shows you started.
+> 2. **During work**, post `comment_issue { kind: "evidence" }` for any non-trivial intermediate finding (failed test → fix, design decision, scope change).
+> 3. **Before close**, call `link_commits_to_issue { number: N }` to attach the SHAs that implemented the fix.
+> 4. **Close** with `close_issue` — `comment` and `reason` are now REQUIRED, plus `evidence` and `commits` whenever you have them. Never close via raw `gh issue close` — it bypasses the audit trail.
+> 5. The MCP server records the active prompt id on every call, so the chain `prompt → status comment → commits → close` is reconstructible.
 
 ### 2a. Sync and branch
 
@@ -145,12 +152,25 @@ SLUG=$(echo "[issue title]" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '
 git checkout -b feat/${SLUG}
 ```
 
-### 2b. Read and understand
+### 2b. Announce + read
+
+Post a status comment so the timeline shows you've started:
+
+```
+update_issue {
+  number: N,
+  add_labels: ["status:in-progress"],
+  comment: "Picking this up. Plan: <one-line summary>."
+}
+```
+
+Then:
 
 1. Re-read the issue body for acceptance criteria
-2. Read all affected files identified in Phase 1
-3. Read `CLAUDE.md` conventions — follow them exactly
-4. Check `patterns.architecture` from brief — match existing patterns
+2. Pull the originating prompt(s) so you understand the user's intent: `get_prompt_history { issue: N, limit: 5 }`
+3. Read all affected files identified in Phase 1
+4. Read `CLAUDE.md` conventions — follow them exactly
+5. Check `patterns.architecture` from brief — match existing patterns
 
 ### 2c. Implement
 
@@ -214,15 +234,39 @@ Closes #[N]"
 git push origin develop
 ```
 
-Close the issue:
-```bash
-gh issue close [N] --comment "Implemented in $(git rev-parse --short HEAD)."
+### 2e-1. Link the commits to the issue
+
+Before closing, attach commit SHAs to the issue timeline so the audit chain is searchable:
+
+```
+link_commits_to_issue { number: N }
 ```
 
-Also close via MCP tool: `close_issue { number: N, comment: "Implemented in <sha>" }`
-```bash
-npx codebase issue close [N] --comment "Implemented in $(git rev-parse --short HEAD)" 2>/dev/null || true
+(MCP scans the last 50 commits, picks any whose subject references `#N`, and posts a single consolidated `evidence` comment. If you used a non-default branch range, pass `since: "main..HEAD"`.)
+
+### 2e-2. Close with the structured contract
+
+Always close via MCP — never raw `gh issue close`. The MCP tool requires a comment, a reason, and ideally evidence + commits, then posts the closing comment AND closes in one atomic call:
+
 ```
+close_issue {
+  number: N,
+  reason: "fixed",
+  comment: "<one-line summary of what changed>",
+  evidence: "<test output / before-after / verification steps>",
+  commits: ["<short-sha-1>", "<short-sha-2>"]
+}
+```
+
+If MCP is unavailable for some reason, the CLI fallback is `npx codebase issue close N --reason "..."` — but it's strictly inferior because it can't capture commits/evidence in one call.
+
+**Traceability checklist before you close:**
+
+- [ ] `update_issue` posted a `status:in-progress` comment when work began
+- [ ] All non-trivial intermediate findings posted via `comment_issue { kind: "evidence" }`
+- [ ] `link_commits_to_issue` attached the commit SHAs
+- [ ] `close_issue` includes `reason`, `comment`, `evidence`, `commits`
+- [ ] You did NOT call `gh issue close` directly
 
 Refresh manifest:
 ```bash

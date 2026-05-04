@@ -9,6 +9,8 @@ allowed-tools: Agent, Bash(gh:*), Bash(git add:*), Bash(git commit:*), Bash(git 
 
 **The single command that does everything.** Runs simulate → build → launch in a fully autonomous loop until your project is shipped. No human intervention required after invocation.
 
+> **Traceability contract**: vibeloop inherits the contracts of `/simulate`, `/build`, and `/launch`. At loop resume, call `get_prompt_history { limit: 10 }` first so you pick up the user's earlier intent before deciding what to work on next.
+
 ```
 /vibeloop                    # full run: simulate → build → launch
 /vibeloop --skip-launch      # simulate → build only, stop before release

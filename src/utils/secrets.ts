@@ -59,9 +59,12 @@ const SECRET_PATTERNS: Array<{ pattern: RegExp; type: string }> = [
       /(?:heroku_api_key|HEROKU_API_KEY)\s*[=:]\s*['"][0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}['"]/,
     type: "heroku-api-key",
   },
-  // Database URLs with credentials
+  // Database URLs with credentials. Bounded segments + colon excluded from
+  // the username class to prevent catastrophic backtracking on colon-rich
+  // attacker pastes (the previous `[^\s'"]+:[^\s'"]+@` form had `a+b+@` shape).
   {
-    pattern: /(?:mongodb|postgres|mysql|redis):\/\/[^\s'"]+:[^\s'"]+@[^\s'"]+/,
+    pattern:
+      /(?:mongodb(?:\+srv)?|postgres(?:ql)?|mysql|redis|amqp):\/\/[^\s'":@]{1,128}:[^\s'"@]{1,256}@[^\s'"]{1,256}/,
     type: "database-url-with-credentials",
   },
   // Google
@@ -123,13 +126,19 @@ export function isScannableFile(filePath: string): boolean {
   return false;
 }
 
+/** Hard cap on input size to bound regex work on attacker pastes. */
+const MAX_SCAN_BYTES = 256 * 1024;
+
 /**
  * Scan a file's content for leaked secrets.
  * Returns findings without secret values.
  */
 export function scanForSecrets(content: string, filePath: string): SecretFinding[] {
   const findings: SecretFinding[] = [];
-  const lines = content.split("\n");
+  // Truncate ahead of the line split so we never run patterns over more than
+  // the cap. `.env` files this big are pathological anyway.
+  const safe = content.length > MAX_SCAN_BYTES ? content.slice(0, MAX_SCAN_BYTES) : content;
+  const lines = safe.split("\n");
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];

@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 const MANIFEST_ENTRY = ".codebase.json";
 const CACHE_ENTRY = ".codebase.cache.json";
+const PROMPTS_ENTRY = ".codebase/prompts.jsonl";
 
 export function updateGitignore(root: string): void {
   const path = join(root, ".gitignore");
@@ -10,8 +11,9 @@ export function updateGitignore(root: string): void {
 
   const needsManifest = !content.includes(MANIFEST_ENTRY);
   const needsCache = !content.includes(CACHE_ENTRY);
+  const needsPrompts = !content.includes(PROMPTS_ENTRY);
 
-  if (!needsManifest && !needsCache) {
+  if (!needsManifest && !needsCache && !needsPrompts) {
     return;
   }
 
@@ -24,6 +26,11 @@ export function updateGitignore(root: string): void {
     if (needsCache) {
       addition += `${CACHE_ENTRY}\n`;
     }
+  }
+  if (needsPrompts) {
+    addition += "\n# Prompt audit log (local only — may contain sensitive context)\n";
+    addition += `${PROMPTS_ENTRY}\n`;
+    addition += `${PROMPTS_ENTRY}.*\n`;
   }
 
   writeFileSync(path, content.trimEnd() + addition, "utf-8");

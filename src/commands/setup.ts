@@ -10,7 +10,7 @@ import {
   rmSync,
   renameSync,
 } from "node:fs";
-import { execFile, execFileSync } from "node:child_process";
+import { execFile, execFileSync, execSync } from "node:child_process";
 import type { CLIOptions, Manifest } from "../types.js";
 import { runScan } from "./scan.js";
 import { claudeIntegration } from "../integrations/claude.js";
@@ -445,9 +445,46 @@ export function installContextInjectHookForFix(root: string): void {
  * Uses a sentinel file to inject only on the first prompt per session,
  * then re-injects if the manifest is refreshed mid-session.
  */
+/**
+ * Resolve a stable command for invoking the codebase CLI from a hook.
+ *
+ * Hooks must NOT use `npx --yes codebase` because:
+ *   1. `npx --yes` may resolve unscoped `codebase` from npm and execute it.
+ *      Our package is `codebase-ai`; the bare `codebase` name on npm is not us.
+ *   2. `npx` adds 150–400 ms startup at best, seconds with a registry round-trip.
+ *
+ * Order of preference:
+ *   1. Globally-installed `codebase` on PATH (`command -v codebase`).
+ *   2. The currently-running script (when run via `npx codebase setup`).
+ *   3. Hard-coded fallback: `node <CLI_PATH>` baked at setup time.
+ *
+ * The returned string is shell-safe (already quoted as needed by the caller's
+ * heredoc usage — paths with spaces are wrapped in double quotes).
+ */
+function resolveCodebaseCommand(): string {
+  // Try `command -v codebase` first.
+  try {
+    const which = execSync("command -v codebase 2>/dev/null", { encoding: "utf-8" }).trim();
+    if (which && existsSync(which)) {
+      return JSON.stringify(which);
+    }
+  } catch {
+    /* fall through */
+  }
+  // Fall back to the currently running script (this is what `npx codebase setup`
+  // points to — usually a `dist/index.js` symlinked from a global node_modules/.bin).
+  if (process.argv[1] && existsSync(process.argv[1])) {
+    return `node ${JSON.stringify(process.argv[1])}`;
+  }
+  // Last-ditch fallback. Will fail loudly if codebase isn't on PATH at hook time.
+  return "codebase";
+}
+
 function installContextInjectHook(root: string): void {
   const hooksDir = join(root, ".claude", "hooks");
   mkdirSync(hooksDir, { recursive: true });
+
+  const CODEBASE_CMD = resolveCodebaseCommand();
 
   const hookPath = join(hooksDir, "context-inject.sh");
 
@@ -455,6 +492,9 @@ function installContextInjectHook(root: string): void {
 # context-inject.sh — UserPromptSubmit hook
 # Outputs project slim brief as system-reminder on the FIRST prompt of each
 # Claude Code session only. Re-injects if the manifest is refreshed mid-session.
+#
+# Binary path baked at \`codebase setup\` time — see resolveCodebaseCommand().
+CODEBASE=${CODEBASE_CMD}
 
 MANIFEST=".codebase.json"
 
@@ -475,7 +515,7 @@ SENTINEL="/tmp/.codebase-ctx-\${PROJ_HASH}-\${SESSION_ID}"
 if [ -f "\$SENTINEL" ]; then
   if [ -f "\$MANIFEST" ] && [ "\$MANIFEST" -nt "\$SENTINEL" ]; then
     echo "--- codebase context refreshed ---"
-    npx --yes codebase context --quiet 2>/dev/null || true
+    eval "\$CODEBASE" context --quiet 2>/dev/null || true
     touch "\$SENTINEL"
   fi
   exit 0
@@ -490,11 +530,11 @@ if [ -f "\$MANIFEST" ]; then
   MTIME=$(stat -f %m "\$MANIFEST" 2>/dev/null || stat -c %Y "\$MANIFEST" 2>/dev/null || date +%s)
   AGE_SECONDS=$(( \$(date +%s) - MTIME ))
   if [ "\$AGE_SECONDS" -gt \$(( TTL_MINUTES * 60 )) ]; then
-    npx --yes codebase scan-only --quiet 2>/dev/null || true
+    eval "\$CODEBASE" scan-only --quiet 2>/dev/null || true
   fi
 fi
 
-npx --yes codebase context --quiet 2>/dev/null || true
+eval "\$CODEBASE" context --quiet 2>/dev/null || true
 `;
 
   writeFileSync(hookPath, hookScript, "utf-8");
@@ -518,6 +558,33 @@ npx --yes codebase context --quiet 2>/dev/null || true
     promptHooks.push({
       matcher: "",
       hooks: [{ type: "command", command: `bash .claude/hooks/context-inject.sh` }],
+    });
+  }
+  // prompt-capture.sh — captures every user prompt to .codebase/prompts.jsonl.
+  // Mirroring to GitHub is OPT-IN (set CODEBASE_PROMPT_MIRROR=1). Runs in a
+  // detached background subshell so the user's prompt is never blocked.
+  const captureHookPath = join(hooksDir, "prompt-capture.sh");
+  const captureScript = `#!/bin/bash
+# prompt-capture.sh — UserPromptSubmit hook
+# Reads the prompt from stdin, runs the capture in a detached background
+# subshell, returns immediately. Never blocks the user's prompt.
+#
+# Binary path baked at \`codebase setup\` time — see resolveCodebaseCommand().
+CODEBASE=${CODEBASE_CMD}
+
+STDIN_DATA=$(cat)
+# Detach: the subshell runs after this script exits. stdout/err discarded.
+( echo "\$STDIN_DATA" | eval "\$CODEBASE" prompts capture --quiet >/dev/null 2>&1 ) &
+disown 2>/dev/null || true
+exit 0
+`;
+  writeFileSync(captureHookPath, captureScript, "utf-8");
+  chmodSync(captureHookPath, 0o755);
+  const hasCaptureHook = JSON.stringify(promptHooks).includes("prompt-capture");
+  if (!hasCaptureHook) {
+    promptHooks.push({
+      matcher: "",
+      hooks: [{ type: "command", command: `bash .claude/hooks/prompt-capture.sh` }],
     });
   }
   hooks["UserPromptSubmit"] = promptHooks;
@@ -550,6 +617,9 @@ npx --yes codebase context --quiet 2>/dev/null || true
     ".claude/hooks/context-inject.sh (UserPromptSubmit + PostCompact — auto-inject slim brief)"
   );
   success(".claude/hooks/session-start.sh (SessionStart — fires before first prompt)");
+  success(
+    ".claude/hooks/prompt-capture.sh (UserPromptSubmit — audits prompts → .codebase/prompts.jsonl + mirrors to issue refs)"
+  );
 }
 
 function installClaudeHooks(root: string): void {

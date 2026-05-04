@@ -11,6 +11,8 @@ Release manager. Gate on open bugs, generate all release artifacts, create a Git
 
 Branch flow: `develop` → `main`.
 
+> **Traceability contract**: when a release ships issues, post `comment_issue { kind: "decision" }` on each closed issue stating the version it shipped in, e.g. `Shipped in v1.2.0 — see release notes <url>`. This makes "when did this fix go live?" trivial to answer from the issue timeline.
+
 ## Arguments
 
 ```

@@ -110,3 +110,9 @@ HANDOFF.md
 # codebase graph — persistent call/import graph
 .codebase/graph.json
 .codebase/graph.json.tmp
+
+# codebase traceability — local prompt audit log (may contain sensitive context)
+.codebase/prompts.jsonl
+.codebase/prompts.jsonl.*
+.codebase/session-log.jsonl
+.codebase/session-log-*.jsonl

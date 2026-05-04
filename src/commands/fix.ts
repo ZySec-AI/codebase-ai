@@ -1,6 +1,6 @@
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, chmodSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import type { CLIOptions } from "../types.js";
 import { scan } from "../scanner/engine.js";
@@ -238,9 +238,35 @@ export async function runFix(options: CLIOptions): Promise<void> {
     fixCount++;
   }
 
+  // Helper: a hook script is OK only if file exists AND it's executable AND it's wired
+  // in settings.json. Doctor enforces all three; fix must repair all three.
+  // If only the executable bit is missing, repair it cheaply with chmod.
+  const isExecutable = (path: string): boolean => {
+    try {
+      return existsSync(path) && (statSync(path).mode & 0o111) !== 0;
+    } catch {
+      return false;
+    }
+  };
+  const ensureExecutable = (path: string): boolean => {
+    if (!existsSync(path) || isExecutable(path)) {
+      return false;
+    }
+    try {
+      chmodSync(path, 0o755);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   // ─── 8b. Session-start hook ───────────────────────────────
+  if (ensureExecutable(sessionHook)) {
+    fixed("Restored executable bit → .claude/hooks/session-start.sh");
+    fixCount++;
+  }
   const sessionHookOk = (() => {
-    if (!existsSync(sessionHook)) {
+    if (!isExecutable(sessionHook)) {
       return false;
     }
     if (!existsSync(settingsFile)) {
@@ -262,8 +288,12 @@ export async function runFix(options: CLIOptions): Promise<void> {
 
   // ─── 8c. Context inject hook (UserPromptSubmit) ───────────
   const contextHook = join(root, ".claude", "hooks", "context-inject.sh");
+  if (ensureExecutable(contextHook)) {
+    fixed("Restored executable bit → .claude/hooks/context-inject.sh");
+    fixCount++;
+  }
   const contextHookOk = (() => {
-    if (!existsSync(contextHook)) {
+    if (!isExecutable(contextHook)) {
       return false;
     }
     if (!existsSync(settingsFile)) {
@@ -280,6 +310,34 @@ export async function runFix(options: CLIOptions): Promise<void> {
     const { installContextInjectHookForFix } = await import("./setup.js");
     installContextInjectHookForFix(root);
     fixed("Installed context-inject hook → .claude/hooks/context-inject.sh");
+    fixCount++;
+  }
+
+  // ─── 8d. Prompt-capture hook (UserPromptSubmit) — traceability ───
+  const promptHook = join(root, ".claude", "hooks", "prompt-capture.sh");
+  if (ensureExecutable(promptHook)) {
+    fixed("Restored executable bit → .claude/hooks/prompt-capture.sh");
+    fixCount++;
+  }
+  const promptHookOk = (() => {
+    if (!isExecutable(promptHook)) {
+      return false;
+    }
+    if (!existsSync(settingsFile)) {
+      return false;
+    }
+    try {
+      const s = JSON.parse(readFileSync(settingsFile, "utf-8"));
+      return JSON.stringify(s.hooks?.UserPromptSubmit ?? "").includes("prompt-capture");
+    } catch {
+      return false;
+    }
+  })();
+  if (!promptHookOk) {
+    // installContextInjectHook also writes + wires prompt-capture.sh
+    const { installContextInjectHookForFix } = await import("./setup.js");
+    installContextInjectHookForFix(root);
+    fixed("Installed prompt-capture hook → .claude/hooks/prompt-capture.sh");
     fixCount++;
   }
 

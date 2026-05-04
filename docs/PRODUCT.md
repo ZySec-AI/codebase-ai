@@ -4,7 +4,7 @@
 
 ## Summary
 
-One command. Every AI tool understands your project instantly.
+One command. Every AI tool understands your project instantly. Every prompt and every issue close is auditable — `codebase` makes traceability a first-class product property: prompts captured to `.codebase/prompts.jsonl`, mirrored to referenced GitHub issues, and the MCP server enforces structured close comments (reason + evidence + commits) so issues never close silently.
 
 ## ICP (Ideal Customer Profile)
 

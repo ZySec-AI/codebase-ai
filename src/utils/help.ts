@@ -394,6 +394,43 @@ const HELP: Record<string, CommandHelp> = {
     seeAlso: ["start", "tokens"],
   },
 
+  prompts: {
+    description:
+      "Audit log of user prompts (.codebase/prompts.jsonl). Captured by the prompt-capture UserPromptSubmit hook.",
+    usage: "codebase prompts [list|show|capture] [options]",
+    examples: [
+      { command: "codebase prompts list", description: "All captured prompts in this project" },
+      {
+        command: "codebase prompts list --issue 42",
+        description: "Prompts that referenced #42",
+      },
+      {
+        command: "codebase prompts list --since 24h --limit 20",
+        description: "Recent prompts (relative time: 30m, 24h, 7d)",
+      },
+      {
+        command: "codebase prompts show <id>",
+        description: "Full body of a specific prompt",
+      },
+      {
+        command: "echo 'fix #1' | codebase prompts capture",
+        description: "Hook entry point — reads prompt from stdin (JSON or raw)",
+      },
+    ],
+    options: [
+      { flag: "--issue <n>", description: "Filter by referenced issue number" },
+      { flag: "--branch <name>", description: "Filter by git branch" },
+      { flag: "--since <dur>", description: "Relative window (e.g. 30m, 24h, 7d)" },
+      { flag: "--limit <n>", description: "Cap number of records" },
+      { flag: "--json", description: "Emit JSON instead of summary" },
+      {
+        flag: "--no-mirror",
+        description: "(capture) Skip posting to GitHub even if issue refs found",
+      },
+    ],
+    seeAlso: ["doctor", "handoff"],
+  },
+
   context: {
     description: "Lightweight session context — slim brief, force reset, or check manifest age",
     usage: "codebase context [reset|age]",

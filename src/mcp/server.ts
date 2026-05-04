@@ -1,14 +1,6 @@
 import { createInterface } from "node:readline";
 import { readFile, writeFile, rename } from "node:fs/promises";
-import {
-  existsSync,
-  readdirSync,
-  appendFileSync,
-  mkdirSync,
-  statSync,
-  renameSync,
-  unlinkSync,
-} from "node:fs";
+import { existsSync, readdirSync, appendFileSync, mkdirSync, statSync, renameSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { execFile } from "node:child_process";
@@ -18,6 +10,13 @@ import { queryPath } from "../utils/json-path.js";
 import { scan } from "../scanner/engine.js";
 import { generateBrief, generateSlimBrief } from "./brief.js";
 import { rankIssues, syncGitHub } from "../github/sync.js";
+import {
+  buildCloseBody,
+  isCommentKind,
+  withTraceFooter,
+  type StructuredCloseInput,
+} from "../github/issues.js";
+import { latestPromptIdFast, parseSince, readPrompts } from "../prompts/store.js";
 import type { Manifest } from "../types.js";
 
 // ─── MCP response cache ────────────────────────────────────────
@@ -168,21 +167,63 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "close_issue",
-    description: "Close a GitHub issue after fixing it. Add a comment explaining what was done.",
+    description:
+      "Close a GitHub issue with a structured audit trail. Required: a closing comment, a reason, and ideally the commits that resolved it. Closes the issue first, then posts the structured comment with reason + evidence + commits + trace footer. If the comment post fails, the issue is still closed (recoverable via comment_issue) — never the other way round, so the timeline can never show 'Closed: …' on an issue that's still open. Use this after verifying the fix.",
     inputSchema: {
       type: "object" as const,
       properties: {
         number: { type: "number" as const, description: "Issue number to close" },
-        comment: { type: "string" as const, description: "Comment explaining resolution" },
+        comment: {
+          type: "string" as const,
+          description:
+            "Required. Plain-English summary of what was done — the lead line of the closing comment.",
+        },
+        reason: {
+          type: "string" as const,
+          enum: ["fixed", "wont-fix", "duplicate", "not-reproducible", "obsolete"],
+          description:
+            "Required. Why this issue is being closed. 'fixed' is the default for completed work.",
+        },
+        evidence: {
+          type: "string" as const,
+          description:
+            "Optional. Supporting evidence — test output, before/after, manual verification steps, screenshots URL. Anything that proves the work is done.",
+        },
+        commits: {
+          type: "array" as const,
+          items: { type: "string" as const },
+          description:
+            "Optional. Commit SHAs (short or full) that implement the fix. Listed in the closing comment for traceability.",
+        },
       },
-      required: ["number"],
+      required: ["number", "comment", "reason"],
+    },
+  },
+
+  {
+    name: "comment_issue",
+    description:
+      "Post a structured comment to a GitHub issue. Use this to record status updates, evidence, decisions, or notes. Each comment is tagged with a `kind` and a trace footer (timestamp · branch · prompt id) so the audit trail is searchable.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        number: { type: "number" as const, description: "Issue number" },
+        body: { type: "string" as const, description: "Comment body (markdown)" },
+        kind: {
+          type: "string" as const,
+          enum: ["status", "evidence", "decision", "close-reason", "note"],
+          description:
+            "Comment kind — drives the trace footer. status = starting/progress, evidence = proof of work, decision = architectural choice, close-reason = closure rationale, note = freeform.",
+        },
+      },
+      required: ["number", "body", "kind"],
     },
   },
 
   {
     name: "update_issue",
     description:
-      "Update a GitHub issue — add/remove labels, set assignee. Use this to advance issues through the pipeline (e.g., add 'status:in-progress', remove 'status:backlog').",
+      "Update a GitHub issue — add/remove labels, set assignee, optionally post a status comment in the same call. Use this to advance issues through the pipeline (e.g., add 'status:in-progress' AND drop a 'starting work on X' comment so the change is visible).",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -201,8 +242,59 @@ const TOOL_DEFINITIONS = [
           type: "string" as const,
           description: "GitHub username to assign (or empty string to unassign)",
         },
+        comment: {
+          type: "string" as const,
+          description:
+            "Optional. Status comment to post alongside the label/assignee changes. Recommended whenever you flip a status:* label so the change is visible in the timeline.",
+        },
       },
       required: ["number"],
+    },
+  },
+
+  {
+    name: "link_commits_to_issue",
+    description:
+      "Find recent commits that reference an issue (via #N or 'Refs #N' in the message) and post a single consolidated comment to that issue listing the SHAs and one-line summaries. Call this between implementation and close so the issue timeline shows what shipped.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        number: { type: "number" as const, description: "Issue number to link to" },
+        since: {
+          type: "string" as const,
+          description:
+            "Optional git revision range (default: last 50 commits). E.g. 'main..HEAD' or a SHA.",
+        },
+        limit: {
+          type: "number" as const,
+          description: "Max commits to scan (default: 50)",
+        },
+      },
+      required: ["number"],
+    },
+  },
+
+  {
+    name: "get_prompt_history",
+    description:
+      "Read captured user prompts from .codebase/prompts.jsonl — the project-local audit log written by the prompt-capture hook. Use to recover 'what was I asked to do' at session resume, or to pull the originating prompt(s) for a specific issue.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        issue: {
+          type: "number" as const,
+          description: "Filter to prompts that referenced this issue number",
+        },
+        branch: { type: "string" as const, description: "Filter by git branch" },
+        since: {
+          type: "string" as const,
+          description: "Relative window: 30m, 24h, 7d, 1w. Defaults to all time.",
+        },
+        limit: {
+          type: "number" as const,
+          description: "Cap number of records returned (default: 20)",
+        },
+      },
     },
   },
 
@@ -463,14 +555,16 @@ function appendSessionLog(root: string, entry: object): void {
       if (size > LOG_MAX_BYTES) {
         const now = new Date();
         const week = `${now.getFullYear()}-${String(getISOWeek(now)).padStart(2, "0")}`;
-        const rotated = join(dir, `session-log-${week}.jsonl`);
+        let rotated = join(dir, `session-log-${week}.jsonl`);
+        // If a rotated file for the same week already exists, append a
+        // millisecond stamp instead of unlinking — never destroy accumulated
+        // trace evidence (CLAUDE.md "Traceability Contract" guarantee).
+        if (existsSync(rotated)) {
+          const stamp = new Date().toISOString().replace(/[:T.]/g, "-").slice(0, 23);
+          rotated = join(dir, `session-log-${week}-${stamp}.jsonl`);
+        }
         try {
-          // If rotated file already exists, just delete the old one to start fresh
-          if (!existsSync(rotated)) {
-            renameSync(logFile, rotated);
-          } else {
-            unlinkSync(logFile);
-          }
+          renameSync(logFile, rotated);
         } catch {
           /* non-critical */
         }
@@ -480,6 +574,46 @@ function appendSessionLog(root: string, entry: object): void {
   } catch {
     /* non-critical */
   }
+}
+
+// ─── Prompt-id cache for hot-path traceability ────────────────────
+//
+// Every MCP tool call needs the active prompt id to thread through both the
+// session log and structured comments. Reading prompts.jsonl on every call
+// is up to 2 MB of sync I/O — unacceptable on a chatty agent. Cache by
+// mtime: if the file hasn't changed, reuse last result.
+interface PromptIdCacheEntry {
+  mtimeMs: number;
+  size: number;
+  bySession: Map<string, string | undefined>;
+}
+const _promptIdCache = new Map<string, PromptIdCacheEntry>();
+
+function getPromptIdCached(root: string, sessionId?: string): string | undefined {
+  let mtimeMs = 0;
+  let size = 0;
+  try {
+    const s = statSync(join(root, ".codebase", "prompts.jsonl"));
+    mtimeMs = s.mtimeMs;
+    size = s.size;
+  } catch {
+    return undefined;
+  }
+  const key = sessionId ?? "_global_";
+  const entry = _promptIdCache.get(root);
+  if (entry && entry.mtimeMs === mtimeMs && entry.size === size) {
+    if (entry.bySession.has(key)) {
+      return entry.bySession.get(key);
+    }
+    const id = latestPromptIdFast(root, sessionId);
+    entry.bySession.set(key, id);
+    return id;
+  }
+  const fresh: PromptIdCacheEntry = { mtimeMs, size, bySession: new Map() };
+  const id = latestPromptIdFast(root, sessionId);
+  fresh.bySession.set(key, id);
+  _promptIdCache.set(root, fresh);
+  return id;
 }
 
 function getISOWeek(date: Date): number {
@@ -546,15 +680,27 @@ async function handleToolCall(req: JsonRpcRequest, root: string): Promise<JsonRp
   const args = (params.arguments || {}) as Record<string, unknown>;
 
   const result = await dispatchToolCall(req, root, toolName, args);
-  // Fire-and-forget session log
+  // Fire-and-forget session log via setImmediate — the response to the caller
+  // never waits on the disk write or the prompt-id stat. Cached prompt-id
+  // lookup is O(1) when the file hasn't changed (see getPromptIdCached).
   const resultStr = JSON.stringify(result);
-  appendSessionLog(root, {
+  const sessionId = process.env.CLAUDE_SESSION_ID ?? process.pid.toString();
+  const promptId = getPromptIdCached(root, process.env.CLAUDE_SESSION_ID) ?? null;
+  const logEntry = {
     ts: new Date().toISOString(),
-    session_id: process.env.CLAUDE_SESSION_ID ?? process.pid.toString(),
+    session_id: sessionId,
+    prompt_id: promptId,
     tool: toolName,
     result_bytes: resultStr.length,
     tokens_est: Math.round(resultStr.length / 3.8),
     cache_hit: false,
+  };
+  setImmediate(() => {
+    try {
+      appendSessionLog(root, logEntry);
+    } catch {
+      /* non-critical */
+    }
   });
   return result;
 }
@@ -691,9 +837,30 @@ async function dispatchToolCall(
         });
       }
 
+      case "comment_issue": {
+        const result = await ghCommentIssue(root, args);
+        return respond(req.id, {
+          content: [{ type: "text", text: result }],
+        });
+      }
+
       case "update_issue": {
         const result = await ghUpdateIssue(root, args);
         await invalidateManifest(root);
+        return respond(req.id, {
+          content: [{ type: "text", text: result }],
+        });
+      }
+
+      case "link_commits_to_issue": {
+        const result = await ghLinkCommits(root, args);
+        return respond(req.id, {
+          content: [{ type: "text", text: result }],
+        });
+      }
+
+      case "get_prompt_history": {
+        const result = getPromptHistory(root, args);
         return respond(req.id, {
           content: [{ type: "text", text: result }],
         });
@@ -1465,15 +1632,92 @@ async function ghCreateIssue(root: string, args: Record<string, unknown>): Promi
   return `Issue created: ${url}`;
 }
 
+async function detectBranch(root: string): Promise<string | undefined> {
+  try {
+    const out = await ghPlainExec(root, "git", ["rev-parse", "--abbrev-ref", "HEAD"]);
+    return out.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function ghPlainExec(root: string, cmd: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, { cwd: root, timeout: 15_000 }, (err, stdout, stderr) => {
+      if (err) {
+        reject(new Error(stderr || err.message));
+      } else {
+        resolve(stdout.toString());
+      }
+    });
+  });
+}
+
 async function ghCloseIssue(root: string, args: Record<string, unknown>): Promise<string> {
   const number = args.number as number;
   const comment = args.comment as string | undefined;
+  const reason = args.reason as string | undefined;
+  const evidence = args.evidence as string | undefined;
+  const commits = args.commits as string[] | undefined;
 
-  if (comment) {
-    await ghExecArgs(root, ["issue", "comment", String(number), "--body", comment]);
+  if (typeof number !== "number" || Number.isNaN(number)) {
+    throw new Error("close_issue: 'number' is required");
   }
+  if (!comment || !comment.trim()) {
+    throw new Error(
+      "close_issue: 'comment' is required — never close an issue silently. Provide a one-line summary of what was done."
+    );
+  }
+  const validReasons = new Set(["fixed", "wont-fix", "duplicate", "not-reproducible", "obsolete"]);
+  if (!reason || !validReasons.has(reason)) {
+    throw new Error(
+      "close_issue: 'reason' is required and must be one of: fixed, wont-fix, duplicate, not-reproducible, obsolete"
+    );
+  }
+
+  const branch = await detectBranch(root);
+  const promptId = getPromptIdCached(root, process.env.CLAUDE_SESSION_ID);
+  const input: StructuredCloseInput = {
+    number,
+    reason: reason as StructuredCloseInput["reason"],
+    comment,
+    evidence,
+    commits,
+    branch,
+    promptId,
+  };
+  const body = buildCloseBody(input);
+  // Close FIRST, comment SECOND. Worst-case failure mode is "issue closed
+  // without a comment" — recoverable via comment_issue. The reverse order
+  // ("comment posted lying about a close that never happened") leaves a
+  // permanent inconsistency in the GitHub timeline.
   await ghExecArgs(root, ["issue", "close", String(number)]);
-  return `Issue #${number} closed.`;
+  await ghExecArgs(root, ["issue", "comment", String(number), "--body", body]);
+  return `Issue #${number} closed (${reason}). Comment posted with evidence${commits?.length ? ` and ${commits.length} commit(s)` : ""}.\n\n${body}`;
+}
+
+async function ghCommentIssue(root: string, args: Record<string, unknown>): Promise<string> {
+  const number = args.number as number;
+  const body = args.body as string | undefined;
+  const kind = args.kind as string | undefined;
+
+  if (typeof number !== "number" || Number.isNaN(number)) {
+    throw new Error("comment_issue: 'number' is required");
+  }
+  if (!body || !body.trim()) {
+    throw new Error("comment_issue: 'body' is required");
+  }
+  if (!kind || !isCommentKind(kind)) {
+    throw new Error(
+      "comment_issue: 'kind' must be one of: status, evidence, decision, close-reason, note"
+    );
+  }
+
+  const branch = await detectBranch(root);
+  const promptId = getPromptIdCached(root, process.env.CLAUDE_SESSION_ID);
+  const fullBody = withTraceFooter(body, { kind, branch, promptId });
+  const url = await ghExecArgs(root, ["issue", "comment", String(number), "--body", fullBody]);
+  return `Comment (${kind}) posted to #${number}${url ? ` — ${url}` : ""}.`;
 }
 
 async function ghUpdateIssue(root: string, args: Record<string, unknown>): Promise<string> {
@@ -1481,6 +1725,7 @@ async function ghUpdateIssue(root: string, args: Record<string, unknown>): Promi
   const addLabels = args.add_labels as string[] | undefined;
   const removeLabels = args.remove_labels as string[] | undefined;
   const assignee = args.assignee as string | undefined;
+  const comment = args.comment as string | undefined;
 
   const updates: string[] = [];
 
@@ -1515,10 +1760,133 @@ async function ghUpdateIssue(root: string, args: Record<string, unknown>): Promi
     }
   }
 
+  if (comment && comment.trim()) {
+    const branch = await detectBranch(root);
+    const promptId = getPromptIdCached(root, process.env.CLAUDE_SESSION_ID);
+    const body = withTraceFooter(comment, { kind: "status", branch, promptId });
+    await ghExecArgs(root, ["issue", "comment", String(number), "--body", body]);
+    updates.push("posted status comment");
+  }
+
   if (updates.length === 0) {
     return `Issue #${number}: no changes requested.`;
   }
   return `Issue #${number} updated: ${updates.join("; ")}.`;
+}
+
+/**
+ * Allowlist for `git log` revision/range arguments accepted from MCP callers.
+ * Anything that doesn't match is refused — `since` is then passed positionally
+ * after a `--` separator so it can never be interpreted as a flag.
+ *
+ * Accepted shapes:
+ *   - ISO date / partial:           2026-05-04            2026-05-04T12:00:00Z
+ *   - Relative:                     7.days.ago            2.weeks.ago           1.year.ago
+ *   - SHA (7–40 hex):               a1b2c3d               a1b2c3d4e5...
+ *   - HEAD~N / HEAD^N / HEAD..ref:  HEAD~5 HEAD^2  main..HEAD  origin/main..HEAD
+ */
+const SINCE_ALLOWLIST =
+  /^(?:\d{4}-\d{2}-\d{2}(?:[T ][\d:Z+\-]{1,15})?|\d{1,5}\.(?:second|minute|hour|day|week|month|year)s?\.ago|[0-9a-fA-F]{7,40}|HEAD(?:~\d{1,4}|\^\d{0,4})?|[A-Za-z0-9._/-]{1,80}\.\.[A-Za-z0-9._/-]{1,80})$/;
+
+async function ghLinkCommits(root: string, args: Record<string, unknown>): Promise<string> {
+  const number = args.number as number;
+  if (typeof number !== "number" || Number.isNaN(number)) {
+    throw new Error("link_commits_to_issue: 'number' is required");
+  }
+  const sinceRaw = args.since as string | undefined;
+  if (sinceRaw !== undefined && !SINCE_ALLOWLIST.test(sinceRaw)) {
+    throw new Error(
+      "link_commits_to_issue: 'since' must be an ISO date, relative window (e.g. 7.days.ago), commit SHA, or revision range (e.g. main..HEAD)"
+    );
+  }
+  const since = sinceRaw ?? "";
+  // Coerce limit to a bounded positive int so it can never become a flag.
+  const rawLimit = args.limit;
+  const limit = Math.max(1, Math.min(500, typeof rawLimit === "number" ? rawLimit : 50));
+
+  const range = since || `-n ${limit}`;
+  const gitArgs = ["log", `--max-count=${limit}`, "--pretty=format:%H%x09%s", "--date=iso"];
+  if (since) {
+    // SINCE_ALLOWLIST above guarantees `since` cannot start with `-`, so we can
+    // safely place it on the command line. Two cases:
+    //   1. ISO date / relative window — use `--since=<value>` (positional dates
+    //      like "2020-01-01" are ambiguous to git when no commit/branch by that
+    //      name exists; --since= is unambiguous and always treats the value as
+    //      a date expression).
+    //   2. Revision (SHA / HEAD~N / range) — pass positionally.
+    // DO NOT use a leading `--` separator: in `git log` it forces the rest to
+    // be a pathspec, which silently produces an empty result.
+    const isDateLike =
+      /^(?:\d{4}-\d{2}-\d{2}(?:[T ][\d:Z+\-]{1,15})?|\d{1,5}\.(?:second|minute|hour|day|week|month|year)s?\.ago)$/.test(
+        since
+      );
+    if (isDateLike) {
+      gitArgs.push(`--since=${since}`);
+    } else {
+      gitArgs.push(since);
+    }
+  }
+
+  const out = await ghPlainExec(root, "git", gitArgs);
+  const lines = out.split("\n").filter(Boolean);
+  const matcher = new RegExp(`(?:^|\\W)#${number}\\b|(?:Refs|Closes|Fixes)\\s+#${number}\\b`, "i");
+
+  // gh log gives us "<sha>\t<subject>". We only have the subject, but most repos
+  // mention the issue in the subject or trailer. For trailers we'd need %B, but
+  // that breaks the simple split — keep the subject-only filter and document.
+  const matched: Array<{ sha: string; subject: string }> = [];
+  for (const line of lines) {
+    const tab = line.indexOf("\t");
+    if (tab < 0) {
+      continue;
+    }
+    const sha = line.slice(0, tab);
+    const subject = line.slice(tab + 1);
+    if (matcher.test(subject)) {
+      matched.push({ sha: sha.slice(0, 12), subject });
+    }
+  }
+
+  if (matched.length === 0) {
+    return `link_commits_to_issue: scanned ${lines.length} commits in range '${range}', none reference #${number}. Nothing posted.`;
+  }
+
+  const branch = await detectBranch(root);
+  const promptId = getPromptIdCached(root, process.env.CLAUDE_SESSION_ID);
+  const bodyLines = [
+    `**Commits referencing #${number}**`,
+    "",
+    ...matched.map((c) => `- \`${c.sha}\` ${c.subject}`),
+  ];
+  const body = withTraceFooter(bodyLines.join("\n"), { kind: "evidence", branch, promptId });
+  await ghExecArgs(root, ["issue", "comment", String(number), "--body", body]);
+  return `Linked ${matched.length} commit(s) to #${number}.`;
+}
+
+function getPromptHistory(root: string, args: Record<string, unknown>): string {
+  const issue = args.issue as number | undefined;
+  const branch = args.branch as string | undefined;
+  const sinceArg = args.since as string | undefined;
+  const limit = (args.limit as number | undefined) ?? 20;
+
+  const filter: Parameters<typeof readPrompts>[1] = { limit };
+  if (typeof issue === "number") {
+    filter.issue = issue;
+  }
+  if (branch) {
+    filter.branch = branch;
+  }
+  if (sinceArg) {
+    const parsed = parseSince(sinceArg);
+    if (parsed) {
+      filter.since = parsed;
+    }
+  }
+  const records = readPrompts(root, filter);
+  if (records.length === 0) {
+    return "No prompts captured. (Hook may not be installed — run: codebase setup)";
+  }
+  return JSON.stringify(records, null, 2);
 }
 
 async function invalidateManifest(root: string): Promise<void> {
