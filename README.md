@@ -197,7 +197,7 @@ codebase mcp               # start MCP server (stdio)
 }
 ```
 
-Add to `.mcp.json` in your project root. 25 tools including `project_brief` (supports `slim: true`, auto-slims when context is large), `get_next_task`, `get_blockers`, `create_issue`, `close_issue`, `update_issue`, `get_issue`, `get_pr`, `get_plan`, `update_plan`, `token_budget`, `rescan_project`, `refresh_status`, `list_commands`, `list_skills`, `generate_handoff`, `get_codebase`, `query_codebase`, `get_impact_radius`, `get_review_context`, `query_graph`, `rebuild_graph`, `get_dead_code`, `get_cycles`, `get_orphans`.
+Add to `.mcp.json` in your project root. 28 tools including `project_brief` (supports `slim: true`, auto-slims when context is large), `get_next_task`, `get_blockers`, `create_issue`, `close_issue`, `comment_issue`, `update_issue`, `link_commits_to_issue`, `get_issue`, `get_pr`, `get_plan`, `update_plan`, `get_prompt_history`, `token_budget`, `rescan_project`, `refresh_status`, `list_commands`, `list_skills`, `generate_handoff`, `get_codebase`, `query_codebase`, `get_impact_radius`, `get_review_context`, `query_graph`, `rebuild_graph`, `get_dead_code`, `get_cycles`, `get_orphans`.
 
 ---
 
