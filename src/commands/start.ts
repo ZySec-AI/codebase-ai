@@ -304,6 +304,12 @@ export async function runStart(options: CLIOptions): Promise<void> {
     env.ANTHROPIC_BASE_URL = customUrl.replace(/\/v1\/?$/, "");
     env.ANTHROPIC_AUTH_TOKEN = customKey || anthropicKey;
     delete env.ANTHROPIC_API_KEY;
+  } else {
+    // Anthropic / Claude Plan — clear any leftover proxy env vars
+    delete env.ANTHROPIC_BASE_URL;
+    delete env.ANTHROPIC_AUTH_TOKEN;
+    // If ANTHROPIC_API_KEY was previously deleted by another provider,
+    // the user's shell profile or claude auth will provide it
   }
 
   // ── 8. Ensure context-inject hook is installed ────────────────
