@@ -1,5 +1,5 @@
 import { resolve, join } from "node:path";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { mkdir, appendFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { createInterface } from "node:readline";
@@ -10,6 +10,57 @@ import { resolveProviderConfig, saveConfig, loadConfig, ZAI_BASE_URL } from "../
 import { estimateTokens } from "../utils/tokens.js";
 import { runInit } from "./init.js";
 import { runSetup } from "./setup.js";
+
+// ─── Provider settings sync ─────────────────────────────────────────
+
+const PROVIDER_ENV_KEYS = [
+  "ANTHROPIC_BASE_URL",
+  "ANTHROPIC_AUTH_TOKEN",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL",
+];
+
+function switchProviderSettings(
+  mode: "anthropic" | "openrouter" | "zai" | "custom",
+  providerEnv: { baseUrl?: string; authToken?: string; models?: Record<string, string> }
+): void {
+  const settingsPath = join(homedir(), ".claude", "settings.json");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let settings: Record<string, any> = {};
+  try {
+    settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+  } catch {
+    return; // no settings file = nothing to fix
+  }
+
+  if (!settings.env) {
+    settings.env = {};
+  }
+
+  if (mode === "anthropic") {
+    for (const key of PROVIDER_ENV_KEYS) {
+      delete settings.env[key];
+    }
+  } else {
+    if (providerEnv.baseUrl) {
+      settings.env.ANTHROPIC_BASE_URL = providerEnv.baseUrl;
+    }
+    if (providerEnv.authToken) {
+      settings.env.ANTHROPIC_AUTH_TOKEN = providerEnv.authToken;
+    }
+
+    if (providerEnv.models) {
+      Object.assign(settings.env, providerEnv.models);
+    } else {
+      delete settings.env.ANTHROPIC_DEFAULT_HAIKU_MODEL;
+      delete settings.env.ANTHROPIC_DEFAULT_SONNET_MODEL;
+      delete settings.env.ANTHROPIC_DEFAULT_OPUS_MODEL;
+    }
+  }
+
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+}
 
 // ─── Provider config ──────────────────────────────────────────────
 
@@ -308,8 +359,32 @@ export async function runStart(options: CLIOptions): Promise<void> {
     // Anthropic / Claude Plan — clear any leftover proxy env vars
     delete env.ANTHROPIC_BASE_URL;
     delete env.ANTHROPIC_AUTH_TOKEN;
-    // If ANTHROPIC_API_KEY was previously deleted by another provider,
-    // the user's shell profile or claude auth will provide it
+  }
+
+  // Sync provider env vars to ~/.claude/settings.json so Claude Code
+  // doesn't override our process-level env with stale settings
+  if (providerMode === "anthropic") {
+    switchProviderSettings("anthropic", {});
+  } else if (providerMode === "zai") {
+    switchProviderSettings("zai", {
+      baseUrl: ZAI_BASE_URL,
+      authToken: zaiKey,
+      models: {
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: "glm-5",
+        ANTHROPIC_DEFAULT_SONNET_MODEL: "glm-5-turbo",
+        ANTHROPIC_DEFAULT_OPUS_MODEL: "glm-5.1",
+      },
+    });
+  } else if (providerMode === "openrouter") {
+    switchProviderSettings("openrouter", {
+      baseUrl: openrouterBase,
+      authToken: openrouterKey,
+    });
+  } else if (providerMode === "custom") {
+    switchProviderSettings("custom", {
+      baseUrl: customUrl.replace(/\/v1\/?$/, ""),
+      authToken: customKey || anthropicKey,
+    });
   }
 
   // ── 8. Ensure context-inject hook is installed ────────────────
