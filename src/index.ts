@@ -12,18 +12,14 @@ import { runStatus } from "./commands/status.js";
 import { runMcp } from "./commands/mcp.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runFix } from "./commands/fix.js";
-import { runRelease } from "./commands/release.js";
-import { runPlan } from "./commands/plan.js";
 import { runSkills } from "./commands/skills.js";
 import { runTokens } from "./commands/tokens.js";
 import { runHandoff } from "./commands/handoff.js";
 import { runContext } from "./commands/context.js";
 import { runStart, runSessions } from "./commands/start.js";
 import { runConfig } from "./commands/config.js";
-import { startServer } from "./server/index.js";
 import { runUninstall } from "./commands/uninstall.js";
 import { runGraph } from "./commands/graph.js";
-import { runStats } from "./commands/stats.js";
 import { runPrompts } from "./commands/prompts.js";
 import type { CLIOptions } from "./types.js";
 
@@ -52,8 +48,6 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
   mcp: runMcp,
   doctor: runDoctor,
   fix: runFix,
-  release: runRelease,
-  plan: runPlan,
   skills: runSkills,
   tokens: runTokens,
   handoff: runHandoff,
@@ -67,19 +61,8 @@ const commands: Record<string, (opts: CLIOptions) => Promise<void>> = {
   uninstall: runUninstall,
   graph: runGraph,
   prompts: runPrompts,
-  serve: (opts: CLIOptions) => {
-    startServer(opts.path, opts.port ?? 3000);
-    return Promise.resolve();
-  },
   // Keep "scan-only" for hooks that just want manifest refresh
   "scan-only": runScan,
-  stats: (opts: CLIOptions) =>
-    runStats({
-      quiet: opts.quiet,
-      session: opts.positionals.includes("--session"),
-      weekly: opts.positionals.includes("--weekly"),
-      positionals: opts.positionals,
-    }),
 };
 
 // ─── Global error handlers ────────────────────────────────────────

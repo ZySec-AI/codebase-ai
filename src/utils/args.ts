@@ -40,10 +40,7 @@ const COMMANDS = new Set([
   "next",
   "doctor",
   "fix",
-  "release",
-  "plan",
   "skills",
-  "serve",
   "handoff",
   "tokens",
   "context",
@@ -52,7 +49,6 @@ const COMMANDS = new Set([
   "config",
   "uninstall",
   "graph",
-  "stats",
   "prompts",
 ]);
 
@@ -126,16 +122,6 @@ export function parseArgs(argv: string[]): CLIOptions {
       }
       if (key === "slim") {
         opts.slim = true;
-        continue;
-      }
-      if (key === "session") {
-        // handled as positional for stats command
-        opts.positionals = [...opts.positionals, "--session"];
-        continue;
-      }
-      if (key === "weekly") {
-        // handled as positional for stats command
-        opts.positionals = [...opts.positionals, "--weekly"];
         continue;
       }
       if (key === "skills") {

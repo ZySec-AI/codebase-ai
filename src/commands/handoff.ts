@@ -1,5 +1,5 @@
 import { resolve, join } from "node:path";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { CLIOptions, Manifest } from "../types.js";
@@ -77,15 +77,6 @@ export async function runHandoff(options: CLIOptions): Promise<void> {
       )
   );
 
-  // ── PLAN.md ───────────────────────────────────────────────────
-  const planPath = join(root, "PLAN.md");
-  let planSnippet = "";
-  if (existsSync(planPath)) {
-    const planContent = readFileSync(planPath, "utf-8");
-    // Include up to the first 20 lines of PLAN.md
-    planSnippet = planContent.split("\n").slice(0, 20).join("\n").trim();
-  }
-
   // ── Build HANDOFF.md ──────────────────────────────────────────
   const now = new Date().toISOString();
   const lines: string[] = [];
@@ -157,15 +148,6 @@ export async function runHandoff(options: CLIOptions): Promise<void> {
     for (const b of blockers) {
       lines.push(`- #${b.number}: ${b.title}`);
     }
-    lines.push("");
-  }
-
-  // PLAN.md snippet
-  if (planSnippet) {
-    lines.push("## Active Plan (from PLAN.md)");
-    lines.push("```");
-    lines.push(planSnippet);
-    lines.push("```");
     lines.push("");
   }
 
