@@ -222,18 +222,7 @@ const HELP: Record<string, CommandHelp> = {
         description: "16 tools total",
       },
     ],
-    seeAlso: ["serve"],
-  },
-
-  serve: {
-    description: "Start HTTP server (REST alternative to MCP, default port 3000)",
-    usage: "codebase serve [--port N]",
-    examples: [
-      { command: "codebase serve", description: "Start HTTP server on port 3000" },
-      { command: "codebase serve --port 8080", description: "Start on custom port" },
-    ],
-    options: [{ flag: "--port <n>", description: "Port to listen on (default: 3000)" }],
-    seeAlso: ["mcp"],
+    seeAlso: ["brief"],
   },
 
   skills: {
@@ -256,20 +245,6 @@ const HELP: Record<string, CommandHelp> = {
     description: "Auto-repair issues found by doctor",
     usage: "codebase fix",
     examples: [{ command: "codebase fix", description: "Auto-fix all issues" }],
-    seeAlso: ["doctor"],
-  },
-
-  release: {
-    description: "Gate check → tag → merge develop→main → GitHub release",
-    usage: "codebase release [version] [options]",
-    examples: [
-      { command: "codebase release", description: "Auto-increment version and release" },
-      { command: "codebase release v1.2.0", description: "Release with explicit version" },
-      { command: "codebase release --dry-run", description: "Preview release without tagging" },
-    ],
-    options: [
-      { flag: "--dry-run", description: "Preview release notes without creating tag or merge" },
-    ],
     seeAlso: ["doctor"],
   },
 
@@ -455,14 +430,14 @@ const HELP: Record<string, CommandHelp> = {
 
 export function printMainHelp(): void {
   console.log(`
-${bold("codebase")} — One command. Every AI tool understands your project instantly.
+${bold("codebase")} — Agent harness. One scan, every AI tool understands your project.
 
 ${bold("QUICK START")}
   ${command("codebase")}                  ← Default: smart launcher → picks provider/model → starts Claude Code
   ${command("npx codebase")}              ← First time setup (init + start)
 
-${bold("AI INTERFACE")}
-  These are the commands your AI tools call:
+${bold("AGENT INTERFACE")}
+  Commands your AI agents call via MCP or CLI:
 
   ${command("codebase brief")}             Full project briefing — run this first
   ${command("codebase brief --slim")}      Lightweight brief (~20 lines) for session-start hooks
@@ -473,28 +448,42 @@ ${bold("AI INTERFACE")}
   ${command("codebase query <path>")}      Query any field (e.g. ${code("stack.languages")})
   ${command("codebase handoff")}           Generate HANDOFF.md for session transfer
 
-${bold("AUTONOMOUS LOOP")}
-  After ${command("codebase setup")}, these slash commands are available in Claude Code:
+${bold("MCP SERVER")}
+  ${command("codebase mcp")}               Start stdio MCP server (28 tools)
+  ${command("# Add to .mcp.json:")}        ${code('{"mcpServers":{"codebase":{"command":"npx","args":["codebase","mcp"]}}}')}
 
-  ${command("/vibeloop")}                  Full autonomous run — simulate → build → launch (zero intervention)
+${bold("SLASH COMMANDS")}
+  After ${command("codebase setup")}, these are available in Claude Code:
+
+  ${command("/vibeloop")}                  Full autonomous run — simulate → build → launch
   ${command("/setup")}                     Bootstrap project — labels, milestone, PRODUCT.md
-  ${command("/simulate")}                  AI customer journeys (agent-browser) + UX audit
+  ${command("/simulate")}                  AI customer journeys + UX audit
   ${command("/build")}                     Autonomous loop — build → test → simulate → repeat
   ${command("/launch")}                    Gate check → tag → release → merge to main
   ${command("/review")}                    Security, quality, deps, accessibility audit
 
   ${command("codebase skills")}            List installed Claude skills
 
-${bold("HUMAN COMMANDS")}
+${bold("SETUP & MAINTENANCE")}
   ${command("codebase init")}              Full setup (scan + AI tools + hooks)
   ${command("codebase scan")}              Update .codebase.json only (lightweight)
   ${command("codebase setup")}             Wire AI tools + install slash commands
-  ${command("codebase release")}           Gate check → tag → develop→main
   ${command("codebase doctor")}            Health check & diagnostics
   ${command("codebase fix")}               Auto-repair issues found by doctor
   ${command("codebase tokens")}            Token budget report (A/B/C/D grades)
-  ${command("codebase sessions")}          Recent Claude Code session log (provider, model, duration)
+  ${command("codebase sessions")}          Recent Claude Code session log
   ${command("codebase uninstall --force")} Remove all codebase artifacts
+
+${bold("ISSUE TRACKING")}
+  ${command('codebase issue create "title"')}
+  ${command('codebase issue close <n> --reason "why"')}
+  ${command("codebase issue list")}
+
+${bold("GRAPH ANALYSIS")}
+  ${command("codebase graph build")}       Build call/import graph
+  ${command("codebase graph dead")}        Unreachable files + dead exports
+  ${command("codebase graph cycles")}      Import cycles (Tarjan SCC)
+  ${command("codebase graph impact --pr N")} Blast radius for a PR
 
 ${bold("PROVIDER SETUP")}
   ${command("codebase config")}            Show stored keys and effective env vars
@@ -509,18 +498,6 @@ ${bold("OPTIONS")}
   ${code("--version, -v")}                 Show version
   ${code("--verbose")}                     Show detailed progress
   ${code("--quiet")}                       Suppress output
-
-${bold("EXAMPLES")}
-  ${command("npx codebase")}                              # One-time setup
-  ${command("codebase brief")}                            # Project overview
-  ${command("codebase next")}                             # Next task
-  ${command("codebase query commands.test --force | sh")}   # Run tests
-  ${command('codebase issue create "Fix bug"')}        # Track work
-
-${bold("GLOBAL OPTIONS")}
-  ${code("--path <dir>")}               Target directory (default: current)
-  ${code("--verbose")}                   Show detailed output
-  ${code("--quiet")}                     Minimal output
 
 ${bold("LEARN MORE")}
   Docs:     ${link("https://github.com/ZySec-AI/codebase#readme", "README.md")}

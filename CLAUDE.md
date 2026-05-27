@@ -216,3 +216,17 @@ Returns: project identity, tech stack, commands, structure, current status, next
 - Browser automation: see `~/.claude/skills/simulate/SKILL.md`
 - Call graph: `codebase graph build` then `get_impact_radius` / `query_graph` via MCP
 <!-- codebase:end -->
+
+## Harness: codebase-ai Engineering
+
+**Goal:** Coordinate engineer, reviewer, qa, and releaser agents through the full dev cycle — implement, validate, review, ship.
+
+**Trigger:** For any multi-step engineering work (feature, bug fix, review+fix, release), use the `codebase-orchestrator` skill. Single-step questions can be answered directly.
+
+**Agents:** `.claude/agents/` — `engineer`, `reviewer`, `qa`, `releaser`  
+**Skills:** `.claude/skills/` — `codebase-engineer`, `codebase-reviewer`, `codebase-releaser`, `codebase-orchestrator`
+
+**Change history:**
+| Date | Change | Target | Reason |
+|------|--------|--------|--------|
+| 2026-05-27 | Initial harness setup | All | Engineering best practices + end-to-end agent coordination |
