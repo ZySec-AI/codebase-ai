@@ -33,7 +33,7 @@ jobs:
       rust: ${{ steps.detect.outputs.rust }}
       docker: ${{ steps.detect.outputs.docker }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: detect
         run: |
           echo "python=$(find . -name 'requirements*.txt' -o -name 'pyproject.toml' -o -name 'setup.py' | head -1 | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
